@@ -1,0 +1,14 @@
+
+Transcript
+Preposition Count: 8
+Word Count: 90
+Lexical Diversity: 0.7333333333333333
+Syntactic Complexity: 12.857142857142858
+Speech Fluency: 1
+Connectedness of Speech: 0.2563482330491145
+Mean Length of Utterance: 12.857142857142858
+Pronoun Usage: 6
+Negation Usage: 0
+Extracted Key Terms: ['picture', 'distance', 'boat', 'floats', 'trees', 'end', 'lake', 'sunset', 'light', 'sun', 'day', 'birds', 'side', 'times', 'movement', 'water']
+Circumlocution Score: 5
+Circumlocution Details: [('The sun is low, casting golden light across the water, which looks really smooth.', 0.30731847882270813), ('A small boat floats there, empty, just drifting.', 0.3174440562725067), ('The sun is low, casting golden light across the water, which looks really smooth.', 0.4143834114074707), ('Everything about it feels peaceful, like the end of a long day.', 0.30189964175224304), ('A small boat floats there, empty, just drifting.', 0.3148677349090576)]

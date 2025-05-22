@@ -1,0 +1,76 @@
+{
+  "status": "success",
+  "transcript_preview": "I'm staring out the window blankly. I'm quite, I'm...",
+  "metrics": {
+    "preposition_count": 13,
+    "word_count": 134,
+    "lexical_diversity": 0.47761194029850745,
+    "syntactic_complexity": 16.875,
+    "speech_fluency": 0,
+    "connectedness_of_speech": 0.4481603503227234,
+    "mean_length_of_utterance": 16.75,
+    "pronoun_usage": 21,
+    "negation_usage": 1,
+    "circumlocution_score": 8
+  },
+  "key_terms": [
+    "vision",
+    "trees",
+    "freshness",
+    "smells",
+    "spot",
+    "school",
+    "tree",
+    "trunk",
+    "blankly",
+    "time",
+    "periphery",
+    "green",
+    "outside",
+    "top",
+    "window",
+    "summer"
+  ],
+  "circumlocution_details": [
+    {
+      "sentence": "I'm staring out the window blankly.",
+      "similarity": 0.3426726460456848,
+      "term": "vision"
+    },
+    {
+      "sentence": "I see a tree outside the window, and I'm staring at it.",
+      "similarity": 0.3761458694934845,
+      "term": "vision"
+    },
+    {
+      "sentence": "I see a tree outside the window, and I'm staring at it.",
+      "similarity": 0.4606752097606659,
+      "term": "trees"
+    },
+    {
+      "sentence": "There is a spot where if I keep looking at the tree, I see hte trunk disappear and in my peripheral vision is just the top of the tree.",
+      "similarity": 0.4710993766784668,
+      "term": "trees"
+    },
+    {
+      "sentence": "I smell the green of the trees and freshness of hte breeze.",
+      "similarity": 0.5152707099914551,
+      "term": "smells"
+    },
+    {
+      "sentence": "I see a tree outside the window, and I'm staring at it.",
+      "similarity": 0.3184521496295929,
+      "term": "blankly"
+    },
+    {
+      "sentence": "I see the trunk in my vision, and then in my periphery as I slowly start looking away.",
+      "similarity": 0.36330533027648926,
+      "term": "blankly"
+    },
+    {
+      "sentence": "There is a spot where if I keep looking at the tree, I see hte trunk disappear and in my peripheral vision is just the top of the tree.",
+      "similarity": 0.3036479651927948,
+      "term": "blankly"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+FROM openjdk:11
+
+WORKDIR /app
+
+# Install Python and dependencies
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip build-essential git wget unzip autoconf automake libtool clang && \
+    pip3 install --upgrade pip && \
+    pip3 install python-for-android && \
+    pip3 install sphinx && \ 
+    # Pin specific versions to ensure compatibility
+    pip3 install nltk==3.8.1 spacy==3.5.0 transformers==4.26.1 sentence-transformers==2.2.2 torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu && \
+    python3 -m spacy download en_core_web_sm && \
+    python3 -c "import nltk; nltk.download('punkt')"
+
+# Copy the Python script into the container
+COPY analysis3.py /app/analysis3.py
+
+# Set the default environment variable for the results file path
+ENV RESULTS_FILE_PATH=/app/output/results.txt
+
+# Set the default command to allow passing a transcript and results file path
+ENTRYPOINT ["python3", "analysis3.py"]
