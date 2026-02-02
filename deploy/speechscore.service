@@ -1,0 +1,36 @@
+[Unit]
+Description=SpeechScore API — Speech Analysis Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jsuppe
+Group=jsuppe
+WorkingDirectory=/home/jsuppe/speech3
+Environment="PATH=/home/jsuppe/speech3/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/jsuppe/speech3/venv/bin/python3 -m uvicorn api.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --log-level info \
+    --timeout-keep-alive 120
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jsuppe/speech3/api/logs /home/jsuppe/speech3/api/tmp_uploads /home/jsuppe/speech3/api/keys.json /home/jsuppe/speech3/api/usage.json
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

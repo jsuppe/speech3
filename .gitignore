@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Database (binary, rebuilt from audio + migration)
+speechscore.db
+speechscore.db-shm
+speechscore.db-wal
+
+# Audio test data (too large for git)
+test_speeches/
+
+# API runtime artifacts
+api/keys.json
+api/usage.json
+api/logs/
+api/tmp_uploads/
+api/__pycache__/
+
+# Benchmark data (now in SQLite)
+benchmark_db.json
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Batch scripts (one-off, not part of the product)
+batch_analyze*.py
+fix_round3.py
+run_all_samples.py

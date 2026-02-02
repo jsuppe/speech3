@@ -1,0 +1,49 @@
+# SpeechScore API — Docker Compose
+# Usage: docker compose up -d
+# Requires: NVIDIA Container Toolkit (nvidia-ctk)
+
+services:
+  speechscore:
+    build: .
+    image: speechscore:latest
+    container_name: speechscore-api
+    restart: unless-stopped
+    ports:
+      - "${SPEECHSCORE_PORT:-8000}:8000"
+    volumes:
+      # Persist ML model cache (faster-whisper, HuggingFace transformers)
+      - model-cache:/app/data
+      # Persist API keys and usage data
+      - ./api/keys.json:/app/api/keys.json
+      - ./api/usage.json:/app/api/usage.json
+      # Logs
+      - ./api/logs:/app/api/logs
+    environment:
+      - SPEECHSCORE_HOST=0.0.0.0
+      - SPEECHSCORE_PORT=8000
+      - SPEECHSCORE_MAX_QUEUE=${SPEECHSCORE_MAX_QUEUE:-20}
+      - SPEECHSCORE_JOB_EXPIRY_HOURS=${SPEECHSCORE_JOB_EXPIRY_HOURS:-24}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  model-cache:
+    name: speechscore-models
