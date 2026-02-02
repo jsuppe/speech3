@@ -1,34 +1,78 @@
-# Use a smaller base image
-FROM python:3.9-slim
+# SpeechScore API — GPU-accelerated speech analysis
+# Build: docker build -t speechscore .
+# Run:   docker run --gpus all -p 8000:8000 speechscore
+
+# ── Stage 1: Base with CUDA + Python ─────────────────────────────
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Make python3.12 the default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
+
+# ── Stage 2: Install Python dependencies ─────────────────────────
+FROM base AS deps
 
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker cache
+# Install pip for 3.12
+RUN python3 -m ensurepip --upgrade && \
+    python3 -m pip install --upgrade pip setuptools wheel
+
+# Install Python deps (cached layer)
 COPY requirements.txt .
+RUN python3 -m pip install -r requirements.txt
 
-# Install dependencies with specific versions to ensure compatibility
-RUN pip install --no-cache-dir pip==21.3.1 && \
-    pip install --no-cache-dir huggingface_hub==0.4.0 && \
-    pip install --no-cache-dir -r requirements.txt && \
-    python -m nltk.downloader punkt && \
-    python -m spacy download en_core_web_sm
+# Install spaCy model
+RUN python3 -m spacy download en_core_web_sm
 
-# Copy Python scripts
-COPY analysis3.py analysis3-json.py setup.py ./
-COPY precache_models.py ./
+# ── Stage 3: Application ─────────────────────────────────────────
+FROM deps AS app
 
-# Create a models directory and precache the models
-RUN mkdir -p /app/models /app/output && \
-    chmod 777 /app/models /app/output && \
-    # Pre-download models to avoid downloading at runtime
-    python precache_models.py
+WORKDIR /app
 
-# Set environment variables for model caching
-ENV SENTENCE_TRANSFORMERS_HOME=/app/models
-ENV TRANSFORMERS_CACHE=/app/models
-ENV HF_HOME=/app/models
-ENV RESULTS_FILE_PATH=/app/output/results.txt
+# Copy application code
+COPY api/ ./api/
+COPY analysis3_module.py .
+COPY audio_quality.py .
+COPY audio_analysis.py .
+COPY advanced_audio_analysis.py .
+COPY advanced_text_analysis.py .
+COPY rhetorical_analysis.py .
+COPY sentiment_analysis.py .
+COPY voice_pipeline.py .
 
-# Default entrypoint is the original script
-ENTRYPOINT ["python", "analysis3.py"]
+# Create directories
+RUN mkdir -p /app/api/logs /app/api/tmp_uploads /app/data
 
+# Model cache directory (mount as volume for persistence)
+ENV HF_HOME=/app/data/huggingface \
+    WHISPER_CACHE=/app/data/whisper
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')" || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Run with uvicorn
+CMD ["python3", "-m", "uvicorn", "api.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--log-level", "info", \
+     "--timeout-keep-alive", "120"]

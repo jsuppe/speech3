@@ -30,11 +30,13 @@ except ImportError:
     sys.stdout.write(error_response("SpaCy is not installed."))
     sys.exit(1)
 
-# Set environment variables for model caching
-os.environ["SENTENCE_TRANSFORMERS_HOME"] = "/app/models"
-os.environ["TRANSFORMERS_CACHE"] = "/app/models"
-os.environ["HF_HOME"] = "/app/models"
-os.environ['NLTK_DATA'] = '/app/models/nltk_data'
+# Set environment variables for model caching (use local paths if not in Docker)
+_cache_dir = "/app/models" if os.path.isdir("/app") else os.path.expanduser("~/.cache/speech3_models")
+os.makedirs(_cache_dir, exist_ok=True)
+os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", _cache_dir)
+os.environ.setdefault("TRANSFORMERS_CACHE", _cache_dir)
+os.environ.setdefault("HF_HOME", _cache_dir)
+os.environ.setdefault('NLTK_DATA', os.path.expanduser('~/nltk_data'))
 
 # Check for sentence_transformers
 try:
