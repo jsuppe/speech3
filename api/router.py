@@ -1,13 +1,16 @@
 """API route handlers for SpeechScore."""
 
 import os
+import sys
 import time
+import uuid
+import json
 import logging
 import tempfile
 
-from fastapi import APIRouter, UploadFile, File, Query, Request, Depends, Response
+from fastapi import APIRouter, UploadFile, File, Query, Request, Depends, Response, Body
 from fastapi.responses import JSONResponse
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from . import config
 from .models import (
@@ -24,6 +27,11 @@ from .job_manager import manager as job_manager, QueueFullError
 from .auth import auth_required, admin_required
 from .rate_limiter import rate_limiter, TIER_LIMITS
 from .usage import usage_tracker
+
+# Ensure speech3 root is on the path for scoring import
+SPEECH3_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SPEECH3_DIR not in sys.path:
+    sys.path.insert(0, SPEECH3_DIR)
 
 logger = logging.getLogger("speechscore.api")
 
@@ -660,3 +668,355 @@ async def admin_usage(key_data: dict = Depends(admin_required)):
         ))
 
     return AdminUsageResponse(keys=entries, total=len(entries))
+
+
+# ---------------------------------------------------------------------------
+# Scoring & Grading (Task #38)
+# ---------------------------------------------------------------------------
+
+@router.get("/speeches/{speech_id}/score", tags=["Scoring"])
+async def get_speech_score(
+    speech_id: int,
+    profile: str = Query("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical"),
+    key_data: dict = Depends(auth_required),
+):
+    """
+    Get a scored assessment of a speech with letter grades and numeric scores.
+
+    Scoring is percentile-based: each metric is compared against the full database distribution.
+    Different profiles weight metrics differently for various use cases.
+    """
+    from scoring import score_speech, SCORING_PROFILES
+
+    if profile not in SCORING_PROFILES:
+        return _error(400, "INVALID_PROFILE",
+                      f"Unknown profile '{profile}'. Valid profiles: {', '.join(sorted(SCORING_PROFILES.keys()))}")
+
+    db = pipeline_runner.get_db()
+    speech = db.get_speech(speech_id)
+    if not speech:
+        return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
+
+    result = score_speech(db, speech_id, profile)
+    if not result:
+        return _error(404, "NO_ANALYSIS", f"No analysis found for speech {speech_id}.")
+
+    return result
+
+
+@router.get("/scoring/profiles", tags=["Scoring"])
+async def list_scoring_profiles(key_data: dict = Depends(auth_required)):
+    """List all available scoring profiles with their descriptions and metrics."""
+    from scoring import get_available_profiles
+    return {"profiles": get_available_profiles()}
+
+
+# ---------------------------------------------------------------------------
+# Benchmark (Task #39)
+# ---------------------------------------------------------------------------
+
+@router.get("/speeches/{speech_id}/benchmark", tags=["Comparison"])
+async def benchmark_speech(
+    speech_id: int,
+    key_data: dict = Depends(auth_required),
+):
+    """
+    Benchmark a speech against the entire database.
+    Returns percentile rankings and scores across all profiles.
+    """
+    from scoring import benchmark_speech as _benchmark
+
+    db = pipeline_runner.get_db()
+    speech = db.get_speech(speech_id)
+    if not speech:
+        return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
+
+    result = _benchmark(db, speech_id)
+    if not result:
+        return _error(404, "NO_ANALYSIS", f"No analysis found for speech {speech_id}.")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Comparison (Task #39)
+# ---------------------------------------------------------------------------
+
+@router.post("/compare", tags=["Comparison"])
+async def compare_speeches(
+    body: dict = Body(..., example={"speech_ids": [1, 2, 3], "profile": "general"}),
+    key_data: dict = Depends(auth_required),
+):
+    """
+    Compare 2+ speeches side-by-side with metrics and scoring.
+
+    Request body:
+    - speech_ids: list of 2+ speech IDs to compare
+    - profile: scoring profile to use (default: "general")
+    """
+    from scoring import score_speech, SCORING_PROFILES
+
+    speech_ids = body.get("speech_ids", [])
+    profile = body.get("profile", "general")
+
+    if not speech_ids or len(speech_ids) < 2:
+        return _error(400, "INVALID_REQUEST", "Provide at least 2 speech_ids to compare.")
+
+    if len(speech_ids) > 10:
+        return _error(400, "TOO_MANY", "Maximum 10 speeches can be compared at once.")
+
+    if profile not in SCORING_PROFILES:
+        return _error(400, "INVALID_PROFILE",
+                      f"Unknown profile '{profile}'. Valid: {', '.join(sorted(SCORING_PROFILES.keys()))}")
+
+    db = pipeline_runner.get_db()
+
+    comparisons = []
+    for sid in speech_ids:
+        speech = db.get_speech(sid)
+        if not speech:
+            continue
+
+        analysis = db.get_analysis(sid)
+        transcription = db.get_transcription(sid)
+        score = score_speech(db, sid, profile)
+
+        entry = {
+            "speech_id": sid,
+            "title": speech.get("title", ""),
+            "speaker": speech.get("speaker"),
+            "category": speech.get("category"),
+            "duration_sec": speech.get("duration_sec"),
+            "metrics": {},
+            "score": score,
+        }
+
+        if analysis:
+            for col in [
+                "wpm", "pitch_mean_hz", "pitch_std_hz", "jitter_pct", "shimmer_pct",
+                "hnr_db", "vocal_fry_ratio", "lexical_diversity", "syntactic_complexity",
+                "fk_grade_level", "repetition_score", "sentiment", "quality_level",
+                "articulation_rate", "pitch_range_hz", "connectedness",
+                "vowel_space_index", "snr_db",
+            ]:
+                val = analysis.get(col)
+                if val is not None:
+                    entry["metrics"][col] = val
+
+        if transcription:
+            entry["word_count"] = transcription.get("word_count")
+            entry["language"] = transcription.get("language")
+
+        comparisons.append(entry)
+
+    if len(comparisons) < 2:
+        return _error(404, "INSUFFICIENT_DATA",
+                      "Could not find enough speeches with data for comparison.")
+
+    return {
+        "profile": profile,
+        "speeches": comparisons,
+        "count": len(comparisons),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Batch Analysis (Task #46)
+# ---------------------------------------------------------------------------
+
+# In-memory batch store
+_batches: Dict[str, dict] = {}
+
+
+@router.post("/batch/analyze", tags=["Batch"])
+async def batch_analyze(
+    request: Request,
+    preset: Optional[str] = Query("full", description="Analysis preset for all files"),
+    language: Optional[str] = Query(None, description="Language code for Whisper"),
+    key_data: dict = Depends(auth_required),
+):
+    """
+    Submit multiple audio files for batch analysis.
+    Returns a batch_id with individual job IDs for tracking.
+
+    Upload multiple files as multipart form data with field name 'files'.
+    """
+    form = await request.form()
+    files = form.getlist("files")
+
+    if not files:
+        return _error(400, "NO_FILES", "No files provided. Upload with field name 'files'.")
+
+    if len(files) > 20:
+        return _error(400, "TOO_MANY_FILES", "Maximum 20 files per batch.")
+
+    # Validate preset
+    if preset:
+        preset_lower = preset.strip().lower()
+        if preset_lower not in config.MODULE_PRESETS:
+            return _error(400, "INVALID_PRESET",
+                          f"Unknown preset '{preset}'. Valid: {', '.join(sorted(config.MODULE_PRESETS.keys()))}")
+    else:
+        preset_lower = "full"
+
+    # Resolve modules
+    resolved_modules = config.MODULE_PRESETS.get(preset_lower, config.ALL_MODULES.copy())
+    modules_requested = sorted(resolved_modules)
+
+    # Validate language
+    lang = None
+    if language:
+        lang = language.strip().lower()
+        if not lang or len(lang) > 10:
+            return _error(400, "INVALID_LANGUAGE", "Language code must be a short ISO code.")
+
+    batch_id = str(uuid.uuid4())
+    jobs = []
+
+    os.makedirs(config.ASYNC_UPLOAD_DIR, exist_ok=True)
+
+    for file_item in files:
+        if not hasattr(file_item, 'filename') or not file_item.filename:
+            continue
+
+        ext = file_item.filename.rsplit(".", 1)[-1].lower() if "." in file_item.filename else ""
+        if ext not in config.ALLOWED_EXTENSIONS:
+            jobs.append({
+                "filename": file_item.filename,
+                "job_id": None,
+                "status": "rejected",
+                "error": f"Invalid file type '.{ext}'",
+            })
+            continue
+
+        # Save to temp
+        suffix = f".{ext}"
+        fd, tmp_path = tempfile.mkstemp(suffix=suffix, dir=config.ASYNC_UPLOAD_DIR)
+        os.close(fd)
+
+        content = await file_item.read()
+        if len(content) > config.MAX_FILE_SIZE_BYTES:
+            os.remove(tmp_path)
+            jobs.append({
+                "filename": file_item.filename,
+                "job_id": None,
+                "status": "rejected",
+                "error": f"File exceeds {config.MAX_FILE_SIZE_MB}MB limit",
+            })
+            continue
+
+        if len(content) == 0:
+            os.remove(tmp_path)
+            jobs.append({
+                "filename": file_item.filename,
+                "job_id": None,
+                "status": "rejected",
+                "error": "Empty file",
+            })
+            continue
+
+        with open(tmp_path, "wb") as f:
+            f.write(content)
+
+        # Submit as async job
+        try:
+            job = job_manager.create_job(
+                filename=file_item.filename,
+                upload_path=tmp_path,
+                webhook_url=None,
+                modules=resolved_modules.copy(),
+                preset=preset_lower,
+                quality_gate="warn",
+                language=lang,
+                modules_requested=modules_requested,
+                key_id=key_data["key_id"],
+            )
+            jobs.append({
+                "filename": file_item.filename,
+                "job_id": job.job_id,
+                "status": "queued",
+                "error": None,
+            })
+        except QueueFullError as e:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            jobs.append({
+                "filename": file_item.filename,
+                "job_id": None,
+                "status": "rejected",
+                "error": str(e),
+            })
+
+    # Store batch info
+    _batches[batch_id] = {
+        "batch_id": batch_id,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "preset": preset_lower,
+        "language": lang,
+        "total_files": len(files),
+        "jobs": jobs,
+    }
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "batch_id": batch_id,
+            "total_files": len(files),
+            "queued": sum(1 for j in jobs if j["status"] == "queued"),
+            "rejected": sum(1 for j in jobs if j["status"] == "rejected"),
+            "jobs": jobs,
+        }
+    )
+
+
+@router.get("/batch/{batch_id}", tags=["Batch"])
+async def get_batch_status(
+    batch_id: str,
+    key_data: dict = Depends(auth_required),
+):
+    """Check status of a batch analysis job. Returns individual job statuses."""
+    batch = _batches.get(batch_id)
+    if not batch:
+        return _error(404, "BATCH_NOT_FOUND", f"Batch '{batch_id}' not found or expired.")
+
+    # Update job statuses from job manager
+    updated_jobs = []
+    for job_info in batch["jobs"]:
+        if job_info.get("job_id"):
+            job = job_manager.get_job(job_info["job_id"])
+            if job:
+                entry = {
+                    "filename": job_info["filename"],
+                    "job_id": job_info["job_id"],
+                    "status": job.status,
+                    "error": job.error,
+                    "speech_id": job.result.get("speech_id") if job.result else None,
+                }
+                updated_jobs.append(entry)
+            else:
+                updated_jobs.append(job_info)
+        else:
+            updated_jobs.append(job_info)
+
+    total = len(updated_jobs)
+    complete = sum(1 for j in updated_jobs if j["status"] == "complete")
+    failed = sum(1 for j in updated_jobs if j["status"] in ("failed", "rejected"))
+    processing = sum(1 for j in updated_jobs if j["status"] == "processing")
+    queued = sum(1 for j in updated_jobs if j["status"] == "queued")
+
+    overall_status = "complete" if (complete + failed) == total else \
+                     "processing" if processing > 0 else \
+                     "queued" if queued > 0 else "complete"
+
+    return {
+        "batch_id": batch_id,
+        "status": overall_status,
+        "created_at": batch["created_at"],
+        "preset": batch["preset"],
+        "total": total,
+        "complete": complete,
+        "failed": failed,
+        "processing": processing,
+        "queued": queued,
+        "jobs": updated_jobs,
+    }

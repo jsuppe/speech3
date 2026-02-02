@@ -15,6 +15,7 @@ if SPEECH3_DIR not in sys.path:
     sys.path.insert(0, SPEECH3_DIR)
 
 from speech_db import SpeechDB
+from scoring import score_speech, benchmark_speech, SCORING_PROFILES
 
 logger = logging.getLogger("speechscore.frontend")
 
@@ -125,7 +126,11 @@ async def speech_list(
 
 
 @router.get("/speeches/{speech_id}", response_class=HTMLResponse)
-async def speech_detail(request: Request, speech_id: int):
+async def speech_detail(
+    request: Request,
+    speech_id: int,
+    profile: str = Query("general"),
+):
     """Detailed view of a single speech analysis."""
     db = get_db()
     speech = db.get_speech(speech_id)
@@ -138,6 +143,12 @@ async def speech_detail(request: Request, speech_id: int):
     spectrogram = db.get_spectrogram(speech_id, "combined")
     full_result = db.get_full_analysis(speech_id)
 
+    # Get scoring data
+    if profile not in SCORING_PROFILES:
+        profile = "general"
+    score_data = score_speech(db, speech_id, profile) if analysis else None
+    available_profiles = list(SCORING_PROFILES.keys())
+
     return templates.TemplateResponse("speech_detail.html", {
         "request": request,
         "speech": speech,
@@ -147,6 +158,10 @@ async def speech_detail(request: Request, speech_id: int):
         "audio_size": audio["size_bytes"] if audio else 0,
         "has_spectrogram": spectrogram is not None,
         "full_result": json.dumps(full_result, indent=2) if full_result else "{}",
+        "score": score_data,
+        "score_json": json.dumps(score_data) if score_data else "null",
+        "current_profile": profile,
+        "available_profiles": available_profiles,
     })
 
 
@@ -162,10 +177,14 @@ async def upload_page(request: Request):
 async def compare_page(
     request: Request,
     ids: str = Query(None),
+    profile: str = Query("general"),
 ):
-    """Side-by-side speech comparison."""
+    """Side-by-side speech comparison with scoring."""
     db = get_db()
     speeches = db.list_speeches(limit=500)
+
+    if profile not in SCORING_PROFILES:
+        profile = "general"
 
     compared = []
     if ids:
@@ -175,15 +194,34 @@ async def compare_page(
             if speech:
                 analysis = db.get_analysis(sid)
                 transcription = db.get_transcription(sid)
+                score_data = score_speech(db, sid, profile) if analysis else None
                 compared.append({
                     "speech": speech,
                     "analysis": analysis,
                     "transcription": transcription,
+                    "score": score_data,
                 })
 
     return templates.TemplateResponse("compare.html", {
         "request": request,
         "speeches": speeches,
         "compared": compared,
+        "compared_json": json.dumps([
+            {
+                "id": c["speech"]["id"],
+                "title": c["speech"]["title"],
+                "score": c.get("score"),
+                "metrics": {
+                    k: c["analysis"][k] for k in [
+                        "wpm", "pitch_mean_hz", "pitch_std_hz", "jitter_pct", "shimmer_pct",
+                        "hnr_db", "vocal_fry_ratio", "lexical_diversity", "syntactic_complexity",
+                        "fk_grade_level", "repetition_score",
+                    ] if c.get("analysis") and c["analysis"].get(k) is not None
+                } if c.get("analysis") else {},
+            }
+            for c in compared
+        ]) if compared else "[]",
         "current_ids": ids or "",
+        "current_profile": profile,
+        "available_profiles": list(SCORING_PROFILES.keys()),
     })

@@ -4,18 +4,29 @@
 {% block content %}
 <div class="fade-in">
     <h1 class="text-2xl font-bold text-white mb-2">Compare Speeches</h1>
-    <p class="text-sm text-gray-400 mb-6">Select speeches to compare side-by-side.</p>
+    <p class="text-sm text-gray-400 mb-6">Select speeches to compare side-by-side with scoring.</p>
 
     <!-- Speech Selector -->
-    <form method="get" class="flex flex-wrap gap-3 mb-8">
-        <select name="ids" id="speechSelect" multiple size="4"
-                class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none w-96">
-            {% for s in speeches %}
-            <option value="{{ s.id }}" {% if s.id|string in current_ids.split(',') %}selected{% endif %}>
-                {{ s.title }} {% if s.speaker %}({{ s.speaker }}){% endif %}
-            </option>
-            {% endfor %}
-        </select>
+    <form method="get" class="flex flex-wrap gap-3 mb-8 items-end">
+        <div>
+            <label class="block text-sm text-gray-400 mb-1">Select Speeches</label>
+            <select name="ids" id="speechSelect" multiple size="4"
+                    class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none w-96">
+                {% for s in speeches %}
+                <option value="{{ s.id }}" {% if s.id|string in current_ids.split(',') %}selected{% endif %}>
+                    {{ s.title }} {% if s.speaker %}({{ s.speaker }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-400 mb-1">Scoring Profile</label>
+            <select id="profileSelect" class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none">
+                {% for p in available_profiles %}
+                <option value="{{ p }}" {% if p == current_profile %}selected{% endif %}>{{ p|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="flex flex-col gap-2">
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
                 Compare Selected
@@ -25,63 +36,132 @@
     </form>
 
     {% if compared %}
-    <!-- Comparison Chart -->
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
-        <h2 class="text-lg font-semibold text-white mb-4">Metric Comparison</h2>
-        <canvas id="compareChart" height="120"></canvas>
-    </div>
-
-    <!-- Side by Side Cards -->
+    <!-- Score Summary Cards -->
     <div class="grid md:grid-cols-{{ compared|length }} gap-4 mb-6">
         {% for item in compared %}
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <a href="/speeches/{{ item.speech.id }}" class="text-white font-semibold hover:text-indigo-300 transition-colors">
-                {{ item.speech.title }}
-            </a>
-            <div class="text-sm text-gray-400 mt-1">{{ item.speech.speaker or '—' }}</div>
-
-            {% if item.analysis %}
-            <div class="mt-4 space-y-2 text-sm">
-                {% set a = item.analysis %}
-                {% set rows = [
-                    ("WPM", a.wpm, "%.0f"),
-                    ("Pitch Mean", a.pitch_mean_hz, "%.0f Hz"),
-                    ("Pitch Std", a.pitch_std_hz, "%.1f Hz"),
-                    ("Jitter", a.jitter_pct, "%.2f%%"),
-                    ("Shimmer", a.shimmer_pct, "%.1f%%"),
-                    ("HNR", a.hnr_db, "%.1f dB"),
-                    ("Vocal Fry", a.vocal_fry_ratio, "%.1f%%"),
-                    ("Lex Diversity", a.lexical_diversity, "%.3f"),
-                    ("Complexity", a.syntactic_complexity, "%.1f"),
-                    ("Grade Level", a.fk_grade_level, "%.1f"),
-                    ("Repetition", a.repetition_score, "%.2f"),
-                    ("Sentiment", a.sentiment, "%s"),
-                    ("Quality", a.quality_level, "%s"),
-                ] %}
-                {% for label, value, fmt in rows %}
-                {% if value is not none %}
-                <div class="flex justify-between">
-                    <span class="text-gray-500">{{ label }}</span>
-                    <span class="text-white font-mono">
-                        {% if value is number and 'Fry' in label %}{{ fmt|format(value * 100) }}
-                        {% elif value is number %}{{ fmt|format(value) }}
-                        {% else %}{{ value }}{% endif %}
-                    </span>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 {% if item.score %}{% if loop.index0 == 0 %}border-l-4 border-l-indigo-500{% endif %}{% endif %}">
+            <div class="flex items-start justify-between">
+                <div>
+                    <a href="/speeches/{{ item.speech.id }}" class="text-white font-semibold hover:text-indigo-300 transition-colors">
+                        {{ item.speech.title[:40] }}
+                    </a>
+                    <div class="text-sm text-gray-400 mt-0.5">{{ item.speech.speaker or '—' }}</div>
+                </div>
+                {% if item.score %}
+                <div class="text-center ml-2">
+                    <div class="text-3xl font-black" style="color: {{ item.score.grade_color }}">{{ item.score.letter_grade }}</div>
+                    <div class="text-sm font-bold text-gray-300">{{ item.score.composite_score }}</div>
                 </div>
                 {% endif %}
+            </div>
+
+            {% if item.score %}
+            <!-- Category mini-scores -->
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                {% for cat_key, cat in item.score.category_scores.items() %}
+                <div class="bg-gray-800/50 rounded px-2 py-1 text-center">
+                    <div class="text-[10px] text-gray-500 uppercase">{{ cat.label }}</div>
+                    <div class="text-sm font-bold" style="color: {{ cat.grade_color }}">{{ cat.grade }} <span class="text-xs text-gray-400">({{ cat.score }})</span></div>
+                </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <p class="text-gray-500 text-sm mt-4">No analysis data</p>
-            {% endif %}
-
-            {% if item.transcription %}
-            <details class="mt-4">
-                <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300">Transcript ({{ item.transcription.word_count }} words)</summary>
-                <p class="text-xs text-gray-400 mt-2 max-h-32 overflow-y-auto leading-relaxed">{{ item.transcription.text }}</p>
-            </details>
             {% endif %}
         </div>
+        {% endfor %}
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <!-- Radar Chart Overlay -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Score Comparison (Radar)</h2>
+            <canvas id="radarCompare" height="300"></canvas>
+        </div>
+
+        <!-- Bar Chart -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Metric Comparison (Bar)</h2>
+            <canvas id="barCompare" height="300"></canvas>
+        </div>
+    </div>
+
+    <!-- Detailed Metric Table -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6 overflow-x-auto">
+        <h2 class="text-lg font-semibold text-white mb-4">Detailed Metrics</h2>
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-gray-800">
+                    <th class="text-left py-2 px-2 text-gray-500 font-medium">Metric</th>
+                    {% for item in compared %}
+                    <th class="text-center py-2 px-2 text-gray-400 font-medium">{{ item.speech.title[:25] }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% set rows = [
+                    ("WPM", "wpm", "%.0f"),
+                    ("Pitch Mean", "pitch_mean_hz", "%.0f Hz"),
+                    ("Pitch Std", "pitch_std_hz", "%.1f Hz"),
+                    ("Jitter", "jitter_pct", "%.2f%%"),
+                    ("Shimmer", "shimmer_pct", "%.1f%%"),
+                    ("HNR", "hnr_db", "%.1f dB"),
+                    ("Vocal Fry", "vocal_fry_ratio", "%.3f"),
+                    ("Lex Diversity", "lexical_diversity", "%.3f"),
+                    ("Complexity", "syntactic_complexity", "%.1f"),
+                    ("Grade Level", "fk_grade_level", "%.1f"),
+                    ("Repetition", "repetition_score", "%.2f"),
+                    ("Sentiment", "sentiment", "%s"),
+                    ("Quality", "quality_level", "%s"),
+                ] %}
+                {% for label, key, fmt in rows %}
+                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <td class="py-2 px-2 text-gray-400">{{ label }}</td>
+                    {% for item in compared %}
+                    <td class="text-center py-2 px-2 text-white font-mono">
+                        {% if item.analysis and item.analysis[key] is not none %}
+                            {% if item.analysis[key] is number %}
+                                {{ fmt|format(item.analysis[key]) }}
+                            {% else %}
+                                {{ item.analysis[key] }}
+                            {% endif %}
+                        {% else %}
+                            <span class="text-gray-600">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+
+                <!-- Score row -->
+                {% if compared[0].score %}
+                <tr class="border-t-2 border-gray-700">
+                    <td class="py-2 px-2 text-white font-semibold">Overall Score</td>
+                    {% for item in compared %}
+                    <td class="text-center py-2 px-2 font-bold text-lg" style="color: {{ item.score.grade_color if item.score else '#6b7280' }}">
+                        {% if item.score %}
+                        {{ item.score.letter_grade }} ({{ item.score.composite_score }})
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Transcripts (collapsible) -->
+    <div class="grid md:grid-cols-{{ compared|length }} gap-4 mb-6">
+        {% for item in compared %}
+        {% if item.transcription %}
+        <details class="bg-gray-900 border border-gray-800 rounded-xl">
+            <summary class="p-4 cursor-pointer text-sm font-medium text-gray-400 hover:text-white transition-colors">
+                {{ item.speech.title[:30] }} — Transcript ({{ item.transcription.word_count }} words)
+            </summary>
+            <div class="px-4 pb-4 text-xs text-gray-400 leading-relaxed max-h-48 overflow-y-auto">{{ item.transcription.text }}</div>
+        </details>
+        {% endif %}
         {% endfor %}
     </div>
     {% elif current_ids %}
@@ -92,46 +172,90 @@
 
 {% block scripts %}
 <script>
-// Fix multi-select to use comma-separated ids
+// Fix multi-select to use comma-separated ids + profile
 document.querySelector('form').addEventListener('submit', function(e) {
     e.preventDefault();
     const select = document.getElementById('speechSelect');
+    const profile = document.getElementById('profileSelect').value;
     const ids = Array.from(select.selectedOptions).map(o => o.value).slice(0, 4).join(',');
-    window.location.href = `/compare?ids=${ids}`;
+    window.location.href = `/compare?ids=${ids}&profile=${profile}`;
 });
 
 {% if compared %}
-// Grouped bar chart
-const labels = {{ compared | map(attribute='speech') | map(attribute='title') | list | tojson }};
-const metricNames = ['WPM', 'Pitch (Hz)', 'HNR (dB)', 'Lex Diversity', 'Complexity'];
-const colors = ['#6366f1', '#f59e0b', '#10b981', '#ec4899'];
+const comparedData = {{ compared_json|safe }};
+const colors = ['#6366f1', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'];
 
-const datasets = [
-    {% for item in compared %}
-    {
-        label: '{{ item.speech.title[:30] }}',
-        data: [
-            {{ item.analysis.wpm or 0 }},
-            {{ item.analysis.pitch_mean_hz or 0 }},
-            {{ item.analysis.hnr_db or 0 }},
-            {{ (item.analysis.lexical_diversity or 0) * 100 }},
-            {{ item.analysis.syntactic_complexity or 0 }},
-        ],
-        backgroundColor: colors[{{ loop.index0 }}] + '99',
-        borderColor: colors[{{ loop.index0 }}],
-        borderWidth: 1,
-        borderRadius: 3,
-    },
-    {% endfor %}
-];
+// --- Radar Chart: overlay all speeches' score profiles ---
+if (comparedData.length > 0 && comparedData[0].score) {
+    // Collect all metric names that have scores
+    const allMetrics = new Set();
+    comparedData.forEach(c => {
+        if (c.score && c.score.metric_scores) {
+            Object.entries(c.score.metric_scores).forEach(([k, v]) => {
+                if (v.available && v.score !== null) allMetrics.add(k);
+            });
+        }
+    });
+    const metricNames = Array.from(allMetrics);
 
-new Chart(document.getElementById('compareChart'), {
+    const radarDatasets = comparedData.map((c, i) => ({
+        label: c.title.substring(0, 30),
+        data: metricNames.map(m => c.score?.metric_scores?.[m]?.score ?? 0),
+        backgroundColor: colors[i] + '15',
+        borderColor: colors[i],
+        borderWidth: 2,
+        pointBackgroundColor: colors[i],
+        pointRadius: 3,
+    }));
+
+    const radarLabels = metricNames.map(m => {
+        const first = comparedData.find(c => c.score?.metric_scores?.[m]);
+        return first?.score?.metric_scores?.[m]?.label || m;
+    });
+
+    new Chart(document.getElementById('radarCompare'), {
+        type: 'radar',
+        data: { labels: radarLabels, datasets: radarDatasets },
+        options: {
+            plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+            scales: {
+                r: {
+                    beginAtZero: true, max: 100,
+                    grid: { color: '#1f2937' },
+                    angleLines: { color: '#1f2937' },
+                    ticks: { display: false },
+                    pointLabels: { color: '#9ca3af', font: { size: 9 } },
+                }
+            }
+        }
+    });
+}
+
+// --- Bar Chart: grouped bars for key raw metrics ---
+const barMetrics = ['WPM', 'Pitch (Hz)', 'HNR (dB)', 'Lex Diversity ×100', 'Complexity'];
+const barDatasets = comparedData.map((c, i) => ({
+    label: c.title.substring(0, 30),
+    data: [
+        c.metrics.wpm || 0,
+        c.metrics.pitch_mean_hz || 0,
+        c.metrics.hnr_db || 0,
+        (c.metrics.lexical_diversity || 0) * 100,
+        c.metrics.syntactic_complexity || 0,
+    ],
+    backgroundColor: colors[i] + '99',
+    borderColor: colors[i],
+    borderWidth: 1,
+    borderRadius: 3,
+}));
+
+new Chart(document.getElementById('barCompare'), {
     type: 'bar',
-    data: { labels: metricNames, datasets },
+    data: { labels: barMetrics, datasets: barDatasets },
     options: {
         plugins: { legend: { labels: { color: '#9ca3af' } } },
         scales: {
-            y: { beginAtZero: true },
+            y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
         }
     }
 });
