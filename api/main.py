@@ -184,13 +184,14 @@ async def global_exception_handler(request, exc):
     )
 
 
-# Register routes
+# Register API routes
 from .router import router  # noqa: E402
 app.include_router(router)
 
-
-# Root redirect to docs
-@app.get("/", include_in_schema=False)
-async def root():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/docs")
+# Register frontend routes
+try:
+    from frontend.routes import router as frontend_router
+    app.include_router(frontend_router, include_in_schema=False)
+    logger.info("Frontend dashboard routes registered.")
+except ImportError as e:
+    logger.warning(f"Frontend not available: {e}")

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}{{ speech.title }} — SpeechScore{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Back + Title -->
+    <div class="mb-6">
+        <a href="/speeches" class="text-sm text-gray-400 hover:text-white transition-colors">← Back to library</a>
+        <h1 class="text-2xl font-bold text-white mt-2">{{ speech.title }}</h1>
+        <div class="flex items-center gap-4 mt-1 text-sm text-gray-400">
+            {% if speech.speaker %}<span>{{ speech.speaker }}</span>{% endif %}
+            {% if speech.year %}<span>{{ speech.year }}</span>{% endif %}
+            {% if speech.duration_sec %}<span>{{ "%.1f"|format(speech.duration_sec) }}s</span>{% endif %}
+            {% if speech.category %}<span>{{ speech.category }}</span>{% endif %}
+        </div>
+        <div class="flex gap-1.5 mt-2">
+            {% for p in speech.products %}
+            <span class="px-2 py-0.5 text-xs rounded-full
+                {% if p == 'SpeechScore' %}bg-indigo-500/20 text-indigo-300
+                {% elif p == 'OratoScore' %}bg-amber-500/20 text-amber-300
+                {% elif p == 'PitchPerfect' %}bg-green-500/20 text-green-300
+                {% elif p == 'ReadAloud' %}bg-cyan-500/20 text-cyan-300
+                {% else %}bg-rose-500/20 text-rose-300{% endif %}">{{ p }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if analysis %}
+    <!-- Key Metrics Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        {% set metrics = [
+            ("WPM", analysis.wpm, "%.0f", "words/min"),
+            ("Pitch", analysis.pitch_mean_hz, "%.0f", "Hz mean"),
+            ("Jitter", analysis.jitter_pct, "%.2f", "%"),
+            ("Shimmer", analysis.shimmer_pct, "%.1f", "%"),
+            ("HNR", analysis.hnr_db, "%.1f", "dB"),
+            ("Vocal Fry", analysis.vocal_fry_ratio, "%.1f%%", "ratio"),
+            ("Lex Diversity", analysis.lexical_diversity, "%.3f", ""),
+            ("Complexity", analysis.syntactic_complexity, "%.1f", "depth"),
+            ("Grade Level", analysis.fk_grade_level, "%.1f", "FK"),
+            ("Repetition", analysis.repetition_score, "%.2f", "score"),
+            ("Sentiment", analysis.sentiment, "%s", ""),
+            ("Quality", analysis.quality_level, "%s", ""),
+        ] %}
+        {% for label, value, fmt, unit in metrics %}
+        {% if value is not none %}
+        <div class="metric-card bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">{{ label }}</div>
+            <div class="text-xl font-bold text-white mt-1">
+                {% if value is number %}
+                {{ fmt|format(value if 'fry' not in label.lower() else value * 100) }}
+                {% else %}
+                {{ value }}
+                {% endif %}
+            </div>
+            {% if unit %}<div class="text-xs text-gray-500">{{ unit }}</div>{% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Metrics Radar Chart -->
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Analysis Profile</h2>
+            <canvas id="radarChart" height="250"></canvas>
+        </div>
+
+        <!-- Spectrogram -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Spectrogram</h2>
+            {% if has_spectrogram %}
+            <img src="/v1/speeches/{{ speech.id }}/spectrogram"
+                 alt="Spectrogram" class="w-full rounded-lg" loading="lazy">
+            {% else %}
+            <div class="flex items-center justify-center h-48 text-gray-500">No spectrogram available</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Audio Player + Transcript -->
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+        {% if has_audio %}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Audio</h2>
+            <audio controls class="w-full" preload="none">
+                <source src="/v1/speeches/{{ speech.id }}/audio" type="audio/opus">
+                Your browser does not support the audio element.
+            </audio>
+            <div class="text-xs text-gray-500 mt-2">
+                Opus • {{ "%.1f"|format(audio_size / 1024) }} KB
+            </div>
+        </div>
+        {% endif %}
+
+        {% if transcription %}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Transcript</h2>
+            <div class="text-sm text-gray-300 leading-relaxed max-h-64 overflow-y-auto pr-2">
+                {{ transcription.text }}
+            </div>
+            <div class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
+                {{ transcription.word_count }} words • {{ transcription.language or 'en' }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Full JSON (collapsible) -->
+    <details class="bg-gray-900 border border-gray-800 rounded-xl mb-6">
+        <summary class="p-4 cursor-pointer text-sm font-medium text-gray-400 hover:text-white transition-colors">
+            Full Analysis JSON
+        </summary>
+        <pre class="p-4 pt-0 text-xs text-gray-400 overflow-x-auto max-h-96 overflow-y-auto"><code>{{ full_result }}</code></pre>
+    </details>
+
+    <!-- Actions -->
+    <div class="flex gap-3">
+        <a href="/v1/speeches/{{ speech.id }}/audio" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
+            Download Audio
+        </a>
+        <a href="/compare?ids={{ speech.id }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">
+            Compare
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if analysis %}
+<script>
+// Radar chart — normalize metrics to 0-1 scale
+const metrics = {
+    'WPM': {{ analysis.wpm or 0 }},
+    'Pitch Var': {{ analysis.pitch_std_hz or 0 }},
+    'Voice Quality': {{ analysis.hnr_db or 0 }},
+    'Lex Diversity': {{ (analysis.lexical_diversity or 0) * 100 }},
+    'Complexity': {{ analysis.syntactic_complexity or 0 }},
+    'Repetition': {{ (analysis.repetition_score or 0) * 10 }},
+};
+
+// Normalize each to roughly 0-100 scale
+const norms = {
+    'WPM': [80, 200],
+    'Pitch Var': [0, 100],
+    'Voice Quality': [0, 25],
+    'Lex Diversity': [0, 80],
+    'Complexity': [5, 30],
+    'Repetition': [0, 60],
+};
+
+const labels = Object.keys(metrics);
+const values = labels.map(l => {
+    const [min, max] = norms[l];
+    return Math.min(100, Math.max(0, ((metrics[l] - min) / (max - min)) * 100));
+});
+
+new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+        labels: labels,
+        datasets: [{
+            data: values,
+            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            pointBackgroundColor: '#6366f1',
+            pointRadius: 4,
+        }]
+    },
+    options: {
+        plugins: { legend: { display: false } },
+        scales: {
+            r: {
+                beginAtZero: true,
+                max: 100,
+                grid: { color: '#1f2937' },
+                angleLines: { color: '#1f2937' },
+                ticks: { display: false },
+                pointLabels: { color: '#9ca3af', font: { size: 11 } },
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

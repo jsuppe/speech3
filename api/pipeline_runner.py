@@ -351,6 +351,30 @@ def run_pipeline(
     return result
 
 
+def _generate_spectrogram_bytes(audio_path: str) -> bytes | None:
+    """Generate spectrogram PNG from audio file using songsee."""
+    try:
+        import shutil
+        if not shutil.which("songsee"):
+            return None
+        fd, png_path = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        result = subprocess.run(
+            ["songsee", audio_path, "-o", png_path],
+            capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode == 0 and os.path.exists(png_path):
+            with open(png_path, "rb") as f:
+                return f.read()
+        return None
+    except Exception as e:
+        logger.warning(f"Spectrogram generation failed: {e}")
+        return None
+    finally:
+        if 'png_path' in locals() and os.path.exists(png_path):
+            os.unlink(png_path)
+
+
 def persist_result(
     original_audio_path: str,
     result: dict,
@@ -420,9 +444,15 @@ def persist_result(
         # The result from run_pipeline uses top-level keys that store_analysis expects
         db.store_analysis(speech_id, result, preset=preset)
 
-        # Store spectrogram if provided
+        # Store spectrogram — use provided path or auto-generate
         if spectrogram_path and os.path.exists(spectrogram_path):
             db.store_spectrogram_from_file(speech_id, spectrogram_path)
+        else:
+            # Auto-generate spectrogram from the original audio
+            png_data = _generate_spectrogram_bytes(original_audio_path)
+            if png_data:
+                db.store_spectrogram(speech_id, png_data, spec_type="combined", fmt="png")
+                logger.info(f"Auto-generated spectrogram for speech_id={speech_id} ({len(png_data)/1024:.0f} KB)")
 
         logger.info(f"Persisted analysis → speech_id={speech_id}, title='{title}'")
         return speech_id

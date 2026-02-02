@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Compare — SpeechScore{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <h1 class="text-2xl font-bold text-white mb-2">Compare Speeches</h1>
+    <p class="text-sm text-gray-400 mb-6">Select speeches to compare side-by-side.</p>
+
+    <!-- Speech Selector -->
+    <form method="get" class="flex flex-wrap gap-3 mb-8">
+        <select name="ids" id="speechSelect" multiple size="4"
+                class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none w-96">
+            {% for s in speeches %}
+            <option value="{{ s.id }}" {% if s.id|string in current_ids.split(',') %}selected{% endif %}>
+                {{ s.title }} {% if s.speaker %}({{ s.speaker }}){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <div class="flex flex-col gap-2">
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+                Compare Selected
+            </button>
+            <p class="text-xs text-gray-500">Hold Ctrl/Cmd to select multiple (max 4)</p>
+        </div>
+    </form>
+
+    {% if compared %}
+    <!-- Comparison Chart -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Metric Comparison</h2>
+        <canvas id="compareChart" height="120"></canvas>
+    </div>
+
+    <!-- Side by Side Cards -->
+    <div class="grid md:grid-cols-{{ compared|length }} gap-4 mb-6">
+        {% for item in compared %}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <a href="/speeches/{{ item.speech.id }}" class="text-white font-semibold hover:text-indigo-300 transition-colors">
+                {{ item.speech.title }}
+            </a>
+            <div class="text-sm text-gray-400 mt-1">{{ item.speech.speaker or '—' }}</div>
+
+            {% if item.analysis %}
+            <div class="mt-4 space-y-2 text-sm">
+                {% set a = item.analysis %}
+                {% set rows = [
+                    ("WPM", a.wpm, "%.0f"),
+                    ("Pitch Mean", a.pitch_mean_hz, "%.0f Hz"),
+                    ("Pitch Std", a.pitch_std_hz, "%.1f Hz"),
+                    ("Jitter", a.jitter_pct, "%.2f%%"),
+                    ("Shimmer", a.shimmer_pct, "%.1f%%"),
+                    ("HNR", a.hnr_db, "%.1f dB"),
+                    ("Vocal Fry", a.vocal_fry_ratio, "%.1f%%"),
+                    ("Lex Diversity", a.lexical_diversity, "%.3f"),
+                    ("Complexity", a.syntactic_complexity, "%.1f"),
+                    ("Grade Level", a.fk_grade_level, "%.1f"),
+                    ("Repetition", a.repetition_score, "%.2f"),
+                    ("Sentiment", a.sentiment, "%s"),
+                    ("Quality", a.quality_level, "%s"),
+                ] %}
+                {% for label, value, fmt in rows %}
+                {% if value is not none %}
+                <div class="flex justify-between">
+                    <span class="text-gray-500">{{ label }}</span>
+                    <span class="text-white font-mono">
+                        {% if value is number and 'Fry' in label %}{{ fmt|format(value * 100) }}
+                        {% elif value is number %}{{ fmt|format(value) }}
+                        {% else %}{{ value }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm mt-4">No analysis data</p>
+            {% endif %}
+
+            {% if item.transcription %}
+            <details class="mt-4">
+                <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300">Transcript ({{ item.transcription.word_count }} words)</summary>
+                <p class="text-xs text-gray-400 mt-2 max-h-32 overflow-y-auto leading-relaxed">{{ item.transcription.text }}</p>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% elif current_ids %}
+    <p class="text-gray-400">No matching speeches found.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Fix multi-select to use comma-separated ids
+document.querySelector('form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const select = document.getElementById('speechSelect');
+    const ids = Array.from(select.selectedOptions).map(o => o.value).slice(0, 4).join(',');
+    window.location.href = `/compare?ids=${ids}`;
+});
+
+{% if compared %}
+// Grouped bar chart
+const labels = {{ compared | map(attribute='speech') | map(attribute='title') | list | tojson }};
+const metricNames = ['WPM', 'Pitch (Hz)', 'HNR (dB)', 'Lex Diversity', 'Complexity'];
+const colors = ['#6366f1', '#f59e0b', '#10b981', '#ec4899'];
+
+const datasets = [
+    {% for item in compared %}
+    {
+        label: '{{ item.speech.title[:30] }}',
+        data: [
+            {{ item.analysis.wpm or 0 }},
+            {{ item.analysis.pitch_mean_hz or 0 }},
+            {{ item.analysis.hnr_db or 0 }},
+            {{ (item.analysis.lexical_diversity or 0) * 100 }},
+            {{ item.analysis.syntactic_complexity or 0 }},
+        ],
+        backgroundColor: colors[{{ loop.index0 }}] + '99',
+        borderColor: colors[{{ loop.index0 }}],
+        borderWidth: 1,
+        borderRadius: 3,
+    },
+    {% endfor %}
+];
+
+new Chart(document.getElementById('compareChart'), {
+    type: 'bar',
+    data: { labels: metricNames, datasets },
+    options: {
+        plugins: { legend: { labels: { color: '#9ca3af' } } },
+        scales: {
+            y: { beginAtZero: true },
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}
