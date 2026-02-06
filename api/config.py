@@ -60,6 +60,7 @@ ALLOWED_CONTENT_TYPES = {
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # /home/jsuppe/speech3
 API_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "speechscore.db")
 LOG_DIR = os.path.join(API_DIR, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "api.log")
 ASYNC_UPLOAD_DIR = os.path.join(API_DIR, "tmp_uploads")

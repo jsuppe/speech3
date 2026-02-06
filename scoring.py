@@ -295,30 +295,39 @@ def _score_metric(
 
 
 def _letter_grade(score: float) -> str:
-    """Convert numeric score (0-100) to letter grade."""
-    if score >= 97:
+    """
+    Convert numeric score (0-100) to letter grade.
+    
+    Thresholds are calibrated for percentile-based scoring where 50 = average.
+    - 80+ = A tier (top 20%)
+    - 65+ = B tier (above average)
+    - 50+ = C tier (average)
+    - 35+ = D tier (below average)
+    - <35 = F (poor)
+    """
+    if score >= 90:
         return "A+"
-    elif score >= 93:
+    elif score >= 85:
         return "A"
-    elif score >= 90:
-        return "A-"
-    elif score >= 87:
-        return "B+"
-    elif score >= 83:
-        return "B"
     elif score >= 80:
-        return "B-"
-    elif score >= 77:
-        return "C+"
-    elif score >= 73:
-        return "C"
+        return "A-"
+    elif score >= 75:
+        return "B+"
     elif score >= 70:
-        return "C-"
-    elif score >= 67:
-        return "D+"
-    elif score >= 63:
-        return "D"
+        return "B"
+    elif score >= 65:
+        return "B-"
     elif score >= 60:
+        return "C+"
+    elif score >= 55:
+        return "C"
+    elif score >= 50:
+        return "C-"
+    elif score >= 45:
+        return "D+"
+    elif score >= 40:
+        return "D"
+    elif score >= 35:
         return "D-"
     else:
         return "F"

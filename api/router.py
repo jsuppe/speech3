@@ -25,6 +25,7 @@ from .models import (
 from . import pipeline_runner
 from .job_manager import manager as job_manager, QueueFullError
 from .auth import auth_required, admin_required
+from .user_auth import get_current_user, decode_token, flexible_auth
 from .rate_limiter import rate_limiter, TIER_LIMITS
 from .usage import usage_tracker
 
@@ -171,6 +172,7 @@ def _resolve_modules(
 
 @router.post("/analyze", tags=["Analysis"])
 async def analyze(
+    request: Request,
     audio: UploadFile = File(...),
     mode: Optional[str] = Query(None, description="Set to 'async' for async processing"),
     webhook_url: Optional[str] = Query(None, description="URL to POST results to when complete"),
@@ -178,7 +180,7 @@ async def analyze(
     preset: Optional[str] = Query(None, description="Named preset: quick, text_only, audio_only, full, clinical, coaching"),
     quality_gate: Optional[str] = Query(None, description="Quality gate mode: warn (default), block, skip"),
     language: Optional[str] = Query(None, description="Language code for Whisper (e.g. 'en', 'es'). Default: auto-detect."),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """
     Analyze an uploaded audio file through the speech pipeline.
@@ -189,7 +191,9 @@ async def analyze(
     Use `modules` or `preset` to select which analysis modules run.
     If both are provided, `preset` takes precedence.
     """
-    key_id = key_data["key_id"]
+    key_data = auth.get("key_data")
+    key_id = key_data["key_id"] if key_data else "user"
+    user_id = auth.get("user_id")
 
     # Ensure upload dir exists
     os.makedirs(config.ASYNC_UPLOAD_DIR, exist_ok=True)
@@ -311,6 +315,7 @@ async def analyze(
             result=result,
             filename=audio.filename,
             preset=resolved_preset,
+            user_id=user_id,
         )
         if speech_id is not None:
             result["speech_id"] = speech_id
@@ -337,6 +342,205 @@ async def analyze(
                     os.remove(path)
                 except OSError:
                     pass
+
+
+# ---------------------------------------------------------------------------
+# Streaming Analysis (Server-Sent Events)
+# ---------------------------------------------------------------------------
+
+from fastapi.responses import StreamingResponse
+import asyncio
+import queue
+import threading
+
+@router.post("/analyze/stream", tags=["Analysis"])
+async def analyze_stream(
+    request: Request,
+    audio: UploadFile = File(...),
+    modules: Optional[str] = Query(None, description="Comma-separated module names"),
+    preset: Optional[str] = Query(None, description="Named preset"),
+    quality_gate: Optional[str] = Query(None, description="Quality gate mode: warn, block, skip"),
+    language: Optional[str] = Query(None, description="Language code for Whisper"),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Analyze audio with real-time progress streaming via Server-Sent Events (SSE).
+    
+    Events emitted:
+    - `progress`: {stage: "transcription" | "text_analysis" | etc, progress: 0-100}
+    - `complete`: Full analysis result
+    - `error`: Error message if analysis fails
+    
+    Connect with EventSource or fetch with streaming body.
+    """
+    key_data = auth.get("key_data")
+    key_id = key_data["key_id"] if key_data else "user"
+    user_id = auth.get("user_id")
+
+    os.makedirs(config.ASYNC_UPLOAD_DIR, exist_ok=True)
+
+    # Resolve modules
+    resolved_modules, resolved_preset, modules_requested, mod_error = _resolve_modules(modules, preset)
+    if mod_error is not None:
+        return mod_error
+
+    # Validate quality_gate
+    qg = config.DEFAULT_QUALITY_GATE
+    if quality_gate is not None:
+        qg = quality_gate.strip().lower()
+        if qg not in config.VALID_QUALITY_GATES:
+            return _error(400, "INVALID_QUALITY_GATE", f"Unknown quality_gate '{quality_gate}'")
+
+    # Validate language
+    lang = None
+    if language is not None:
+        lang = language.strip().lower()
+        if not lang or len(lang) > 10:
+            return _error(400, "INVALID_LANGUAGE", "Language code must be a short ISO code")
+
+    # Save upload
+    tmp_path, ext, total_bytes_or_error = await _validate_and_save_upload(audio)
+    if tmp_path is None:
+        return total_bytes_or_error
+
+    total_bytes = total_bytes_or_error
+    original_filename = audio.filename
+
+    logger.info(f"SSE stream: {original_filename} ({total_bytes / 1024:.0f} KB) [preset={resolved_preset}]")
+
+    # Module stages for progress tracking
+    ALL_STAGES = [
+        "audio_quality", "transcription", "text_analysis", "advanced_text_analysis",
+        "rhetorical_analysis", "sentiment_analysis", "audio_analysis", "advanced_audio_analysis"
+    ]
+    
+    async def event_stream():
+        progress_queue = queue.Queue()
+        result_holder = {"result": None, "error": None}
+        tmp_wav = None
+
+        def progress_callback(stage: str):
+            """Called by pipeline_runner before each stage."""
+            # Calculate progress percentage based on stage
+            try:
+                stage_idx = ALL_STAGES.index(stage)
+                progress = int((stage_idx / len(ALL_STAGES)) * 100)
+            except ValueError:
+                progress = 50
+            progress_queue.put(("progress", {"stage": stage, "progress": progress}))
+
+        def run_pipeline():
+            nonlocal tmp_wav
+            try:
+                # Check duration
+                duration = pipeline_runner.get_audio_duration(tmp_path)
+                if duration <= 0:
+                    result_holder["error"] = "Could not read audio file. It may be corrupt."
+                    return
+                if duration > config.MAX_DURATION_SEC:
+                    result_holder["error"] = f"Audio duration {duration:.0f}s exceeds {config.MAX_DURATION_SEC}s limit."
+                    return
+
+                # Record usage
+                audio_minutes = duration / 60.0
+                rate_limiter.record_audio_minutes(key_id, audio_minutes)
+                usage_tracker.record_audio_minutes(key_id, audio_minutes)
+
+                # Convert to WAV
+                progress_queue.put(("progress", {"stage": "converting", "progress": 5}))
+                try:
+                    tmp_wav = pipeline_runner.convert_to_wav(tmp_path)
+                except RuntimeError as e:
+                    result_holder["error"] = f"Conversion failed: {str(e)}"
+                    return
+
+                # Run pipeline with progress callback
+                result = pipeline_runner.run_pipeline(
+                    tmp_wav,
+                    progress_callback=progress_callback,
+                    modules=resolved_modules,
+                    language=lang,
+                    quality_gate=qg,
+                    preset=resolved_preset,
+                    modules_requested=modules_requested,
+                )
+
+                # Override filename
+                result["audio_file"] = original_filename
+
+                # Persist to SQLite
+                speech_id = pipeline_runner.persist_result(
+                    original_audio_path=tmp_path,
+                    result=result,
+                    filename=original_filename,
+                    preset=resolved_preset,
+                    user_id=user_id,
+                )
+                if speech_id is not None:
+                    result["speech_id"] = speech_id
+
+                result_holder["result"] = result
+
+            except pipeline_runner.QualityGateError as e:
+                result_holder["error"] = str(e)
+            except Exception as e:
+                logger.exception("Pipeline error in SSE stream")
+                result_holder["error"] = f"Analysis failed: {str(e)[:500]}"
+            finally:
+                progress_queue.put(("done", None))
+
+        # Start pipeline in background thread
+        thread = threading.Thread(target=run_pipeline, daemon=True)
+        thread.start()
+
+        # Stream events
+        try:
+            while True:
+                try:
+                    event_type, data = progress_queue.get(timeout=0.5)
+                except queue.Empty:
+                    # Send keepalive comment
+                    yield ": keepalive\n\n"
+                    continue
+
+                if event_type == "done":
+                    break
+                elif event_type == "progress":
+                    yield f"event: progress\ndata: {json.dumps(data)}\n\n"
+
+            # Wait for thread to finish (long timeout for large files)
+            thread.join(timeout=600)
+
+            # Send final result or error
+            if result_holder["error"]:
+                yield f"event: error\ndata: {json.dumps({'error': result_holder['error']})}\n\n"
+            elif result_holder["result"]:
+                # Send 100% progress
+                yield f"event: progress\ndata: {json.dumps({'stage': 'complete', 'progress': 100})}\n\n"
+                yield f"event: complete\ndata: {json.dumps(result_holder['result'])}\n\n"
+
+        finally:
+            # Wait for thread to fully complete before cleanup
+            if thread.is_alive():
+                thread.join(timeout=60)
+            
+            # Cleanup temp files
+            for path in [tmp_path, tmp_wav]:
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +576,7 @@ async def get_job(job_id: str, key_data: dict = Depends(auth_required)):
 @router.get("/jobs", response_model=JobListResponse, tags=["Jobs"])
 async def list_jobs(
     status: Optional[str] = Query(None, description="Filter by status: queued|processing|complete|failed"),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """List recent async jobs (last 50). Optionally filter by status."""
     valid_statuses = {"queued", "processing", "complete", "failed"}
@@ -535,21 +739,27 @@ async def list_speeches(
     product: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
-    """List speeches stored in the database."""
+    """List speeches stored in the database. Users see only their own speeches; API keys see all."""
     db = pipeline_runner.get_db()
-    speeches = db.list_speeches(category=category, product=product, limit=limit, offset=offset)
-    total = db.count_speeches()
+    user_id = auth.get("user_id")
+    speeches = db.list_speeches(category=category, product=product, limit=limit, offset=offset, user_id=user_id)
+    total = db.count_speeches(user_id=user_id)
     return {"speeches": speeches, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/speeches/{speech_id}", tags=["Database"])
-async def get_speech(speech_id: int, key_data: dict = Depends(auth_required)):
+async def get_speech(speech_id: int, auth: dict = Depends(flexible_auth)):
     """Get a speech record with its latest analysis metrics."""
     db = pipeline_runner.get_db()
     speech = db.get_speech(speech_id)
     if not speech:
+        return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
+
+    # Users can only see their own speeches
+    user_id = auth.get("user_id")
+    if user_id and speech.get("user_id") and speech["user_id"] != user_id:
         return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
 
     analysis = db.get_analysis(speech_id)
@@ -582,7 +792,7 @@ async def get_speech(speech_id: int, key_data: dict = Depends(auth_required)):
 
 
 @router.get("/speeches/{speech_id}/analysis", tags=["Database"])
-async def get_speech_analysis(speech_id: int, key_data: dict = Depends(auth_required)):
+async def get_speech_analysis(speech_id: int, auth: dict = Depends(flexible_auth)):
     """Get the full analysis JSON for a speech."""
     db = pipeline_runner.get_db()
     result = db.get_full_analysis(speech_id)
@@ -592,23 +802,32 @@ async def get_speech_analysis(speech_id: int, key_data: dict = Depends(auth_requ
 
 
 @router.get("/speeches/{speech_id}/audio", tags=["Database"])
-async def get_speech_audio(speech_id: int, key_data: dict = Depends(auth_required)):
-    """Download the stored audio (Opus) for a speech."""
+async def get_speech_audio(
+    speech_id: int,
+    download: bool = Query(False, description="Force download instead of inline playback"),
+    auth: dict = Depends(flexible_auth)
+):
+    """Stream or download the stored audio for a speech."""
     db = pipeline_runner.get_db()
     audio = db.get_audio(speech_id)
     if not audio:
         return _error(404, "NOT_FOUND", f"No audio stored for speech {speech_id}.")
 
     fmt = audio["format"]
-    mime = {"opus": "audio/opus", "mp3": "audio/mpeg", "wav": "audio/wav"}.get(fmt, "application/octet-stream")
+    mime = {"opus": "audio/opus", "mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg"}.get(fmt, "application/octet-stream")
     filename = audio.get("original_filename", f"speech_{speech_id}.{fmt}")
     if not filename.endswith(f".{fmt}"):
         filename = f"{os.path.splitext(filename)[0]}.{fmt}"
 
+    disposition = "attachment" if download else "inline"
+    
     return Response(
         content=audio["data"],
         media_type=mime,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{filename}"',
+            "Accept-Ranges": "bytes",
+        },
     )
 
 
@@ -616,7 +835,7 @@ async def get_speech_audio(speech_id: int, key_data: dict = Depends(auth_require
 async def get_speech_spectrogram(
     speech_id: int,
     type: str = Query("combined", description="Spectrogram type: combined, spectrogram, mel, loudness"),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """Download stored spectrogram image for a speech."""
     db = pipeline_runner.get_db()
@@ -635,7 +854,7 @@ async def get_speech_spectrogram(
 
 
 @router.get("/db/stats", tags=["Database"])
-async def db_stats(key_data: dict = Depends(auth_required)):
+async def db_stats(auth: dict = Depends(flexible_auth)):
     """Get database statistics: speech count, audio storage, product distribution."""
     db = pipeline_runner.get_db()
     return db.stats()
@@ -678,7 +897,7 @@ async def admin_usage(key_data: dict = Depends(admin_required)):
 async def get_speech_score(
     speech_id: int,
     profile: str = Query("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical"),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """
     Get a scored assessment of a speech with letter grades and numeric scores.
@@ -718,7 +937,7 @@ async def list_scoring_profiles(key_data: dict = Depends(auth_required)):
 @router.get("/speeches/{speech_id}/benchmark", tags=["Comparison"])
 async def benchmark_speech(
     speech_id: int,
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """
     Benchmark a speech against the entire database.
@@ -745,7 +964,7 @@ async def benchmark_speech(
 @router.post("/compare", tags=["Comparison"])
 async def compare_speeches(
     body: dict = Body(..., example={"speech_ids": [1, 2, 3], "profile": "general"}),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """
     Compare 2+ speeches side-by-side with metrics and scoring.
@@ -833,7 +1052,7 @@ async def batch_analyze(
     request: Request,
     preset: Optional[str] = Query("full", description="Analysis preset for all files"),
     language: Optional[str] = Query(None, description="Language code for Whisper"),
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """
     Submit multiple audio files for batch analysis.
@@ -929,7 +1148,7 @@ async def batch_analyze(
                 quality_gate="warn",
                 language=lang,
                 modules_requested=modules_requested,
-                key_id=key_data["key_id"],
+                key_id=auth["key_data"]["key_id"] if auth.get("key_data") else "user",
             )
             jobs.append({
                 "filename": file_item.filename,
@@ -972,7 +1191,7 @@ async def batch_analyze(
 @router.get("/batch/{batch_id}", tags=["Batch"])
 async def get_batch_status(
     batch_id: str,
-    key_data: dict = Depends(auth_required),
+    auth: dict = Depends(flexible_auth),
 ):
     """Check status of a batch analysis job. Returns individual job statuses."""
     batch = _batches.get(batch_id)

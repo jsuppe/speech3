@@ -196,6 +196,7 @@ def run_pipeline(
         "beam_size": 5,
         "vad_filter": True,
         "vad_parameters": {"min_silence_duration_ms": 300},
+        "word_timestamps": True,  # Enable word-level timestamps
     }
     if language:
         whisper_kwargs["language"] = language
@@ -207,10 +208,22 @@ def run_pipeline(
     segment_list = []
     full_text_parts = []
     for seg in segments_gen:
+        # Extract word-level timestamps if available
+        words = []
+        if hasattr(seg, 'words') and seg.words:
+            for w in seg.words:
+                words.append({
+                    "start": round(w.start, 3),
+                    "end": round(w.end, 3),
+                    "word": w.word.strip(),
+                    "probability": round(w.probability, 3) if hasattr(w, 'probability') else None,
+                })
+        
         segment_list.append({
             "start": round(seg.start, 2),
             "end": round(seg.end, 2),
-            "text": seg.text.strip()
+            "text": seg.text.strip(),
+            "words": words,  # Include word-level data
         })
         full_text_parts.append(seg.text.strip())
 
@@ -386,6 +399,7 @@ def persist_result(
     category: str = None,
     source_url: str = None,
     spectrogram_path: str = None,
+    user_id: int = None,
 ) -> int | None:
     """
     Persist analysis result + audio (as Opus) to SQLite.
@@ -421,6 +435,7 @@ def persist_result(
                 category=category,
                 products=products or ["SpeechScore"],
                 audio_hash=audio_hash,
+                user_id=user_id,
             )
 
             # Store audio as Opus

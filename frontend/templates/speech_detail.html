@@ -85,12 +85,21 @@
 
     <!-- Metric Score Breakdown -->
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
-        <h2 class="text-lg font-semibold text-white mb-4">Metric Breakdown</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-white">Metric Breakdown</h2>
+            <span class="text-xs text-gray-500">Hover <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-indigo-500/25 text-indigo-400 text-[9px] font-semibold">?</span> for explanations</span>
+        </div>
         <div class="space-y-3">
             {% for metric_name, m in score.metric_scores.items() %}
             {% if m.available and m.score is not none %}
             <div class="flex items-center gap-3">
-                <div class="w-36 text-sm text-gray-400 truncate" title="{{ m.label }}">{{ m.label }}</div>
+                <div class="w-36 text-sm text-gray-400">
+                    <span class="metric-tip tip-left">
+                        <span class="truncate">{{ m.label }}</span><span class="tip-icon">?</span>
+                        {% if metric_info.get(metric_name) %}<span class="tip-text">{{ metric_info[metric_name] }}</span>
+                        {% elif metric_info.get(m.label) %}<span class="tip-text">{{ metric_info[m.label] }}</span>{% endif %}
+                    </span>
+                </div>
                 <div class="flex-1">
                     <div class="w-full bg-gray-800 rounded-full h-3 relative">
                         <div class="h-3 rounded-full transition-all duration-500"
@@ -141,7 +150,12 @@
         {% for label, value, fmt, unit in metrics %}
         {% if value is not none %}
         <div class="metric-card bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="text-xs text-gray-500 uppercase tracking-wide">{{ label }}</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">
+                <span class="metric-tip{% if loop.index <= 2 %} tip-left{% elif loop.index > 10 %} tip-right{% endif %}">
+                    {{ label }}<span class="tip-icon">?</span>
+                    {% if metric_info.get(label) %}<span class="tip-text">{{ metric_info[label] }}</span>{% endif %}
+                </span>
+            </div>
             <div class="text-xl font-bold text-white mt-1">
                 {% if value is number %}
                 {{ fmt|format(value if 'fry' not in label.lower() else value * 100) }}
@@ -165,7 +179,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Spectrogram</h2>
             {% if has_spectrogram %}
-            <img src="/v1/speeches/{{ speech.id }}/spectrogram"
+            <img src="/speeches/{{ speech.id }}/spectrogram.png"
                  alt="Spectrogram" class="w-full rounded-lg" loading="lazy">
             {% else %}
             <div class="flex items-center justify-center h-48 text-gray-500">No spectrogram available</div>
@@ -180,7 +194,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Audio</h2>
             <audio controls class="w-full" preload="none">
-                <source src="/v1/speeches/{{ speech.id }}/audio" type="audio/opus">
+                <source src="/speeches/{{ speech.id }}/audio.opus" type="audio/opus">
                 Your browser does not support the audio element.
             </audio>
             <div class="text-xs text-gray-500 mt-2">
@@ -212,7 +226,7 @@
 
     <!-- Actions -->
     <div class="flex gap-3">
-        <a href="/v1/speeches/{{ speech.id }}/audio" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
+        <a href="/speeches/{{ speech.id }}/audio.opus" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
             Download Audio
         </a>
         <a href="/compare?ids={{ speech.id }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">

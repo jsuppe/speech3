@@ -250,19 +250,20 @@ class SpeechDB:
         notes: str = None,
         description: str = None,
         audio_hash: str = None,
+        user_id: int = None,
     ) -> int:
         """Insert a new speech record. Returns speech_id."""
         cur = self.conn.execute(
             """INSERT INTO speeches
                (title, speaker, year, source_url, source_file, duration_sec,
-                language, category, products, tags, notes, description, audio_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                language, category, products, tags, notes, description, audio_hash, user_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 title, speaker, year, source_url, source_file, duration_sec,
                 language, category,
                 json.dumps(products) if products else None,
                 json.dumps(tags) if tags else None,
-                notes, description, audio_hash,
+                notes, description, audio_hash, user_id,
             ),
         )
         self.conn.commit()
@@ -298,10 +299,14 @@ class SpeechDB:
         product: str = None,
         limit: int = 100,
         offset: int = 0,
+        user_id: int = None,
     ) -> list:
-        """List speeches with optional filters."""
+        """List speeches with optional filters. If user_id is set, only return that user's speeches."""
         query = "SELECT * FROM speeches WHERE 1=1"
         params = []
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
         if category:
             query += " AND category = ?"
             params.append(category)
@@ -319,8 +324,10 @@ class SpeechDB:
             results.append(d)
         return results
 
-    def count_speeches(self) -> int:
-        """Total speech count."""
+    def count_speeches(self, user_id: int = None) -> int:
+        """Total speech count, optionally filtered by user."""
+        if user_id is not None:
+            return self.conn.execute("SELECT COUNT(*) FROM speeches WHERE user_id = ?", (user_id,)).fetchone()[0]
         return self.conn.execute("SELECT COUNT(*) FROM speeches").fetchone()[0]
 
     # ── Audio storage ─────────────────────────────────────────────────
