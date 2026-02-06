@@ -12,6 +12,7 @@ PORT = int(os.getenv("SPEECHSCORE_PORT", "8000"))
 # All valid module names that callers can request
 VALID_MODULES = {
     "transcription",    # Whisper STT (always required)
+    "diarization",      # Speaker diarization (resemblyzer + clustering)
     "text",             # core text analysis (analysis3_module)
     "advanced_text",    # readability, discourse, entities, perspective
     "rhetorical",       # anaphora, repetition, rhythm

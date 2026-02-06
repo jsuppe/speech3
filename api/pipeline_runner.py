@@ -231,6 +231,22 @@ def run_pipeline(
     timing["transcription_sec"] = round(time.time() - tt, 2)
     modules_run.append("transcription")
 
+    # --- Speaker Diarization ---
+    diarization_result = None
+    if _want("diarization") and segment_list:
+        _report("diarization")
+        td = time.time()
+        try:
+            from diarization import run_diarization, get_speaker_stats
+            # Run diarization and update segment_list in place
+            segment_list = run_diarization(audio_path, segment_list)
+            diarization_result = get_speaker_stats(segment_list)
+            timing["diarization_sec"] = round(time.time() - td, 2)
+            modules_run.append("diarization")
+        except Exception as e:
+            logger.warning(f"Diarization failed: {e}")
+            diarization_result = {"error": str(e)}
+
     # --- Text Analysis ---
     analysis = None
     if _want("text"):
@@ -348,6 +364,8 @@ def run_pipeline(
     # Conditionally include analysis sections
     if quality is not None:
         result["audio_quality"] = quality
+    if diarization_result is not None:
+        result["diarization"] = diarization_result
     if analysis is not None:
         result["speech3_text_analysis"] = analysis
     if advanced_text is not None:
