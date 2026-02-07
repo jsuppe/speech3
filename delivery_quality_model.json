@@ -1,0 +1,16 @@
+{
+  "model": "random_forest",
+  "accuracy": 0.6914285714285714,
+  "n_samples": 74,
+  "weights": {
+    "jitter_pct": 0.07353321950068603,
+    "shimmer_pct": 0.10504054491875234,
+    "hnr_db": 0.19286701376985352,
+    "pitch_std_hz": 0.10534302677992516,
+    "pitch_range_hz": 0.10077093196934844,
+    "wpm": 0.09792270171148754,
+    "articulation_rate": 0.090880472415775,
+    "lexical_diversity": 0.16847320091049384,
+    "connectedness": 0.06516888802367822
+  }
+}

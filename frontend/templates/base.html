@@ -14,6 +14,30 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
         .metric-card { transition: all 0.2s ease; }
+
+        /* Metric info tooltips */
+        .metric-tip { position: relative; display: inline-flex; align-items: center; cursor: help; }
+        .metric-tip .tip-icon { display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: 700;
+            background: #4f46e5; color: #e0e7ff; margin-left: 5px;
+            transition: background 0.15s; flex-shrink: 0; }
+        .metric-tip:hover .tip-icon, .metric-tip.tip-open .tip-icon { background: #6366f1; }
+        .metric-tip .tip-text { visibility: hidden; opacity: 0; position: absolute;
+            bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: #e2e8f0; border: 1px solid #4f46e5;
+            border-radius: 8px; padding: 10px 14px; font-size: 12.5px; font-weight: 400;
+            line-height: 1.5; width: 280px; z-index: 50; pointer-events: none;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+            transition: opacity 0.15s, visibility 0.15s; text-transform: none; }
+        .metric-tip .tip-text::after { content: ''; position: absolute;
+            top: 100%; left: 50%; transform: translateX(-50%);
+            border: 6px solid transparent; border-top-color: #4f46e5; }
+        .metric-tip:hover .tip-text, .metric-tip.tip-open .tip-text { visibility: visible; opacity: 1; pointer-events: auto; }
+        /* Keep tooltip on screen */
+        .metric-tip.tip-left .tip-text { left: 0; transform: translateX(0); }
+        .metric-tip.tip-left .tip-text::after { left: 16px; }
+        .metric-tip.tip-right .tip-text { left: auto; right: 0; transform: translateX(0); }
+        .metric-tip.tip-right .tip-text::after { left: auto; right: 16px; }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -32,6 +56,7 @@
                             <a href="/speeches" class="px-3 py-2 rounded-md text-sm font-medium {% if '/speeches' in request.url.path and request.url.path != '/' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Speeches</a>
                             <a href="/upload" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/upload' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Upload</a>
                             <a href="/compare" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/compare' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Compare</a>
+                            <a href="/methodology" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/methodology' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Methodology</a>
                         </div>
                     </div>
                     <div class="text-xs text-gray-500">
@@ -47,6 +72,20 @@
         </main>
     </div>
 
+    <!-- Tooltip click/tap support -->
+    <script>
+    document.addEventListener('click', function(e) {
+        const icon = e.target.closest('.tip-icon');
+        if (icon) {
+            e.stopPropagation();
+            const tip = icon.closest('.metric-tip');
+            document.querySelectorAll('.metric-tip.tip-open').forEach(t => { if (t !== tip) t.classList.remove('tip-open'); });
+            tip.classList.toggle('tip-open');
+        } else if (!e.target.closest('.tip-text')) {
+            document.querySelectorAll('.metric-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+        }
+    });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

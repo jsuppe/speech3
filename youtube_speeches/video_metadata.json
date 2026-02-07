@@ -1,0 +1,58 @@
+[
+  {
+    "url": "https://www.youtube.com/watch?v=UF8uR6Z6KLc",
+    "metadata": {
+      "video_id": "UF8uR6Z6KLc",
+      "title": "Steve Jobs' 2005 Stanford Commencement Address",
+      "channel": "Stanford",
+      "views": 47937174,
+      "likes": 559156,
+      "duration": 904,
+      "like_ratio": 1.166435051010725,
+      "upload_date": "20080308"
+    },
+    "quality_score": 4.471991032354489
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=arj7oStGLkU",
+    "metadata": {
+      "video_id": "arj7oStGLkU",
+      "title": "Inside the Mind of a Master Procrastinator | Tim Urban | TED",
+      "channel": "TED",
+      "views": 60777265,
+      "likes": 2038285,
+      "duration": 844,
+      "like_ratio": 3.353696485026103,
+      "upload_date": "20160406"
+    },
+    "quality_score": 7.1379322431381516
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=eIho2S0ZahI",
+    "metadata": {
+      "video_id": "eIho2S0ZahI",
+      "title": "How to Speak So That People Want to Listen | Julian Treasure | TED",
+      "channel": "TED",
+      "views": 48099625,
+      "likes": 1086469,
+      "duration": 598,
+      "like_ratio": 2.2587889198720363,
+      "upload_date": "20140627"
+    },
+    "quality_score": 5.783403380042001
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=iCvmsMzlF7o",
+    "metadata": {
+      "video_id": "iCvmsMzlF7o",
+      "title": "The Power of Vulnerability | Bren\u00e9 Brown | TED",
+      "channel": "TED",
+      "views": 24253344,
+      "likes": 429537,
+      "duration": 1250,
+      "like_ratio": 1.7710423766718517,
+      "upload_date": "20110103"
+    },
+    "quality_score": 5.079159502676367
+  }
+]

@@ -196,6 +196,7 @@ def run_pipeline(
         "beam_size": 5,
         "vad_filter": True,
         "vad_parameters": {"min_silence_duration_ms": 300},
+        "word_timestamps": True,  # Enable word-level timestamps
     }
     if language:
         whisper_kwargs["language"] = language
@@ -207,16 +208,44 @@ def run_pipeline(
     segment_list = []
     full_text_parts = []
     for seg in segments_gen:
+        # Extract word-level timestamps if available
+        words = []
+        if hasattr(seg, 'words') and seg.words:
+            for w in seg.words:
+                words.append({
+                    "start": round(w.start, 3),
+                    "end": round(w.end, 3),
+                    "word": w.word.strip(),
+                    "probability": round(w.probability, 3) if hasattr(w, 'probability') else None,
+                })
+        
         segment_list.append({
             "start": round(seg.start, 2),
             "end": round(seg.end, 2),
-            "text": seg.text.strip()
+            "text": seg.text.strip(),
+            "words": words,  # Include word-level data
         })
         full_text_parts.append(seg.text.strip())
 
     transcript = " ".join(full_text_parts)
     timing["transcription_sec"] = round(time.time() - tt, 2)
     modules_run.append("transcription")
+
+    # --- Speaker Diarization ---
+    diarization_result = None
+    if _want("diarization") and segment_list:
+        _report("diarization")
+        td = time.time()
+        try:
+            from diarization import run_diarization, get_speaker_stats
+            # Run diarization and update segment_list in place
+            segment_list = run_diarization(audio_path, segment_list)
+            diarization_result = get_speaker_stats(segment_list)
+            timing["diarization_sec"] = round(time.time() - td, 2)
+            modules_run.append("diarization")
+        except Exception as e:
+            logger.warning(f"Diarization failed: {e}")
+            diarization_result = {"error": str(e)}
 
     # --- Text Analysis ---
     analysis = None
@@ -335,6 +364,8 @@ def run_pipeline(
     # Conditionally include analysis sections
     if quality is not None:
         result["audio_quality"] = quality
+    if diarization_result is not None:
+        result["diarization"] = diarization_result
     if analysis is not None:
         result["speech3_text_analysis"] = analysis
     if advanced_text is not None:
@@ -386,6 +417,7 @@ def persist_result(
     category: str = None,
     source_url: str = None,
     spectrogram_path: str = None,
+    user_id: int = None,
 ) -> int | None:
     """
     Persist analysis result + audio (as Opus) to SQLite.
@@ -421,6 +453,7 @@ def persist_result(
                 category=category,
                 products=products or ["SpeechScore"],
                 audio_hash=audio_hash,
+                user_id=user_id,
             )
 
             # Store audio as Opus

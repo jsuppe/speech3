@@ -1,0 +1,16 @@
+{
+  "google": {
+    "client_ids": [
+      "819724788424-npch88um1io67mbg026fk5lm1d5ib71a.apps.googleusercontent.com",
+      "819724788424-r7p1tr8l7k2b2glsdn1ktj0o6k7cspb0.apps.googleusercontent.com"
+    ],
+    "enabled": true
+  },
+  "apple": {
+    "team_id": "",
+    "key_id": "",
+    "bundle_id": "",
+    "enabled": false
+  },
+  "jwt_secret": "b1ba2f3d04b512275b6a36484cf29f6d7d6aee7c220a4e067e29544657724448"
+}

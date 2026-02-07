@@ -54,6 +54,10 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to load models: {e}")
         # Still start the server so /health can report the problem
 
+    # Initialize user auth system (users table, JWT, OAuth config)
+    from .user_auth import init_user_auth
+    init_user_auth(config.DB_PATH)
+
     # Initialize API key system
     from .auth import init_keys
     admin_key = init_keys()
@@ -187,6 +191,10 @@ async def global_exception_handler(request, exc):
 # Register API routes
 from .router import router  # noqa: E402
 app.include_router(router)
+
+# Register authentication routes
+from .auth_routes import auth_router  # noqa: E402
+app.include_router(auth_router)
 
 # Register frontend routes
 try:

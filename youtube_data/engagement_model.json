@@ -1,0 +1,18 @@
+{
+  "model": "random_forest",
+  "r2_score": -0.6856914676140249,
+  "n_samples": 35,
+  "weights": {
+    "wpm": 0.02466096188149906,
+    "articulation_rate": 0.018512173198603342,
+    "pitch_mean_hz": 0.014210779294021597,
+    "pitch_std_hz": 0.0861041859323371,
+    "pitch_range_hz": 0.17539087272124992,
+    "jitter_pct": 0.377445562181635,
+    "shimmer_pct": 0.08883101253744718,
+    "hnr_db": 0.09651904472461771,
+    "lexical_diversity": 0.03332622666128372,
+    "syntactic_complexity": 0.020817254889825478,
+    "connectedness": 0.06418192597748013
+  }
+}

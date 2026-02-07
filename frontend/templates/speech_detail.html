@@ -25,6 +25,111 @@
         </div>
     </div>
 
+    {% if score %}
+    <!-- Overall Score Card -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-white">Speech Score</h2>
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400">Profile:</label>
+                <select id="profileSelect" onchange="window.location.href='/speeches/{{ speech.id }}?profile=' + this.value"
+                    class="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:border-indigo-500 focus:outline-none">
+                    {% for p in available_profiles %}
+                    <option value="{{ p }}" {% if p == current_profile %}selected{% endif %}>{{ p|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <!-- Big Grade Display -->
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="text-6xl font-black" style="color: {{ score.grade_color }}">{{ score.letter_grade }}</div>
+                <div class="text-2xl font-bold text-white mt-1">{{ score.composite_score }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ score.profile_description }}</div>
+            </div>
+
+            <!-- Category Scores -->
+            <div class="col-span-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {% for cat_key, cat in score.category_scores.items() %}
+                <div class="bg-gray-800/50 rounded-lg p-3 text-center">
+                    <div class="text-xs text-gray-500 uppercase tracking-wide">{{ cat.label }}</div>
+                    <div class="text-2xl font-bold mt-1" style="color: {{ cat.grade_color }}">{{ cat.grade }}</div>
+                    <div class="text-sm text-gray-400">{{ cat.score }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if score.strengths or score.improvements %}
+        <div class="grid md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-800">
+            {% if score.strengths %}
+            <div>
+                <h3 class="text-sm font-medium text-green-400 mb-2">💪 Strengths</h3>
+                {% for s in score.strengths %}
+                <div class="text-sm text-gray-300">• {{ s }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if score.improvements %}
+            <div>
+                <h3 class="text-sm font-medium text-amber-400 mb-2">📈 Areas for Improvement</h3>
+                {% for i in score.improvements %}
+                <div class="text-sm text-gray-300">• {{ i }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Metric Score Breakdown -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-white">Metric Breakdown</h2>
+            <span class="text-xs text-gray-500">Hover <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-indigo-500/25 text-indigo-400 text-[9px] font-semibold">?</span> for explanations</span>
+        </div>
+        <div class="space-y-3">
+            {% for metric_name, m in score.metric_scores.items() %}
+            {% if m.available and m.score is not none %}
+            <div class="flex items-center gap-3">
+                <div class="w-36 text-sm text-gray-400">
+                    <span class="metric-tip tip-left">
+                        <span class="truncate">{{ m.label }}</span><span class="tip-icon">?</span>
+                        {% if metric_info.get(metric_name) %}<span class="tip-text">{{ metric_info[metric_name] }}</span>
+                        {% elif metric_info.get(m.label) %}<span class="tip-text">{{ metric_info[m.label] }}</span>{% endif %}
+                    </span>
+                </div>
+                <div class="flex-1">
+                    <div class="w-full bg-gray-800 rounded-full h-3 relative">
+                        <div class="h-3 rounded-full transition-all duration-500"
+                             style="width: {{ m.score }}%; background-color: {{ m.grade_color }};"></div>
+                    </div>
+                </div>
+                <div class="w-10 text-right text-sm font-mono font-bold" style="color: {{ m.grade_color }}">{{ m.grade }}</div>
+                <div class="w-12 text-right text-sm text-gray-400 font-mono">{{ m.score }}</div>
+                <div class="w-24 text-right text-xs text-gray-500">
+                    {{ m.value }}{% if m.unit %} {{ m.unit }}{% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Score Radar + Bar Charts -->
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Score Profile</h2>
+            <canvas id="scoreRadarChart" height="280"></canvas>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Metric Scores</h2>
+            <canvas id="scoreBarChart" height="280"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
     {% if analysis %}
     <!-- Key Metrics Grid -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -45,7 +150,12 @@
         {% for label, value, fmt, unit in metrics %}
         {% if value is not none %}
         <div class="metric-card bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="text-xs text-gray-500 uppercase tracking-wide">{{ label }}</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">
+                <span class="metric-tip{% if loop.index <= 2 %} tip-left{% elif loop.index > 10 %} tip-right{% endif %}">
+                    {{ label }}<span class="tip-icon">?</span>
+                    {% if metric_info.get(label) %}<span class="tip-text">{{ metric_info[label] }}</span>{% endif %}
+                </span>
+            </div>
             <div class="text-xl font-bold text-white mt-1">
                 {% if value is number %}
                 {{ fmt|format(value if 'fry' not in label.lower() else value * 100) }}
@@ -59,18 +169,17 @@
         {% endfor %}
     </div>
 
-    <!-- Metrics Radar Chart -->
+    <!-- Spectrogram -->
     <div class="grid md:grid-cols-2 gap-6 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Analysis Profile</h2>
             <canvas id="radarChart" height="250"></canvas>
         </div>
 
-        <!-- Spectrogram -->
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Spectrogram</h2>
             {% if has_spectrogram %}
-            <img src="/v1/speeches/{{ speech.id }}/spectrogram"
+            <img src="/speeches/{{ speech.id }}/spectrogram.png"
                  alt="Spectrogram" class="w-full rounded-lg" loading="lazy">
             {% else %}
             <div class="flex items-center justify-center h-48 text-gray-500">No spectrogram available</div>
@@ -85,7 +194,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Audio</h2>
             <audio controls class="w-full" preload="none">
-                <source src="/v1/speeches/{{ speech.id }}/audio" type="audio/opus">
+                <source src="/speeches/{{ speech.id }}/audio.opus" type="audio/opus">
                 Your browser does not support the audio element.
             </audio>
             <div class="text-xs text-gray-500 mt-2">
@@ -117,20 +226,113 @@
 
     <!-- Actions -->
     <div class="flex gap-3">
-        <a href="/v1/speeches/{{ speech.id }}/audio" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
+        <a href="/speeches/{{ speech.id }}/audio.opus" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
             Download Audio
         </a>
         <a href="/compare?ids={{ speech.id }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">
             Compare
+        </a>
+        <a href="/v1/speeches/{{ speech.id }}/benchmark" target="_blank" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">
+            Benchmark JSON
         </a>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-{% if analysis %}
 <script>
-// Radar chart — normalize metrics to 0-1 scale
+{% if score %}
+// Score data from backend
+const scoreData = {{ score_json|safe }};
+
+// Score Radar Chart
+if (scoreData && scoreData.metric_scores) {
+    const metricEntries = Object.entries(scoreData.metric_scores)
+        .filter(([k, v]) => v.available && v.score !== null);
+
+    const radarLabels = metricEntries.map(([k, v]) => v.label);
+    const radarValues = metricEntries.map(([k, v]) => v.score);
+    const radarColors = metricEntries.map(([k, v]) => v.grade_color);
+
+    new Chart(document.getElementById('scoreRadarChart'), {
+        type: 'radar',
+        data: {
+            labels: radarLabels,
+            datasets: [{
+                data: radarValues,
+                backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                borderColor: '#6366f1',
+                borderWidth: 2,
+                pointBackgroundColor: radarColors,
+                pointBorderColor: radarColors,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const idx = ctx.dataIndex;
+                            const m = metricEntries[idx][1];
+                            return `${m.label}: ${m.score} (${m.grade}) — ${m.value} ${m.unit}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: { color: '#1f2937' },
+                    angleLines: { color: '#1f2937' },
+                    ticks: { display: false },
+                    pointLabels: { color: '#9ca3af', font: { size: 10 } },
+                }
+            }
+        }
+    });
+
+    // Score Bar Chart
+    new Chart(document.getElementById('scoreBarChart'), {
+        type: 'bar',
+        data: {
+            labels: radarLabels,
+            datasets: [{
+                data: radarValues,
+                backgroundColor: radarColors.map(c => c + '99'),
+                borderColor: radarColors,
+                borderWidth: 1,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const idx = ctx.dataIndex;
+                            const m = metricEntries[idx][1];
+                            return `Score: ${m.score} (${m.grade})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { beginAtZero: true, max: 100, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+                y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+            }
+        }
+    });
+}
+{% endif %}
+
+{% if analysis %}
+// Legacy radar chart
 const metrics = {
     'WPM': {{ analysis.wpm or 0 }},
     'Pitch Var': {{ analysis.pitch_std_hz or 0 }},
@@ -140,7 +342,6 @@ const metrics = {
     'Repetition': {{ (analysis.repetition_score or 0) * 10 }},
 };
 
-// Normalize each to roughly 0-100 scale
 const norms = {
     'WPM': [80, 200],
     'Pitch Var': [0, 100],
@@ -183,6 +384,6 @@ new Chart(document.getElementById('radarChart'), {
         }
     }
 });
-</script>
 {% endif %}
+</script>
 {% endblock %}
