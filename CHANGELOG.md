@@ -4,6 +4,15 @@ All notable changes to the SpeechScore platform (API, Web Dashboard, Mobile App)
 
 ## [Unreleased]
 
+### 2026-02-18 (Parity Check)
+
+#### Web Dashboard (speechscore.dev)
+- **Added** "🎧 Hear Examples" section in metric help modal — parity with mobile
+  - Play/pause buttons for A/B/C/D/F grade exemplars
+  - Shows speaker name and source (MLK, JFK, FDR, Churchill, etc.)
+  - Audio streams directly from API
+  - Visual feedback with animated volume icon during playback
+
 ### 2026-02-17
 
 #### Mobile App (Flutter) - Project Recording Reminders

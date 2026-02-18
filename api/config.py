@@ -23,8 +23,8 @@ VALID_MODULES = {
     "all",              # shorthand for everything
 }
 
-# The full set when "all" is requested
-ALL_MODULES = VALID_MODULES - {"all"}
+# The full set when "all" is requested (diarization excluded by default - opt-in only)
+ALL_MODULES = VALID_MODULES - {"all", "diarization"}
 
 # Named presets → module sets
 MODULE_PRESETS = {
@@ -34,7 +34,7 @@ MODULE_PRESETS = {
     "full":      ALL_MODULES.copy(),
     "clinical":  {"transcription", "quality", "audio", "advanced_audio"},
     "coaching":  {"transcription", "quality", "text", "audio", "sentiment"},
-    "group":     {"transcription", "quality", "diarization"},  # Multi-party focus: transcription + speaker ID
+    # "group" preset removed - group meetings disabled for initial release
 }
 
 # Quality gate modes
