@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SpeakFit Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="h-full text-gray-100 flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-8 shadow-2xl">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold text-white mb-2">SpeakFit Dashboard</h1>
+                <p class="text-gray-400">Sign in to access the admin dashboard</p>
+            </div>
+            
+            {% if error %}
+            <div class="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg">
+                <p class="text-red-400 text-sm">{{ error }}</p>
+            </div>
+            {% endif %}
+            
+            <div class="flex justify-center">
+                <div id="g_id_onload"
+                     data-client_id="{{ google_client_id }}"
+                     data-context="signin"
+                     data-ux_mode="popup"
+                     data-callback="handleCredentialResponse"
+                     data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-shape="rectangular"
+                     data-theme="filled_black"
+                     data-text="signin_with"
+                     data-size="large"
+                     data-logo_alignment="left">
+                </div>
+            </div>
+            
+            <p class="mt-6 text-center text-xs text-gray-500">
+                Access restricted to authorized users only.
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        function handleCredentialResponse(response) {
+            // Send the credential to our backend
+            fetch('/auth/google/callback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'credential=' + encodeURIComponent(response.credential)
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    return response.json().then(data => {
+                        alert(data.error || 'Login failed');
+                        window.location.reload();
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Login failed. Please try again.');
+            });
+        }
+    </script>
+</body>
+</html>

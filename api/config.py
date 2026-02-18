@@ -34,6 +34,7 @@ MODULE_PRESETS = {
     "full":      ALL_MODULES.copy(),
     "clinical":  {"transcription", "quality", "audio", "advanced_audio"},
     "coaching":  {"transcription", "quality", "text", "audio", "sentiment"},
+    "group":     {"transcription", "quality", "diarization"},  # Multi-party focus: transcription + speaker ID
 }
 
 # Quality gate modes

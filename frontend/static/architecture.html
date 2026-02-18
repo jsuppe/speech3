@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SpeakFit Architecture - 3D View</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #loading {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: white; font-size: 18px;
+            background: rgba(0,0,0,0.8); padding: 30px;
+            border-radius: 10px; text-align: center;
+        }
+        #loading .spinner {
+            border: 4px solid #333; border-top: 4px solid #4CAF50;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #info {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.8); color: white;
+            padding: 15px; border-radius: 8px; max-width: 300px;
+        }
+        #info h3 { margin-top: 0; }
+        #controls {
+            position: absolute; bottom: 10px; left: 10px;
+            background: rgba(0,0,0,0.8); color: white;
+            padding: 10px; border-radius: 8px;
+        }
+        .layer-btn { margin: 2px; padding: 5px 10px; cursor: pointer; border-radius: 4px; border: none; }
+        #detail-panel {
+            position: absolute; top: 0; left: 0;
+            width: 65%; height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+            z-index: 100; padding: 20px;
+            box-sizing: border-box; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        #detail-panel.visible { transform: translateX(0); }
+        #detail-panel h2 { color: white; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid #444; }
+        #detail-canvas-container { flex: 1; position: relative; margin-top: 10px; }
+        #detail-canvas { width: 100%; height: 100%; }
+        #component-tooltip {
+            position: absolute; background: rgba(0,0,0,0.9); color: white;
+            padding: 10px 15px; border-radius: 6px; font-size: 13px;
+            pointer-events: none; display: none; max-width: 250px;
+            border: 1px solid #444; z-index: 200;
+        }
+        #component-tooltip h4 { margin: 0 0 5px 0; color: #4CAF50; }
+        #component-tooltip p { margin: 0; color: #aaa; }
+        #view-toggle {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%); display: flex; gap: 5px;
+            background: rgba(0,0,0,0.8); padding: 5px; border-radius: 6px;
+        }
+        #view-toggle button {
+            padding: 8px 16px; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 12px; background: #333; color: #aaa;
+        }
+        #view-toggle button.active { background: #4CAF50; color: white; }
+        #back-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: #e74c3c; color: white; border: none;
+            padding: 10px 20px; border-radius: 5px; cursor: pointer;
+            font-size: 16px; z-index: 101; display: none;
+        }
+        #back-btn.visible { display: block; }
+        #mini-view {
+            position: absolute; top: 10px; right: 10px;
+            width: 35%; height: 45%; border: 2px solid #444;
+            border-radius: 8px; overflow: hidden; display: none;
+            background: #1a1a2e; cursor: pointer;
+        }
+        #mini-view.visible { display: block; }
+        #mini-view:hover { border-color: #4CAF50; }
+        #mini-label {
+            position: absolute; bottom: 8px; left: 50%;
+            transform: translateX(-50%); background: rgba(0,0,0,0.8);
+            color: #4CAF50; padding: 5px 12px; border-radius: 4px;
+            font-size: 12px; pointer-events: none;
+        }
+        #selected-indicator {
+            position: absolute; top: 8px; left: 8px;
+            background: rgba(0,0,0,0.8); color: white;
+            padding: 5px 10px; border-radius: 4px;
+            font-size: 11px; pointer-events: none;
+        }
+        #full-graph-panel {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; background: #1a1a2e;
+            z-index: 200; display: none; padding: 20px; box-sizing: border-box;
+        }
+        #full-graph-panel.visible { display: block; }
+        #full-graph-panel h2 { color: white; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid #444; }
+        #full-graph-canvas { width: 100%; height: calc(100% - 60px); background: #12121f; border-radius: 8px; }
+        #meta-info {
+            position: absolute; bottom: 10px; right: 10px;
+            background: rgba(0,0,0,0.6); color: #666;
+            padding: 5px 10px; border-radius: 4px; font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+<div id="loading">
+    <div class="spinner"></div>
+    Loading architecture data...
+</div>
+
+<div id="info" style="display:none">
+    <h3>🏗️ SpeakFit Architecture</h3>
+    <p id="hover-info">Hover over components • Click to zoom in<br><br><em>Drag to rotate • Scroll to zoom</em></p>
+</div>
+<div id="controls" style="display:none">
+    <strong>Layers:</strong>
+    <span id="layer-buttons"></span>
+    <span style="margin-left:15px">|</span>
+    <button class="layer-btn" style="background:#e74c3c" onclick="showFullGraph()">🕸️ Full Graph</button>
+</div>
+
+<div id="detail-panel">
+    <h2 id="detail-title">Component Details</h2>
+    <div id="detail-canvas-container">
+        <canvas id="detail-canvas"></canvas>
+        <div id="component-tooltip"></div>
+        <div id="view-toggle">
+            <button id="btn-structure" class="active" onclick="setView('structure')">📐 Structure</button>
+            <button id="btn-deps" onclick="setView('deps')">📚 Dependencies</button>
+        </div>
+    </div>
+</div>
+<button id="back-btn" onclick="zoomOut()">← Back to Overview</button>
+
+<div id="mini-view" onclick="zoomOut()">
+    <canvas id="mini-canvas"></canvas>
+    <span id="selected-indicator"></span>
+    <span id="mini-label">📍 Click to return</span>
+</div>
+
+<div id="full-graph-panel">
+    <h2>🕸️ Full Dependency Graph <button onclick="hideFullGraph()" style="float:right;background:#e74c3c;border:none;color:white;padding:5px 15px;border-radius:4px;cursor:pointer">✕ Close</button></h2>
+    <canvas id="full-graph-canvas"></canvas>
+</div>
+
+<div id="meta-info"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// Global state
+let archData = null;
+let architecture = {};
+let componentDetails = {};
+let dependencyGraph = {};
+let isZoomedIn = false;
+let selectedComponent = null;
+let selectedMesh = null;
+let currentView = 'structure';
+let scene, camera, renderer, controls;
+let miniRenderer, miniCamera;
+let objects = [];
+let layers = {};
+let labelSprites = [];
+let detailRegions = [];
+
+// Load architecture data
+async function loadArchitectureData() {
+    try {
+        const response = await fetch('architecture-data.json');
+        archData = await response.json();
+        
+        architecture = archData.architecture;
+        componentDetails = archData.componentDetails || {};
+        dependencyGraph = archData.dependencyGraph || {};
+        
+        // Update meta info
+        document.getElementById('meta-info').textContent = 
+            `Generated: ${archData.meta?.generated_at?.split('T')[0] || 'Unknown'} | ${archData.meta?.component_count || 0} components`;
+        
+        // Hide loading, show UI
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('info').style.display = 'block';
+        document.getElementById('controls').style.display = 'block';
+        
+        // Initialize 3D scene
+        initScene();
+        buildScene();
+        animate();
+        
+    } catch (error) {
+        document.getElementById('loading').innerHTML = 
+            `<div style="color:#e74c3c">Error loading architecture data</div><p>${error.message}</p>`;
+    }
+}
+
+function initScene() {
+    // Scene setup
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(40, 30, 40);
+    
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    
+    // Mini-view
+    const miniCanvas = document.getElementById('mini-canvas');
+    miniRenderer = new THREE.WebGLRenderer({ canvas: miniCanvas, antialias: true });
+    miniCamera = new THREE.PerspectiveCamera(60, 1.4, 0.1, 1000);
+    miniCamera.position.set(50, 40, 50);
+    miniCamera.lookAt(0, 0, 0);
+    
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+    directional.position.set(20, 40, 20);
+    scene.add(directional);
+    
+    // Grid
+    const grid = new THREE.GridHelper(60, 20, 0x444444, 0x333333);
+    grid.position.y = -20;
+    scene.add(grid);
+    
+    // Event listeners
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('click', onClick);
+    window.addEventListener('resize', onResize);
+}
+
+function buildScene() {
+    const layerButtonsEl = document.getElementById('layer-buttons');
+    
+    Object.entries(architecture).forEach(([layerKey, layer]) => {
+        if (!layer.components || layer.components.length === 0) return;
+        
+        layers[layerKey] = [];
+        const color = parseInt(layer.color.replace('#', '0x'));
+        const cols = Math.ceil(Math.sqrt(layer.components.length));
+        
+        // Create layer button
+        const btn = document.createElement('button');
+        btn.className = 'layer-btn';
+        btn.style.background = layer.color;
+        btn.textContent = layer.name;
+        btn.onclick = () => toggleLayer(layerKey);
+        layerButtonsEl.appendChild(btn);
+        
+        layer.components.forEach((comp, i) => {
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            
+            const height = Math.max(1.5, (comp.size || 10) / 8);
+            const geometry = new THREE.BoxGeometry(3.5, height, 3.5);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: color,
+                transparent: true,
+                opacity: 0.85,
+                shininess: 30
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(
+                (col - cols/2) * 5.5,
+                layer.y + height/2,
+                (row - 1) * 5.5
+            );
+            mesh.userData = { 
+                name: comp.name, 
+                layer: layer.name,
+                size: comp.size || 10,
+                desc: comp.desc || '',
+                layerKey: layerKey,
+                hasDetails: !!componentDetails[comp.name]
+            };
+            
+            scene.add(mesh);
+            objects.push(mesh);
+            layers[layerKey].push(mesh);
+            
+            // Edges
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.4, transparent: true }));
+            line.position.copy(mesh.position);
+            scene.add(line);
+            layers[layerKey].push(line);
+        });
+        
+        // Platform
+        const platformGeom = new THREE.BoxGeometry(35, 0.3, 25);
+        const platformMat = new THREE.MeshPhongMaterial({ color: color, opacity: 0.2, transparent: true });
+        const platform = new THREE.Mesh(platformGeom, platformMat);
+        platform.position.set(0, layer.y - 0.5, 0);
+        scene.add(platform);
+        layers[layerKey].push(platform);
+        
+        // Layer label
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, 512, 128);
+        ctx.strokeStyle = layer.color;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, 508, 124);
+        ctx.fillStyle = layer.color;
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(layer.name, 256, 80);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(20, 5, 1);
+        sprite.position.set(-25, layer.y + 2, 0);
+        scene.add(sprite);
+        layers[layerKey].push(sprite);
+        labelSprites.push(sprite);
+    });
+    
+    // Connection lines between layers
+    const layerYs = Object.values(architecture).map(l => l.y).sort((a,b) => b-a);
+    for (let i = 0; i < layerYs.length - 1; i++) {
+        const line = createConnectionLine(layerYs[i], layerYs[i+1], (i % 2 === 0) ? -5 : 5);
+        scene.add(line);
+    }
+}
+
+function createConnectionLine(fromY, toY, xOffset) {
+    const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(xOffset, fromY - 1, 0),
+        new THREE.Vector3(xOffset + 5, (fromY + toY) / 2, 3),
+        new THREE.Vector3(xOffset, toY + 1, 0)
+    ]);
+    const points = curve.getPoints(20);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.6, transparent: true });
+    return new THREE.Line(geometry, material);
+}
+
+// Raycaster for hover/click
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredObject = null;
+
+function onMouseMove(event) {
+    if (isZoomedIn) return;
+    
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(objects);
+    
+    if (hoveredObject) {
+        hoveredObject.material.emissive?.setHex(0x000000);
+        hoveredObject.scale.set(1, 1, 1);
+    }
+    
+    const infoEl = document.getElementById('hover-info');
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        const data = obj.userData;
+        const clickHint = data.hasDetails ? '<br><strong style="color:#4CAF50">🔍 Click to zoom in</strong>' : '';
+        infoEl.innerHTML = `<strong>${data.name}</strong><br>Layer: ${data.layer}<br>Size: ${data.size}KB<br><em>${data.desc}</em>${clickHint}`;
+        if (obj.material.emissive) obj.material.emissive.setHex(0x333333);
+        obj.scale.set(1.1, 1.1, 1.1);
+        hoveredObject = obj;
+        document.body.style.cursor = 'pointer';
+    } else {
+        infoEl.innerHTML = 'Hover over components • Click to zoom in<br><br><em>Drag to rotate • Scroll to zoom</em>';
+        hoveredObject = null;
+        document.body.style.cursor = 'default';
+    }
+}
+
+function onClick(event) {
+    if (isZoomedIn) return;
+    
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(objects);
+    
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        zoomIn(obj.userData.name, obj);
+    }
+}
+
+function zoomIn(componentName, meshObj) {
+    isZoomedIn = true;
+    selectedComponent = componentName;
+    selectedMesh = meshObj;
+    
+    const details = componentDetails[componentName] || { color: '#888', type: 'flow' };
+    
+    document.getElementById('detail-title').innerHTML = 
+        `🔍 ${componentName} <span style="color:${details.color}">■</span>`;
+    
+    document.getElementById('detail-panel').classList.add('visible');
+    document.getElementById('back-btn').classList.add('visible');
+    document.getElementById('mini-view').classList.add('visible');
+    
+    setTimeout(() => renderDetailVisualization(componentName), 100);
+    
+    document.getElementById('selected-indicator').innerHTML = 
+        `<span style="color:${details.color}">●</span> ${componentName}`;
+    
+    const miniViewRect = document.getElementById('mini-view').getBoundingClientRect();
+    miniRenderer.setSize(miniViewRect.width, miniViewRect.height);
+    miniCamera.aspect = miniViewRect.width / miniViewRect.height;
+    miniCamera.updateProjectionMatrix();
+    
+    if (meshObj?.material?.emissive) meshObj.material.emissive.setHex(0x666666);
+    controls.enabled = false;
+}
+
+function zoomOut() {
+    isZoomedIn = false;
+    selectedComponent = null;
+    selectedMesh = null;
+    
+    // Hide widgetbook iframe
+    if (widgetbookIframe) {
+        widgetbookIframe.style.display = 'none';
+    }
+    
+    document.getElementById('detail-panel').classList.remove('visible');
+    document.getElementById('back-btn').classList.remove('visible');
+    document.getElementById('mini-view').classList.remove('visible');
+    
+    objects.forEach(obj => {
+        if (obj.material?.emissive) obj.material.emissive.setHex(0x000000);
+        obj.scale.set(1, 1, 1);
+    });
+    
+    controls.enabled = true;
+}
+
+function toggleLayer(layerKey) {
+    if (!layers[layerKey]) return;
+    const visible = !layers[layerKey][0].visible;
+    layers[layerKey].forEach(obj => obj.visible = visible);
+}
+window.toggleLayer = toggleLayer;
+
+// Detail view rendering
+const detailCanvas = document.getElementById('detail-canvas');
+const detailCtx = detailCanvas.getContext('2d');
+const tooltip = document.getElementById('component-tooltip');
+
+function renderDetailVisualization(componentName) {
+    const details = componentDetails[componentName] || {};
+    const container = document.getElementById('detail-canvas-container');
+    const w = container.clientWidth;
+    const h = container.clientHeight - 50;
+    
+    detailCanvas.width = w;
+    detailCanvas.height = h;
+    
+    detailCtx.fillStyle = '#1a1a2e';
+    detailCtx.fillRect(0, 0, w, h);
+    
+    if (currentView === 'deps') {
+        renderDependencyStack(componentName, w, h);
+        return;
+    }
+    
+    const type = details.type || 'flow';
+    switch (type) {
+        case 'phone': renderPhoneUI(details, w, h); break;
+        case 'flow': renderFlowDiagram(componentName, details, w, h); break;
+        case 'schema': renderSchema(details, w, h); break;
+        default: renderFlowDiagram(componentName, details, w, h);
+    }
+}
+
+// Widgetbook component name mapping
+const widgetbookComponents = {
+    'HomeScreen': 'screens/homescreen/default',
+    'ResultsScreen': 'screens/resultsscreen/with-score',
+    'RecordScreen': 'screens/recordscreen/ready-to-record',
+    'CoachScreen': 'screens/coachscreen/conversation',
+    'HistoryScreen': 'screens/historyscreen/with-recordings',
+    'SettingsScreen': 'screens/settingsscreen/default',
+};
+
+let widgetbookIframe = null;
+
+function renderPhoneUI(details, w, h) {
+    const ctx = detailCtx;
+    const componentName = selectedComponent;
+    
+    // Check if we have a Widgetbook preview for this component
+    if (componentName && widgetbookComponents[componentName]) {
+        // Clear canvas
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, w, h);
+        
+        // Show loading text
+        ctx.fillStyle = '#666';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading live Flutter preview...', w/2, 30);
+        
+        // Create or update iframe
+        const container = document.getElementById('detail-canvas-container');
+        
+        if (!widgetbookIframe) {
+            widgetbookIframe = document.createElement('iframe');
+            widgetbookIframe.id = 'widgetbook-frame';
+            widgetbookIframe.style.cssText = `
+                position: absolute;
+                top: 50px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 375px;
+                height: calc(100% - 120px);
+                border: 3px solid #333;
+                border-radius: 20px;
+                background: #000;
+            `;
+            container.appendChild(widgetbookIframe);
+        }
+        
+        // Build Widgetbook URL with component path
+        const path = widgetbookComponents[componentName];
+        widgetbookIframe.src = `/static/widgetbook/index.html#/?path=${encodeURIComponent(path)}`;
+        widgetbookIframe.style.display = 'block';
+        
+        detailRegions = [];
+        return;
+    }
+    
+    // Hide iframe if showing canvas-based preview
+    if (widgetbookIframe) {
+        widgetbookIframe.style.display = 'none';
+    }
+    
+    // Fallback to canvas rendering
+    const phoneW = Math.min(w * 0.4, 280);
+    const phoneH = phoneW * 2;
+    const phoneX = (w - phoneW) / 2;
+    const phoneY = (h - phoneH) / 2;
+    
+    // Phone frame
+    ctx.fillStyle = '#222';
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(phoneX - 10, phoneY - 30, phoneW + 20, phoneH + 60, 25);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Screen
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(phoneX, phoneY, phoneW, phoneH);
+    
+    detailRegions = [];
+    (details.regions || []).forEach(region => {
+        const rx = phoneX + (region.x / 100) * phoneW;
+        const ry = phoneY + (region.y / 100) * phoneH;
+        const rw = (region.w / 100) * phoneW;
+        const rh = (region.h / 100) * phoneH;
+        
+        detailRegions.push({ ...region, rx, ry, rw, rh });
+        
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.strokeStyle = details.color || '#4CAF50';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, rw, rh, 6);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(region.name, rx + rw/2, ry + rh/2 + 4);
+    });
+}
+
+function renderFlowDiagram(componentName, details, w, h) {
+    const ctx = detailCtx;
+    const deps = details.depends || [];
+    const ext = details.external || [];
+    
+    detailRegions = [];
+    
+    // Title
+    ctx.fillStyle = details.color || '#888';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(componentName, w/2, 40);
+    
+    if (details.desc) {
+        ctx.fillStyle = '#888';
+        ctx.font = '12px Arial';
+        ctx.fillText(details.desc, w/2, 60);
+    }
+    
+    // Dependencies
+    const boxW = 120;
+    const boxH = 40;
+    let y = 100;
+    
+    if (deps.length > 0) {
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Internal Dependencies:', 30, y);
+        y += 20;
+        
+        deps.forEach((dep, i) => {
+            const x = 40 + (i % 3) * (boxW + 20);
+            const row = Math.floor(i / 3);
+            const yPos = y + row * (boxH + 15);
+            
+            detailRegions.push({ name: dep, desc: 'Internal dependency', rx: x, ry: yPos, rw: boxW, rh: boxH });
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.1)';
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(x, yPos, boxW, boxH, 6);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(dep, x + boxW/2, yPos + boxH/2 + 4);
+        });
+        y += Math.ceil(deps.length / 3) * (boxH + 15) + 30;
+    }
+    
+    if (ext.length > 0) {
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('External Packages:', 30, y);
+        y += 20;
+        
+        ext.forEach((pkg, i) => {
+            const x = 40 + (i % 4) * 100;
+            const row = Math.floor(i / 4);
+            const yPos = y + row * 35;
+            
+            ctx.fillStyle = '#333';
+            ctx.strokeStyle = '#9C27B0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, yPos, 90, 28, 4);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#aaa';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(pkg, x + 45, yPos + 18);
+        });
+    }
+}
+
+function renderSchema(details, w, h) {
+    const ctx = detailCtx;
+    const tables = details.tables || [];
+    const relations = details.relations || [];
+    
+    if (tables.length === 0) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Database Schema', w/2, 40);
+        ctx.fillStyle = details.color || '#9C27B0';
+        ctx.beginPath();
+        ctx.roundRect(w/2 - 80, h/2 - 50, 160, 100, 8);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Arial';
+        ctx.fillText(details.desc || 'Table', w/2, h/2 + 5);
+        return;
+    }
+    
+    detailRegions = [];
+    const tableW = 160;
+    const tableH = 100;
+    const cols = 3;
+    const rows = Math.ceil(tables.length / cols);
+    const gapX = 40;
+    const gapY = 40;
+    const totalW = cols * tableW + (cols - 1) * gapX;
+    const totalH = rows * tableH + (rows - 1) * gapY;
+    const startX = (w - totalW) / 2;
+    const startY = (h - totalH) / 2;
+    
+    const tablePositions = [];
+    
+    // Draw tables
+    tables.forEach((table, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = startX + col * (tableW + gapX);
+        const y = startY + row * (tableH + gapY);
+        
+        tablePositions.push({ x: x + tableW/2, y: y + tableH/2 });
+        detailRegions.push({ name: table.name, desc: table.desc, rx: x, ry: y, rw: tableW, rh: tableH });
+        
+        // Table box
+        ctx.fillStyle = '#2a2a4e';
+        ctx.strokeStyle = details.color || '#9C27B0';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, tableW, tableH, 6);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Header
+        ctx.fillStyle = details.color || '#9C27B0';
+        ctx.beginPath();
+        ctx.roundRect(x, y, tableW, 25, [6, 6, 0, 0]);
+        ctx.fill();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(table.name, x + tableW/2, y + 17);
+        
+        // Columns
+        ctx.fillStyle = '#aaa';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        const tableCols = table.cols || [];
+        tableCols.slice(0, 4).forEach((col, ci) => {
+            ctx.fillText(col, x + 8, y + 40 + ci * 14);
+        });
+        if (tableCols.length > 4) {
+            ctx.fillText('...', x + 8, y + 40 + 4 * 14);
+        }
+    });
+    
+    // Draw relations
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    relations.forEach(rel => {
+        const from = tablePositions[rel.from];
+        const to = tablePositions[rel.to];
+        if (from && to) {
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+            
+            // Label
+            ctx.fillStyle = '#888';
+            ctx.font = '9px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(rel.label || '', (from.x + to.x) / 2, (from.y + to.y) / 2 - 5);
+        }
+    });
+}
+
+function renderDependencyStack(componentName, w, h) {
+    const ctx = detailCtx;
+    detailRegions = [];
+    
+    const boxW = 130;
+    const boxH = 30;
+    let y = 25;
+    
+    // Helper to get deps recursively
+    function getDeepDeps(name, depth, visited = new Set()) {
+        if (visited.has(name) || depth > 2) return { internal: [], external: [] };
+        visited.add(name);
+        
+        const deps = dependencyGraph[name] || { internal: [], external: [] };
+        let result = { internal: [...(deps.internal || [])], external: [...(deps.external || [])] };
+        
+        // Get deps of deps
+        for (const intDep of (deps.internal || [])) {
+            const subDeps = getDeepDeps(intDep, depth + 1, visited);
+            result.internal = [...result.internal, ...subDeps.internal];
+            result.external = [...result.external, ...subDeps.external];
+        }
+        
+        return {
+            internal: [...new Set(result.internal)],
+            external: [...new Set(result.external)]
+        };
+    }
+    
+    // Level 0: Self
+    const selfColor = componentDetails[componentName]?.color || '#888';
+    ctx.fillStyle = selfColor;
+    ctx.beginPath();
+    ctx.roundRect(w/2 - boxW/2, y, boxW, boxH, 6);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎯 ' + componentName, w/2, y + boxH/2 + 4);
+    y += boxH + 15;
+    
+    const deps = dependencyGraph[componentName] || { internal: [], external: [] };
+    
+    // Level 1: Direct dependencies
+    if ((deps.internal?.length || 0) > 0) {
+        // Arrow
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w/2, y - 8);
+        ctx.lineTo(w/2, y + 8);
+        ctx.moveTo(w/2 - 5, y + 3);
+        ctx.lineTo(w/2, y + 8);
+        ctx.lineTo(w/2 + 5, y + 3);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#666';
+        ctx.font = '9px Arial';
+        ctx.fillText('Level 1', w/2 + 60, y);
+        y += 15;
+        
+        const cols = Math.min(deps.internal.length, 4);
+        const totalW = cols * (boxW + 8);
+        const startX = (w - totalW) / 2;
+        
+        deps.internal.forEach((dep, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x = startX + col * (boxW + 8);
+            const yPos = y + row * (boxH + 8);
+            
+            const depColor = componentDetails[dep]?.color || '#2196F3';
+            
+            detailRegions.push({ name: dep, desc: 'Click to explore', rx: x, ry: yPos, rw: boxW, rh: boxH });
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx.strokeStyle = depColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(x, yPos, boxW, boxH, 5);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'center';
+            const label = dep.length > 14 ? dep.slice(0, 13) + '…' : dep;
+            ctx.fillText(label, x + boxW/2, yPos + boxH/2 + 4);
+        });
+        y += Math.ceil(deps.internal.length / cols) * (boxH + 8) + 20;
+    }
+    
+    // Level 2: Dependencies of dependencies
+    const level2Deps = new Set();
+    for (const dep of (deps.internal || [])) {
+        const subDeps = dependencyGraph[dep]?.internal || [];
+        subDeps.forEach(d => {
+            if (d !== componentName && !deps.internal.includes(d)) {
+                level2Deps.add(d);
+            }
+        });
+    }
+    
+    if (level2Deps.size > 0) {
+        // Arrow
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(w/2, y - 8);
+        ctx.lineTo(w/2, y + 8);
+        ctx.moveTo(w/2 - 4, y + 4);
+        ctx.lineTo(w/2, y + 8);
+        ctx.lineTo(w/2 + 4, y + 4);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#555';
+        ctx.font = '9px Arial';
+        ctx.fillText('Level 2', w/2 + 60, y);
+        y += 15;
+        
+        const level2Array = [...level2Deps];
+        const cols2 = Math.min(level2Array.length, 5);
+        const boxW2 = 100;
+        const boxH2 = 24;
+        const totalW2 = cols2 * (boxW2 + 6);
+        const startX2 = (w - totalW2) / 2;
+        
+        level2Array.forEach((dep, i) => {
+            const col = i % cols2;
+            const row = Math.floor(i / cols2);
+            const x = startX2 + col * (boxW2 + 6);
+            const yPos = y + row * (boxH2 + 6);
+            
+            const depColor = componentDetails[dep]?.color || '#666';
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.strokeStyle = depColor;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, yPos, boxW2, boxH2, 4);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#aaa';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            const label = dep.length > 12 ? dep.slice(0, 11) + '…' : dep;
+            ctx.fillText(label, x + boxW2/2, yPos + boxH2/2 + 3);
+        });
+        y += Math.ceil(level2Array.length / cols2) * (boxH2 + 6) + 20;
+    }
+    
+    // External dependencies (combined from all levels)
+    const allExternal = getDeepDeps(componentName, 0).external;
+    
+    if (allExternal.length > 0) {
+        ctx.fillStyle = '#555';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('📚 External Packages (all levels):', 25, y);
+        y += 18;
+        
+        const cols3 = Math.min(allExternal.length, 5);
+        allExternal.forEach((pkg, i) => {
+            const col = i % cols3;
+            const row = Math.floor(i / cols3);
+            const x = 30 + col * 85;
+            const yPos = y + row * 26;
+            
+            ctx.fillStyle = '#252530';
+            ctx.strokeStyle = '#9C27B0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, yPos, 78, 22, 3);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#888';
+            ctx.font = '9px Arial';
+            ctx.textAlign = 'center';
+            const label = pkg.length > 10 ? pkg.slice(0, 9) + '…' : pkg;
+            ctx.fillText(label, x + 39, yPos + 15);
+        });
+    }
+}
+
+function setView(view) {
+    currentView = view;
+    document.getElementById('btn-structure').classList.toggle('active', view === 'structure');
+    document.getElementById('btn-deps').classList.toggle('active', view === 'deps');
+    
+    // Hide widgetbook iframe when switching to deps view
+    if (view === 'deps' && widgetbookIframe) {
+        widgetbookIframe.style.display = 'none';
+    }
+    
+    if (selectedComponent) renderDetailVisualization(selectedComponent);
+}
+window.setView = setView;
+
+// Full graph
+function showFullGraph() {
+    document.getElementById('full-graph-panel').classList.add('visible');
+    renderFullGraph();
+}
+window.showFullGraph = showFullGraph;
+
+function hideFullGraph() {
+    document.getElementById('full-graph-panel').classList.remove('visible');
+}
+window.hideFullGraph = hideFullGraph;
+
+function renderFullGraph() {
+    const canvas = document.getElementById('full-graph-canvas');
+    const ctx = canvas.getContext('2d');
+    const container = canvas.parentElement;
+    const w = container.clientWidth - 40;
+    const h = container.clientHeight - 80;
+    
+    canvas.width = w;
+    canvas.height = h;
+    
+    ctx.fillStyle = '#12121f';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Position nodes by layer
+    const nodePositions = {};
+    const nodeColors = {};
+    const boxW = 100;
+    const boxH = 32;
+    
+    let layerIdx = 0;
+    Object.entries(architecture).forEach(([layerKey, layer]) => {
+        if (!layer.components || layer.components.length === 0) return;
+        
+        const yPos = 60 + layerIdx * (h - 120) / (Object.keys(architecture).length - 1 || 1);
+        const count = layer.components.length;
+        const totalW = count * (boxW + 15);
+        const startX = (w - totalW) / 2;
+        
+        // Layer label
+        ctx.fillStyle = layer.color;
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(layer.name, 15, yPos + 5);
+        
+        layer.components.forEach((comp, i) => {
+            nodePositions[comp.name] = { x: startX + i * (boxW + 15) + boxW/2, y: yPos };
+            nodeColors[comp.name] = layer.color;
+        });
+        
+        layerIdx++;
+    });
+    
+    // Draw connections
+    ctx.lineWidth = 1;
+    Object.entries(dependencyGraph).forEach(([compName, deps]) => {
+        const fromPos = nodePositions[compName];
+        if (!fromPos) return;
+        
+        (deps.internal || []).forEach(dep => {
+            const toPos = nodePositions[dep];
+            if (!toPos) return;
+            
+            ctx.strokeStyle = '#4CAF5040';
+            ctx.beginPath();
+            ctx.moveTo(fromPos.x, fromPos.y + boxH/2);
+            ctx.bezierCurveTo(fromPos.x, (fromPos.y + toPos.y) / 2, toPos.x, (fromPos.y + toPos.y) / 2, toPos.x, toPos.y - boxH/2);
+            ctx.stroke();
+        });
+    });
+    
+    // Draw nodes
+    Object.entries(nodePositions).forEach(([name, pos]) => {
+        ctx.fillStyle = '#1a1a2e';
+        ctx.strokeStyle = nodeColors[name];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(pos.x - boxW/2, pos.y - boxH/2, boxW, boxH, 4);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        let label = name.length > 12 ? name.slice(0, 11) + '…' : name;
+        ctx.fillText(label, pos.x, pos.y + 3);
+    });
+    
+    ctx.fillStyle = '#666';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Green lines: internal dependencies', 15, h - 10);
+}
+
+// Animation
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    labelSprites.forEach(sprite => sprite.quaternion.copy(camera.quaternion));
+    renderer.render(scene, camera);
+    
+    if (isZoomedIn) {
+        const time = Date.now() * 0.0003;
+        miniCamera.position.x = Math.cos(time) * 60;
+        miniCamera.position.z = Math.sin(time) * 60;
+        miniCamera.lookAt(0, 0, 0);
+        labelSprites.forEach(sprite => sprite.quaternion.copy(miniCamera.quaternion));
+        miniRenderer.render(scene, miniCamera);
+        labelSprites.forEach(sprite => sprite.quaternion.copy(camera.quaternion));
+    }
+}
+
+function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (isZoomedIn && selectedComponent) {
+        setTimeout(() => renderDetailVisualization(selectedComponent), 100);
+    }
+}
+
+// Tooltip handling
+detailCanvas.addEventListener('mousemove', (e) => {
+    const rect = detailCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    let found = null;
+    for (const region of detailRegions) {
+        if (x >= region.rx && x <= region.rx + region.rw && y >= region.ry && y <= region.ry + region.rh) {
+            found = region;
+            break;
+        }
+    }
+    
+    if (found) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX - detailCanvas.parentElement.offsetLeft + 15) + 'px';
+        tooltip.style.top = (e.clientY - detailCanvas.parentElement.offsetTop - 50) + 'px';
+        tooltip.innerHTML = `<h4>${found.name}</h4><p>${found.desc || ''}</p>`;
+        detailCanvas.style.cursor = 'pointer';
+    } else {
+        tooltip.style.display = 'none';
+        detailCanvas.style.cursor = 'default';
+    }
+});
+
+detailCanvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+// Start
+loadArchitectureData();
+</script>
+</body>
+</html>

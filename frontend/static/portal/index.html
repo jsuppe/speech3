@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MAGI Documentation Portal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 40px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { 
+            font-size: 2.5rem; 
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: #888; margin-bottom: 40px; }
+        .projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; }
+        .project-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 24px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .project-card:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.3); }
+        .project-card h2 { font-size: 1.5rem; margin-bottom: 8px; }
+        .project-card .emoji { font-size: 2rem; margin-bottom: 12px; }
+        .project-card p { color: #aaa; margin-bottom: 16px; line-height: 1.5; }
+        .project-card .links { display: flex; gap: 12px; flex-wrap: wrap; }
+        .project-card a {
+            display: inline-block;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .project-card a:hover { background: rgba(255,255,255,0.2); }
+        .project-card a.primary { background: #4CAF50; }
+        .project-card a.primary:hover { background: #45a049; }
+        .footer { 
+            margin-top: 60px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 0.85rem;
+        }
+        .footer a { color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💎 MAGI Documentation Portal</h1>
+        <p class="subtitle">Internal tools, architecture docs, and shared patterns</p>
+        
+        <div class="projects">
+            <div class="project-card">
+                <div class="emoji">🎙️</div>
+                <h2>SpeakFit</h2>
+                <p>AI-powered speech analysis app. Flutter frontend, FastAPI backend, ML pipeline.</p>
+                <div class="links">
+                    <a href="speakfit/architecture/" class="primary">📐 Architecture</a>
+                    <a href="speakfit/api-docs/">📚 API Docs</a>
+                    <a href="https://api.speakfit.app/static/test-reports/">🧪 Tests</a>
+                </div>
+            </div>
+            
+            <div class="project-card">
+                <div class="emoji">🦆</div>
+                <h2>Duck App</h2>
+                <p>Safe social platform for kids. Flutter app with boats, ducks, and mini-games.</p>
+                <div class="links">
+                    <a href="duckapp/architecture/" class="primary">📐 Architecture</a>
+                    <a href="duckapp/screens/">📱 Screens</a>
+                </div>
+            </div>
+            
+            <div class="project-card">
+                <div class="emoji">🔧</div>
+                <h2>Shared Patterns</h2>
+                <p>Cross-project learnings, reusable solutions, and team conventions.</p>
+                <div class="links">
+                    <a href="shared/patterns/">📖 Patterns</a>
+                    <a href="shared/release-checklist/">📋 Release Checklist</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Maintained by Gemma 💎 | <a href="https://ruminateai.com">Ruminate AI</a></p>
+        </div>
+    </div>
+</body>
+</html>

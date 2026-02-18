@@ -1,19 +1,54 @@
 """speech3 analysis as an importable module."""
 import os, sys
+import threading
 import numpy as np
 from nltk.tokenize import word_tokenize, sent_tokenize
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-import spacy
-nlp = spacy.load('en_core_web_sm')
+# ---------------------------------------------------------------------------
+# Lazy-loaded model singletons (thread-safe)
+# ---------------------------------------------------------------------------
+_nlp = None
+_nlp_lock = threading.Lock()
+_sentence_model = None
+_sentence_model_lock = threading.Lock()
 
-from sentence_transformers import SentenceTransformer, util
-model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def _get_nlp():
+    """Get spaCy model, loading once on first use (thread-safe)."""
+    global _nlp
+    if _nlp is None:
+        with _nlp_lock:
+            if _nlp is None:  # Double-check after acquiring lock
+                import spacy
+                _nlp = spacy.load('en_core_web_sm')
+    return _nlp
+
+
+def _get_sentence_model():
+    """Get SentenceTransformer, loading once on first use (thread-safe)."""
+    global _sentence_model
+    if _sentence_model is None:
+        with _sentence_model_lock:
+            if _sentence_model is None:  # Double-check after acquiring lock
+                from sentence_transformers import SentenceTransformer
+                _sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return _sentence_model
+
+
+def preload_models():
+    """Explicitly load all models. Call at startup for predictable init."""
+    _get_nlp()
+    _get_sentence_model()
+
+
+# Import util for cosine similarity (lightweight, no model load)
+from sentence_transformers import util
 
 
 def preposition_count(text):
-    doc = nlp(text)
+    doc = _get_nlp()(text)
     return sum(1 for token in doc if token.pos_ == 'ADP')
 
 def word_count(text):
@@ -24,7 +59,7 @@ def lexical_diversity(text):
     return round(len(set(words)) / len(words), 4)
 
 def syntactic_complexity(text):
-    doc = nlp(text)
+    doc = _get_nlp()(text)
     sentences = list(doc.sents)
     lengths = [len(sent) for sent in sentences]
     return round(float(np.mean(lengths)), 2)
@@ -38,7 +73,7 @@ def connectedness_of_speech(text):
     sentences = sent_tokenize(text)
     if len(sentences) <= 1:
         return 0.0
-    embeddings = model.encode(sentences)
+    embeddings = _get_sentence_model().encode(sentences)
     sims = [util.cos_sim(embeddings[i], embeddings[i+1]).item() for i in range(len(sentences)-1)]
     return round(float(np.mean(sims)), 4)
 
@@ -48,7 +83,7 @@ def mean_length_of_utterance(text):
     return round(float(np.mean(lengths)), 2)
 
 def pronoun_usage(text):
-    doc = nlp(text)
+    doc = _get_nlp()(text)
     return sum(1 for token in doc if token.pos_ == 'PRON')
 
 def negation_usage(text):
@@ -57,13 +92,14 @@ def negation_usage(text):
     return sum(words.count(neg) for neg in negations)
 
 def extract_key_terms(text):
-    doc = nlp(text)
+    doc = _get_nlp()(text)
     exclude = ['moment', 'scene', 'ambiance']
     return list(set(token.text.lower() for token in doc if token.pos_ == 'NOUN' and token.text.lower() not in exclude))
 
 def circumlocution(text, target_terms):
     sentences = sent_tokenize(text)
     results = []
+    model = _get_sentence_model()
     for term in target_terms:
         term_emb = model.encode(term)
         for sent in sentences:

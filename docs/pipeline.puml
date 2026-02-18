@@ -1,0 +1,118 @@
+@startuml
+
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+
+title SpeechScore Analysis Pipeline
+
+start
+
+:Audio Upload;
+note right: MP3, WAV, AAC, OGG\nM4A, FLAC, WebM\nMax: 50MB / 10min
+
+:FFmpeg Conversion;
+note right: Convert to 16kHz Mono WAV
+
+:Quality Gate;
+note right
+  SNR Analysis
+  ----
+  HIGH: >15dB
+  MEDIUM: 8-15dB
+  LOW: 3-8dB
+  UNUSABLE: <3dB
+end note
+
+if (Quality >= LOW?) then (yes)
+  :Whisper Transcription;
+  note right
+    Model: large-v3
+    Word timestamps
+    Language detection
+    VAD filtering
+  end note
+  
+  fork
+    :Text Analysis;
+    note right
+      **Core Text**
+      - Word count
+      - Lexical diversity
+      - Syntactic complexity
+      - Fluency score
+      - Connectedness
+      - Key terms (NER)
+      
+      **Advanced Text**
+      - Readability (FK)
+      - Discourse structure
+      - Question density
+      - Perspective
+      
+      **Rhetorical**
+      - Anaphora
+      - Epistrophe
+      - Repetition patterns
+      - Rhythm regularity
+      
+      **Sentiment**
+      - RoBERTa model
+      - Segment arc
+      - Emotional trajectory
+    end note
+  fork again
+    :Audio Analysis;
+    note right
+      **Core Audio (Praat)**
+      - Pitch (F0) stats
+      - Intensity
+      - Jitter/Shimmer/HNR
+      - Pause analysis
+      - Speaking rate (WPM)
+      
+      **Advanced Audio**
+      - Formants (F1-F3)
+      - Vowel space index
+      - Pitch contour
+      - Uptalk detection
+      - Vocal fry ratio
+      - Rate variability
+      - Emphasis patterns
+    end note
+  fork again
+    :Speaker Analysis;
+    note right
+      - Diarization (Resemblyzer)
+      - Voice fingerprinting
+      - Speaker identification
+    end note
+  end fork
+  
+  :Scoring Engine;
+  note right
+    **Profiles**
+    - General
+    - Oratory
+    - Reading Fluency
+    - Presentation
+    - Clinical
+    ----
+    Percentile ranking
+    Category scores
+    Overall 0-100
+  end note
+  
+  :Store Results;
+  note right
+    - JSON Response
+    - Spectrogram PNG
+    - SQLite Database
+  end note
+  
+else (no)
+  :Block/Warn;
+endif
+
+stop
+
+@enduml

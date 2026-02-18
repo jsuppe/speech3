@@ -33,3 +33,7 @@ benchmark_db.json
 batch_analyze*.py
 fix_round3.py
 run_all_samples.py
+
+# Large datasets (stored externally)
+datasets/
+audio/

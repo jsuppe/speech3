@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Documentation — SpeakFit{% endblock %}
+
+{% block content %}
+<div class="fade-in max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-white">Analysis Engine Documentation</h1>
+        <p class="text-sm text-gray-400 mt-1">Technical overview of the SpeakFit audio analysis pipeline</p>
+    </div>
+
+    <!-- Pipeline Diagram -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <h2 class="text-lg font-semibold text-white mb-4">Pipeline Architecture</h2>
+        <div class="bg-white rounded-lg p-4 overflow-x-auto">
+            <img src="/static/images/pipeline.png" alt="SpeakFit Pipeline Diagram" class="max-w-full h-auto">
+        </div>
+    </div>
+
+    <!-- Module Reference -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+        
+        <!-- Transcription -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-blue-400 mb-3">🎙️ Transcription</h3>
+            <p class="text-gray-300 text-sm mb-4">Speech-to-text using OpenAI Whisper large-v3 with CUDA acceleration.</p>
+            <table class="w-full text-sm">
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Model</td>
+                    <td class="py-2 text-white">large-v3 (1.5B params)</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Device</td>
+                    <td class="py-2 text-white">CUDA (float16)</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Features</td>
+                    <td class="py-2 text-white">Word timestamps, VAD filter, language detection</td>
+                </tr>
+                <tr>
+                    <td class="py-2 text-gray-400">Library</td>
+                    <td class="py-2 text-white">faster-whisper</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Quality Gate -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-amber-400 mb-3">📊 Quality Gate</h3>
+            <p class="text-gray-300 text-sm mb-4">Audio quality assessment based on Signal-to-Noise Ratio (SNR).</p>
+            <table class="w-full text-sm">
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">HIGH</td>
+                    <td class="py-2 text-green-400">&gt; 15 dB SNR</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">MEDIUM</td>
+                    <td class="py-2 text-yellow-400">8-15 dB SNR</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">LOW</td>
+                    <td class="py-2 text-orange-400">3-8 dB SNR</td>
+                </tr>
+                <tr>
+                    <td class="py-2 text-gray-400">UNUSABLE</td>
+                    <td class="py-2 text-red-400">&lt; 3 dB SNR</td>
+                </tr>
+            </table>
+            <p class="text-gray-500 text-xs mt-3">Modes: block (reject), warn (annotate), skip (no check)</p>
+        </div>
+
+        <!-- Text Analysis -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-green-400 mb-3">📝 Text Analysis</h3>
+            <p class="text-gray-300 text-sm mb-4">NLP analysis of transcript using spaCy and sentence-transformers.</p>
+            
+            <h4 class="text-white text-sm font-medium mb-2">Core Metrics</h4>
+            <ul class="text-gray-400 text-sm space-y-1 mb-4">
+                <li>• <span class="text-white">Word Count</span> — Total words spoken</li>
+                <li>• <span class="text-white">Lexical Diversity</span> — Unique words / total words</li>
+                <li>• <span class="text-white">Syntactic Complexity</span> — Avg sentence length</li>
+                <li>• <span class="text-white">Fluency Score</span> — Filler word frequency (um, uh, like)</li>
+                <li>• <span class="text-white">Connectedness</span> — Semantic similarity between sentences</li>
+                <li>• <span class="text-white">MLU</span> — Mean Length of Utterance</li>
+            </ul>
+            
+            <h4 class="text-white text-sm font-medium mb-2">Advanced Metrics</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+                <li>• <span class="text-white">Readability</span> — Flesch-Kincaid grade level</li>
+                <li>• <span class="text-white">Discourse</span> — Transition words, argument markers</li>
+                <li>• <span class="text-white">Question Density</span> — Engagement through questions</li>
+                <li>• <span class="text-white">Perspective</span> — First/second/third person usage</li>
+            </ul>
+        </div>
+
+        <!-- Rhetorical Analysis -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-purple-400 mb-3">🎭 Rhetorical Analysis</h3>
+            <p class="text-gray-300 text-sm mb-4">Detection of rhetorical devices and speech patterns.</p>
+            <ul class="text-gray-400 text-sm space-y-2">
+                <li>• <span class="text-white">Anaphora</span> — Repeated sentence beginnings<br>
+                   <span class="text-gray-500 italic">"I have a dream... I have a dream..."</span></li>
+                <li>• <span class="text-white">Epistrophe</span> — Repeated sentence endings<br>
+                   <span class="text-gray-500 italic">"...of the people, by the people, for the people"</span></li>
+                <li>• <span class="text-white">Phrase Repetition</span> — Key phrases repeated 3+ times</li>
+                <li>• <span class="text-white">Rhythm Regularity</span> — Consistency in sentence timing</li>
+            </ul>
+        </div>
+
+        <!-- Sentiment Analysis -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-pink-400 mb-3">💭 Sentiment Analysis</h3>
+            <p class="text-gray-300 text-sm mb-4">Emotional tone analysis using RoBERTa transformer model.</p>
+            <table class="w-full text-sm">
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Model</td>
+                    <td class="py-2 text-white">cardiffnlp/twitter-roberta-base-sentiment</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Classes</td>
+                    <td class="py-2 text-white">Positive / Neutral / Negative</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Per-Segment</td>
+                    <td class="py-2 text-white">Emotional arc over time</td>
+                </tr>
+                <tr>
+                    <td class="py-2 text-gray-400">Trajectory</td>
+                    <td class="py-2 text-white">Rising, falling, stable, mixed</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Audio Analysis -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-cyan-400 mb-3">🔊 Audio Analysis</h3>
+            <p class="text-gray-300 text-sm mb-4">Acoustic analysis using Praat (parselmouth) signal processing.</p>
+            
+            <h4 class="text-white text-sm font-medium mb-2">Core Metrics</h4>
+            <ul class="text-gray-400 text-sm space-y-1 mb-4">
+                <li>• <span class="text-white">Pitch (F0)</span> — Mean, std, range in Hz</li>
+                <li>• <span class="text-white">Intensity</span> — Volume dynamics in dB</li>
+                <li>• <span class="text-white">Jitter</span> — Pitch stability (lower = smoother)</li>
+                <li>• <span class="text-white">Shimmer</span> — Amplitude stability</li>
+                <li>• <span class="text-white">HNR</span> — Harmonics-to-Noise Ratio (voice clarity)</li>
+                <li>• <span class="text-white">Pauses</span> — Count, total duration, avg length</li>
+                <li>• <span class="text-white">Speaking Rate</span> — Words per minute</li>
+            </ul>
+            
+            <h4 class="text-white text-sm font-medium mb-2">Advanced Metrics</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+                <li>• <span class="text-white">Formants (F1-F3)</span> — Vowel quality indicators</li>
+                <li>• <span class="text-white">Vowel Space Index</span> — Articulation clarity</li>
+                <li>• <span class="text-white">Pitch Contour</span> — Intonation patterns</li>
+                <li>• <span class="text-white">Uptalk Detection</span> — Rising pitch at statements</li>
+                <li>• <span class="text-white">Vocal Fry</span> — Creaky voice percentage</li>
+                <li>• <span class="text-white">Rate Variability</span> — Speaking pace changes</li>
+            </ul>
+        </div>
+
+        <!-- Speaker Analysis -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-indigo-400 mb-3">👥 Speaker Analysis</h3>
+            <p class="text-gray-300 text-sm mb-4">Speaker identification and diarization using Resemblyzer embeddings.</p>
+            <table class="w-full text-sm">
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Diarization</td>
+                    <td class="py-2 text-white">Segment-level speaker assignment</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Embeddings</td>
+                    <td class="py-2 text-white">256-dim voice fingerprint</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                    <td class="py-2 text-gray-400">Clustering</td>
+                    <td class="py-2 text-white">Agglomerative (auto-detect speakers)</td>
+                </tr>
+                <tr>
+                    <td class="py-2 text-gray-400">Matching</td>
+                    <td class="py-2 text-white">Cosine similarity ≥80% threshold</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Scoring Engine -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-yellow-400 mb-3">🎯 Scoring Engine</h3>
+            <p class="text-gray-300 text-sm mb-4">Profile-based scoring with percentile ranking against benchmarks.</p>
+            
+            <h4 class="text-white text-sm font-medium mb-2">Scoring Profiles</h4>
+            <ul class="text-gray-400 text-sm space-y-1 mb-4">
+                <li>• <span class="text-white">General</span> — Balanced weights across all metrics</li>
+                <li>• <span class="text-white">Oratory</span> — Emphasis on rhetoric, emotion, dynamics</li>
+                <li>• <span class="text-white">Reading Fluency</span> — Focus on clarity, pace, pronunciation</li>
+                <li>• <span class="text-white">Presentation</span> — Professional delivery emphasis</li>
+                <li>• <span class="text-white">Clinical</span> — Voice quality indicators for assessment</li>
+            </ul>
+            
+            <h4 class="text-white text-sm font-medium mb-2">Score Categories</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+                <li>• <span class="text-white">Delivery</span> — Pace, pauses, emphasis</li>
+                <li>• <span class="text-white">Clarity</span> — Articulation, pronunciation</li>
+                <li>• <span class="text-white">Engagement</span> — Variation, emotion, rhetoric</li>
+                <li>• <span class="text-white">Voice Quality</span> — HNR, jitter, shimmer</li>
+                <li>• <span class="text-white">Overall (0-100)</span> — Weighted composite</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- API Module Reference -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <h2 class="text-lg font-semibold text-white mb-4">API Module Selection</h2>
+        <p class="text-gray-400 text-sm mb-4">Control which modules run via the <code class="text-blue-400">modules</code> or <code class="text-blue-400">preset</code> parameter.</p>
+        
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="text-white text-sm font-medium mb-2">Available Modules</h4>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">transcription</td>
+                        <td class="py-1 text-gray-400">Whisper STT (always runs)</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">quality</td>
+                        <td class="py-1 text-gray-400">Audio quality gate</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">diarization</td>
+                        <td class="py-1 text-gray-400">Speaker separation</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">text</td>
+                        <td class="py-1 text-gray-400">Core text analysis</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">advanced_text</td>
+                        <td class="py-1 text-gray-400">Readability, discourse</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">rhetorical</td>
+                        <td class="py-1 text-gray-400">Repetition, rhythm</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">sentiment</td>
+                        <td class="py-1 text-gray-400">Emotion analysis</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-blue-400 font-mono">audio</td>
+                        <td class="py-1 text-gray-400">Core audio (Praat)</td>
+                    </tr>
+                    <tr>
+                        <td class="py-1 text-blue-400 font-mono">advanced_audio</td>
+                        <td class="py-1 text-gray-400">Formants, fry, emphasis</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div>
+                <h4 class="text-white text-sm font-medium mb-2">Presets</h4>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-green-400 font-mono">quick</td>
+                        <td class="py-1 text-gray-400">transcription, quality</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-green-400 font-mono">text_only</td>
+                        <td class="py-1 text-gray-400">All text modules</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-green-400 font-mono">audio_only</td>
+                        <td class="py-1 text-gray-400">All audio modules</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-green-400 font-mono">full</td>
+                        <td class="py-1 text-gray-400">Everything</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-1 text-green-400 font-mono">clinical</td>
+                        <td class="py-1 text-gray-400">Voice quality focus</td>
+                    </tr>
+                    <tr>
+                        <td class="py-1 text-green-400 font-mono">coaching</td>
+                        <td class="py-1 text-gray-400">Balanced for feedback</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tech Stack -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Technology Stack</h2>
+        <div class="grid md:grid-cols-3 gap-4 text-sm">
+            <div>
+                <h4 class="text-gray-400 font-medium mb-2">Speech Processing</h4>
+                <ul class="text-white space-y-1">
+                    <li>faster-whisper (large-v3)</li>
+                    <li>parselmouth (Praat)</li>
+                    <li>resemblyzer</li>
+                    <li>FFmpeg</li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-gray-400 font-medium mb-2">NLP</h4>
+                <ul class="text-white space-y-1">
+                    <li>spaCy (en_core_web_sm)</li>
+                    <li>sentence-transformers</li>
+                    <li>transformers (RoBERTa)</li>
+                    <li>NLTK</li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-gray-400 font-medium mb-2">Infrastructure</h4>
+                <ul class="text-white space-y-1">
+                    <li>FastAPI</li>
+                    <li>SQLite (WAL mode)</li>
+                    <li>CUDA (RTX 3090)</li>
+                    <li>PyTorch 2.x</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

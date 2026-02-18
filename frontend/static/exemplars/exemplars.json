@@ -1,0 +1,307 @@
+{
+  "metrics": {
+    "wpm": {
+      "label": "Speaking Rate",
+      "direction": "optimal",
+      "unit": "WPM",
+      "grades": {
+        "A": {
+          "value": 131.0,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I Have a Dream (climax)",
+          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
+        },
+        "B": {
+          "value": 121.0,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I've Been to the Mountaintop (climax)",
+          "audio_url": "/static/exemplars/mlk_mountaintop_climax.mp3"
+        },
+        "C": {
+          "value": 107.4,
+          "speaker": "John F. Kennedy",
+          "title": "Inaugural Address (opening)",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        },
+        "D": {
+          "value": 75.7,
+          "speaker": "Franklin D. Roosevelt",
+          "title": "Declaration of War Against Japan (opening)",
+          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+        },
+        "F": {
+          "value": 37.3,
+          "speaker": "Anonymous patient",
+          "title": "Dysarthric Speech - Before Therapy",
+          "audio_url": "/static/exemplars/dysarthric_original.wav"
+        }
+      }
+    },
+    "pitch_variation": {
+      "label": "Pitch Variation",
+      "direction": "higher_better",
+      "unit": "Hz",
+      "grades": {
+        "A": {
+          "value": 112.1,
+          "speaker": "Franklin D. Roosevelt",
+          "title": "Declaration of War Against Japan (opening)",
+          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+        },
+        "B": {
+          "value": 58.7,
+          "speaker": "John F. Kennedy",
+          "title": "Inaugural Address (opening)",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        },
+        "C": {
+          "value": 52.1,
+          "speaker": "Ian Woolf",
+          "title": "Mild Aphasia \u2014 First-Person Account",
+          "audio_url": "/static/exemplars/mild_aphasia_clip.mp3"
+        },
+        "D": {
+          "value": 31.9,
+          "speaker": "Ronald Reagan",
+          "title": "Address on the Berlin Wall",
+          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
+        },
+        "F": {
+          "value": 22.3,
+          "speaker": "Winston Churchill",
+          "title": "First Radio Address as Prime Minister (opening)",
+          "audio_url": "/static/exemplars/churchill_pm_clip.mp3"
+        }
+      }
+    },
+    "voice_quality": {
+      "label": "Voice Quality (HNR)",
+      "direction": "higher_better",
+      "unit": "dB",
+      "grades": {
+        "B": {
+          "value": 13.6,
+          "speaker": "April Sadowski",
+          "title": "Alice in Wonderland Ch1 - April Sadowski",
+          "audio_url": "/static/exemplars/alice_wonderland_clip.mp3"
+        },
+        "C": {
+          "value": 11.3,
+          "speaker": "LibriVox Volunteer",
+          "title": "A Primary Reader - Children's Stories",
+          "audio_url": "/static/exemplars/children_reading_clip.mp3"
+        },
+        "D": {
+          "value": 9.9,
+          "speaker": "John F. Kennedy",
+          "title": "Inaugural Address (opening)",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        },
+        "F": {
+          "value": 5.8,
+          "speaker": "Franklin D. Roosevelt",
+          "title": "Declaration of War Against Japan (opening)",
+          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+        }
+      }
+    },
+    "jitter": {
+      "label": "Jitter",
+      "direction": "lower_better",
+      "unit": "%",
+      "grades": {
+        "A": {
+          "value": 1.11,
+          "speaker": "John F. Kennedy",
+          "title": "Inaugural Address (opening)",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        },
+        "B": {
+          "value": 2.26,
+          "speaker": "Winston Churchill",
+          "title": "First Radio Address as Prime Minister (opening)",
+          "audio_url": "/static/exemplars/churchill_pm_clip.mp3"
+        },
+        "C": {
+          "value": 2.34,
+          "speaker": "Stokely Carmichael",
+          "title": "On Black Power",
+          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
+        },
+        "D": {
+          "value": 2.82,
+          "speaker": "Ronald Reagan",
+          "title": "Address on the Berlin Wall",
+          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
+        },
+        "F": {
+          "value": 4.37,
+          "speaker": "Franklin D. Roosevelt",
+          "title": "Declaration of War Against Japan (opening)",
+          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+        }
+      }
+    },
+    "shimmer": {
+      "label": "Shimmer",
+      "direction": "lower_better",
+      "unit": "%",
+      "grades": {
+        "C": {
+          "value": 10.66,
+          "speaker": "John F. Kennedy",
+          "title": "Inaugural Address (opening)",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        },
+        "D": {
+          "value": 12.32,
+          "speaker": "Stokely Carmichael",
+          "title": "On Black Power",
+          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
+        },
+        "F": {
+          "value": 15.12,
+          "speaker": "Franklin D. Roosevelt",
+          "title": "Declaration of War Against Japan (opening)",
+          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+        }
+      }
+    },
+    "vocal_fry": {
+      "label": "Vocal Fry",
+      "direction": "lower_better",
+      "unit": "ratio",
+      "grades": {
+        "A": {
+          "value": 0.0,
+          "speaker": "Franklin D. Roosevelt",
+          "title": "Declaration of War Against Japan (opening)",
+          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+        },
+        "B": {
+          "value": 0.01,
+          "speaker": "Winston Churchill",
+          "title": "First Radio Address as Prime Minister (opening)",
+          "audio_url": "/static/exemplars/churchill_pm_clip.mp3"
+        },
+        "C": {
+          "value": 0.04,
+          "speaker": "Ronald Reagan",
+          "title": "Inaugural Address",
+          "audio_url": "/static/exemplars/reagan_inaugural_clip.mp3"
+        },
+        "D": {
+          "value": 0.07,
+          "speaker": "Carl Sagan",
+          "title": "Commencement Address (1990)",
+          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
+        },
+        "F": {
+          "value": 0.3,
+          "speaker": "John F. Kennedy",
+          "title": "Inaugural Address (opening)",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        }
+      }
+    },
+    "lexical_diversity": {
+      "label": "Lexical Diversity",
+      "direction": "higher_better",
+      "unit": "",
+      "grades": {
+        "A": {
+          "value": 1.0,
+          "speaker": "Anonymous patient",
+          "title": "Dysarthric Speech - Before Therapy",
+          "audio_url": "/static/exemplars/dysarthric_original.wav"
+        },
+        "C": {
+          "value": 0.84,
+          "speaker": "Lou Gehrig",
+          "title": "Farewell to Baseball",
+          "audio_url": "/static/exemplars/gehrig_farewell_clip.mp3"
+        },
+        "F": {
+          "value": 0.3,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I Have a Dream (climax)",
+          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
+        }
+      }
+    },
+    "snr": {
+      "label": "Signal-to-Noise",
+      "direction": "higher_better",
+      "unit": "dB",
+      "grades": {
+        "A": {
+          "value": 51.5,
+          "speaker": "LibriVox Volunteer",
+          "title": "The Aesop for Children \u2014 Fables 1-4",
+          "audio_url": "/static/exemplars/aesop_children_fables_clip.mp3"
+        },
+        "B": {
+          "value": 40.2,
+          "speaker": "Larry Gifford, Soania Mathur, Tim Hague (all have PD)",
+          "title": "PD Avengers - Parkinson's Disease Speakers",
+          "audio_url": "/static/exemplars/parkinsons_pd_avengers_clip.mp3"
+        },
+        "C": {
+          "value": 36.7,
+          "speaker": "Lou Gehrig",
+          "title": "Farewell to Baseball",
+          "audio_url": "/static/exemplars/gehrig_farewell_clip.mp3"
+        },
+        "D": {
+          "value": 26.1,
+          "speaker": "Carl Sagan",
+          "title": "Commencement Address (1990)",
+          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
+        },
+        "F": {
+          "value": 20.2,
+          "speaker": "Greg Bahnsen",
+          "title": "The Great Debate: Does God Exist? (Opening Argumen",
+          "audio_url": "/static/exemplars/bahnsen_debate_clip.mp3"
+        }
+      }
+    },
+    "pitch_range": {
+      "label": "Pitch Range",
+      "direction": "higher_better",
+      "unit": "Hz",
+      "grades": {
+        "A": {
+          "value": 423.0,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I Have a Dream (climax)",
+          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
+        },
+        "B": {
+          "value": 415.3,
+          "speaker": "Lou Gehrig",
+          "title": "Farewell to Baseball",
+          "audio_url": "/static/exemplars/gehrig_farewell_clip.mp3"
+        },
+        "C": {
+          "value": 389.7,
+          "speaker": "Stokely Carmichael",
+          "title": "On Black Power",
+          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
+        },
+        "D": {
+          "value": 352.0,
+          "speaker": "Mario Cuomo",
+          "title": "1984 DNC Keynote Address (opening)",
+          "audio_url": "/static/exemplars/cuomo_1984_opening.mp3"
+        },
+        "F": {
+          "value": 170.3,
+          "speaker": "Ronald Reagan",
+          "title": "Inaugural Address",
+          "audio_url": "/static/exemplars/reagan_inaugural_clip.mp3"
+        }
+      }
+    }
+  }
+}

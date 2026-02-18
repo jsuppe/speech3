@@ -17,7 +17,7 @@ import tempfile
 import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 
 DB_PATH = Path(__file__).parent / "speechscore.db"
@@ -132,6 +132,33 @@ CREATE TABLE IF NOT EXISTS spectrograms (
     height INTEGER,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE TABLE IF NOT EXISTS coach_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    speech_id INTEGER REFERENCES speeches(id) ON DELETE SET NULL,
+    role TEXT NOT NULL,        -- 'user' or 'assistant'
+    content TEXT NOT NULL,
+    model TEXT,                -- which model responded
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_coach_messages_user_id ON coach_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_coach_messages_speech_id ON coach_messages(speech_id);
+
+CREATE TABLE IF NOT EXISTS speaker_embeddings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    speaker_name TEXT NOT NULL,
+    embedding BLOB NOT NULL,          -- 256-dim float32 vector (Resemblyzer)
+    speech_id INTEGER REFERENCES speeches(id) ON DELETE SET NULL,  -- reference recording
+    embedding_count INTEGER DEFAULT 1, -- how many recordings contributed to this embedding
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_speaker_embeddings_user_id ON speaker_embeddings(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_speaker_embeddings_user_speaker ON speaker_embeddings(user_id, speaker_name);
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_speeches_speaker ON speeches(speaker);
@@ -251,19 +278,20 @@ class SpeechDB:
         description: str = None,
         audio_hash: str = None,
         user_id: int = None,
+        profile: str = "general",
     ) -> int:
         """Insert a new speech record. Returns speech_id."""
         cur = self.conn.execute(
             """INSERT INTO speeches
                (title, speaker, year, source_url, source_file, duration_sec,
-                language, category, products, tags, notes, description, audio_hash, user_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                language, category, products, tags, notes, description, audio_hash, user_id, profile)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 title, speaker, year, source_url, source_file, duration_sec,
                 language, category,
                 json.dumps(products) if products else None,
                 json.dumps(tags) if tags else None,
-                notes, description, audio_hash, user_id,
+                notes, description, audio_hash, user_id, profile,
             ),
         )
         self.conn.commit()
@@ -280,6 +308,106 @@ class SpeechDB:
             d["tags"] = json.loads(d["tags"]) if d["tags"] else []
             return d
         return None
+
+    def update_speech(
+        self,
+        speech_id: int,
+        title: str = None,
+        speaker: str = None,
+        category: str = None,
+        tags: list = None,
+        notes: str = None,
+        profile: str = None,
+        project_id: int = None,
+        user_id: int = None,
+        _unset_project: bool = False,
+    ) -> Optional[dict]:
+        """
+        Update speech metadata. Only updates fields that are provided (not None).
+        If user_id is provided, ensures the speech belongs to that user.
+        Use project_id=0 or _unset_project=True to unassign from project.
+        Returns updated speech or None if not found/unauthorized.
+        """
+        # Check ownership if user_id provided
+        if user_id is not None:
+            existing = self.conn.execute(
+                "SELECT user_id FROM speeches WHERE id = ?", (speech_id,)
+            ).fetchone()
+            if not existing or existing["user_id"] != user_id:
+                return None
+        
+        # Build dynamic UPDATE query
+        updates = []
+        params = []
+        
+        if title is not None:
+            updates.append("title = ?")
+            params.append(title)
+        if speaker is not None:
+            updates.append("speaker = ?")
+            params.append(speaker)
+        if category is not None:
+            updates.append("category = ?")
+            params.append(category)
+        if tags is not None:
+            updates.append("tags = ?")
+            params.append(json.dumps(tags))
+        if notes is not None:
+            updates.append("notes = ?")
+            params.append(notes)
+        if profile is not None:
+            updates.append("profile = ?")
+            params.append(profile)
+        if project_id is not None or _unset_project:
+            updates.append("project_id = ?")
+            # project_id of 0 or None means unassign
+            params.append(project_id if project_id and project_id > 0 else None)
+        
+        if not updates:
+            # Nothing to update, just return the existing speech
+            return self.get_speech(speech_id)
+        
+        # Always update updated_at
+        updates.append("updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
+        
+        query = f"UPDATE speeches SET {', '.join(updates)} WHERE id = ?"
+        params.append(speech_id)
+        
+        self.conn.execute(query, params)
+        self.conn.commit()
+        
+        return self.get_speech(speech_id)
+
+    def delete_speech(self, speech_id: int, user_id: int = None) -> bool:
+        """
+        Delete a speech and all associated data (audio, transcription, analysis, spectrogram).
+        If user_id is provided, ensures the speech belongs to that user.
+        Returns True if deleted, False if not found or unauthorized.
+        """
+        # Check ownership if user_id provided
+        if user_id is not None:
+            existing = self.conn.execute(
+                "SELECT user_id FROM speeches WHERE id = ?", (speech_id,)
+            ).fetchone()
+            if not existing or existing["user_id"] != user_id:
+                return False
+        
+        # Check if speech exists
+        exists = self.conn.execute(
+            "SELECT id FROM speeches WHERE id = ?", (speech_id,)
+        ).fetchone()
+        if not exists:
+            return False
+        
+        # Delete from all related tables (CASCADE should handle this, but be explicit)
+        self.conn.execute("DELETE FROM spectrograms WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM analyses WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM transcriptions WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM audio WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM speeches WHERE id = ?", (speech_id,))
+        self.conn.commit()
+        
+        return True
 
     def find_speech_by_hash(self, audio_hash: str) -> Optional[dict]:
         """Find speech by audio hash (dedup)."""
@@ -300,13 +428,26 @@ class SpeechDB:
         limit: int = 100,
         offset: int = 0,
         user_id: int = None,
+        include_unowned: bool = False,
+        unassigned: bool = False,
     ) -> list:
-        """List speeches with optional filters. If user_id is set, only return that user's speeches."""
-        query = "SELECT * FROM speeches WHERE 1=1"
+        """List speeches with optional filters. If user_id is set, only return that user's speeches.
+        If unassigned=True, only return speeches not assigned to any project."""
+        # Explicitly select columns, excluding heavy cached_score_json (3.5KB avg)
+        query = """SELECT id, title, speaker, year, source_url, source_file, duration_sec,
+                   language, category, products, tags, notes, description, audio_hash,
+                   created_at, updated_at, user_id, profile, project_id,
+                   cached_score, cached_score_profile
+                   FROM speeches WHERE 1=1"""
         params = []
         if user_id is not None:
             query += " AND user_id = ?"
             params.append(user_id)
+        elif not include_unowned:
+            # If no user_id filter and not explicitly including unowned, exclude NULL user_id
+            query += " AND user_id IS NOT NULL"
+        if unassigned:
+            query += " AND project_id IS NULL"
         if category:
             query += " AND category = ?"
             params.append(category)
@@ -324,11 +465,323 @@ class SpeechDB:
             results.append(d)
         return results
 
-    def count_speeches(self, user_id: int = None) -> int:
-        """Total speech count, optionally filtered by user."""
+    def count_speeches(self, user_id: int = None, include_unowned: bool = False, unassigned: bool = False) -> int:
+        """Total speech count, optionally filtered by user. If unassigned=True, only count unassigned."""
+        query = "SELECT COUNT(*) FROM speeches WHERE 1=1"
+        params = []
         if user_id is not None:
-            return self.conn.execute("SELECT COUNT(*) FROM speeches WHERE user_id = ?", (user_id,)).fetchone()[0]
-        return self.conn.execute("SELECT COUNT(*) FROM speeches").fetchone()[0]
+            query += " AND user_id = ?"
+            params.append(user_id)
+        elif not include_unowned:
+            query += " AND user_id IS NOT NULL"
+        if unassigned:
+            query += " AND project_id IS NULL"
+        return self.conn.execute(query, params).fetchone()[0]
+
+    # ── Projects ─────────────────────────────────────────────────────
+
+    def create_project(
+        self, user_id: int, name: str, description: str = None, profile: str = "general", type: str = "standard",
+        reminder_enabled: bool = False, reminder_frequency: str = "daily", reminder_days: list = None, reminder_time: str = "09:00"
+    ) -> int:
+        """Create a new project. Returns project id. Type can be 'standard' or 'group_meeting'."""
+        days_json = json.dumps(reminder_days or [])
+        cur = self.conn.execute(
+            """INSERT INTO projects (user_id, name, description, profile, type, 
+               reminder_enabled, reminder_frequency, reminder_days, reminder_time) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, name, description, profile, type, reminder_enabled, reminder_frequency, days_json, reminder_time)
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def get_project(self, project_id: int) -> Optional[dict]:
+        """Get a project by id."""
+        row = self.conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        # Parse reminder_days JSON
+        if d.get("reminder_days"):
+            try:
+                d["reminder_days"] = json.loads(d["reminder_days"])
+            except:
+                d["reminder_days"] = []
+        else:
+            d["reminder_days"] = []
+        return d
+
+    def list_projects(self, user_id: int) -> list:
+        """List all projects for a user."""
+        rows = self.conn.execute(
+            "SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)
+        ).fetchall()
+        results = []
+        for row in rows:
+            d = dict(row)
+            # Parse reminder_days JSON
+            if d.get("reminder_days"):
+                try:
+                    d["reminder_days"] = json.loads(d["reminder_days"])
+                except:
+                    d["reminder_days"] = []
+            else:
+                d["reminder_days"] = []
+            results.append(d)
+        return results
+
+    def update_project(
+        self, project_id: int, name: str = None, description: str = None, profile: str = None, type: str = None,
+        reminder_enabled: bool = None, reminder_frequency: str = None, reminder_days: list = None, reminder_time: str = None
+    ) -> bool:
+        """Update a project. Returns True if updated."""
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+        if profile is not None:
+            updates.append("profile = ?")
+            params.append(profile)
+        if type is not None:
+            updates.append("type = ?")
+            params.append(type)
+        if reminder_enabled is not None:
+            updates.append("reminder_enabled = ?")
+            params.append(reminder_enabled)
+        if reminder_frequency is not None:
+            updates.append("reminder_frequency = ?")
+            params.append(reminder_frequency)
+        if reminder_days is not None:
+            updates.append("reminder_days = ?")
+            params.append(json.dumps(reminder_days))
+        if reminder_time is not None:
+            updates.append("reminder_time = ?")
+            params.append(reminder_time)
+        if not updates:
+            return False
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(project_id)
+        self.conn.execute(f"UPDATE projects SET {', '.join(updates)} WHERE id = ?", params)
+        self.conn.commit()
+        return True
+
+    def delete_project(self, project_id: int, delete_speeches: bool = True) -> int:
+        """Delete a project. Returns number of speeches deleted if delete_speeches=True."""
+        deleted_count = 0
+        if delete_speeches:
+            # Delete associated speeches
+            cur = self.conn.execute("DELETE FROM speeches WHERE project_id = ?", (project_id,))
+            deleted_count = cur.rowcount
+        else:
+            # Just unlink speeches from project
+            self.conn.execute("UPDATE speeches SET project_id = NULL WHERE project_id = ?", (project_id,))
+        self.conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        self.conn.commit()
+        return deleted_count
+
+    def assign_speech_to_project(self, speech_id: int, project_id: int) -> bool:
+        """Assign a speech to a project. Returns True if updated."""
+        cur = self.conn.execute(
+            "UPDATE speeches SET project_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (project_id, speech_id)
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_project_speeches(self, project_id: int) -> list:
+        """Get all speeches in a project."""
+        rows = self.conn.execute(
+            "SELECT * FROM speeches WHERE project_id = ? ORDER BY created_at DESC",
+            (project_id,)
+        ).fetchall()
+        results = []
+        for row in rows:
+            d = dict(row)
+            d["products"] = json.loads(d["products"]) if d["products"] else []
+            d["tags"] = json.loads(d["tags"]) if d["tags"] else []
+            results.append(d)
+        return results
+
+    def count_project_speeches(self, project_id: int) -> int:
+        """Count speeches in a project."""
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM speeches WHERE project_id = ?", (project_id,)
+        ).fetchone()[0]
+
+    def cache_speech_score(self, speech_id: int, score: float, profile: str) -> None:
+        """Cache the composite score for a speech to avoid recalculation."""
+        self.conn.execute(
+            "UPDATE speeches SET cached_score = ?, cached_score_profile = ? WHERE id = ?",
+            (score, profile, speech_id)
+        )
+        self.conn.commit()
+
+    def cache_speech_score_full(self, speech_id: int, score_json: str, score: float, profile: str) -> None:
+        """Cache the full score JSON including summary for instant loads."""
+        self.conn.execute(
+            "UPDATE speeches SET cached_score_json = ?, cached_score = ?, cached_score_profile = ? WHERE id = ?",
+            (score_json, score, profile, speech_id)
+        )
+        self.conn.commit()
+
+    def invalidate_score_cache(self, speech_id: int) -> None:
+        """Clear cached score when analysis is updated."""
+        self.conn.execute(
+            "UPDATE speeches SET cached_score = NULL, cached_score_profile = NULL WHERE id = ?",
+            (speech_id,)
+        )
+        self.conn.commit()
+
+    def get_cache(self, key: str) -> Optional[dict]:
+        """Get a cached value by key."""
+        row = self.conn.execute(
+            "SELECT value FROM cache WHERE key = ?", (key,)
+        ).fetchone()
+        if row:
+            return json.loads(row[0])
+        return None
+
+    def set_cache(self, key: str, value: dict) -> None:
+        """Set a cached value."""
+        self.conn.execute(
+            "INSERT OR REPLACE INTO cache (key, value, created_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
+            (key, json.dumps(value))
+        )
+        self.conn.commit()
+
+    def delete_cache(self, key: str) -> None:
+        """Delete a cached value."""
+        self.conn.execute("DELETE FROM cache WHERE key = ?", (key,))
+        self.conn.commit()
+
+    def clear_cache_prefix(self, prefix: str) -> int:
+        """Clear all cache entries with a given prefix. Returns count deleted."""
+        cur = self.conn.execute("DELETE FROM cache WHERE key LIKE ?", (f"{prefix}%",))
+        self.conn.commit()
+        return cur.rowcount
+
+    def get_meeting_data(self, project_id: int) -> dict:
+        """Get meeting data for a group_meeting project.
+        Returns participants, chronological transcripts, and basic stats.
+        Uses diarization results when available.
+        """
+        import json
+        
+        # Get all speeches with their transcripts and analysis in chronological order
+        rows = self.conn.execute(
+            """SELECT s.id, s.speaker, s.created_at, s.duration_sec, 
+                      t.text as transcript, a.result as analysis_result
+               FROM speeches s
+               LEFT JOIN transcriptions t ON s.id = t.speech_id
+               LEFT JOIN analyses a ON s.id = a.speech_id
+               WHERE s.project_id = ? 
+               ORDER BY s.created_at ASC""",
+            (project_id,)
+        ).fetchall()
+        
+        # Collect all speakers from diarization results
+        all_speakers = set()
+        transcripts = []
+        
+        for row in rows:
+            # Try to get speakers from diarization
+            diarization_speakers = []
+            if row["analysis_result"]:
+                try:
+                    result = json.loads(row["analysis_result"])
+                    diarization = result.get("diarization", {})
+                    speakers_dict = diarization.get("speakers", {})
+                    # Get speaker names from diarization (excluding UNKNOWN)
+                    for spk_name in speakers_dict.keys():
+                        if spk_name != "UNKNOWN":
+                            diarization_speakers.append(spk_name)
+                            all_speakers.add(spk_name)
+                    # If only UNKNOWN speaker, use the speech's speaker field or generic name
+                    if not diarization_speakers and "UNKNOWN" in speakers_dict:
+                        num_unknown = diarization.get("num_speakers", 1)
+                        if row["speaker"]:
+                            diarization_speakers.append(row["speaker"])
+                            all_speakers.add(row["speaker"])
+                        else:
+                            for i in range(num_unknown):
+                                spk = f"Speaker {len(all_speakers) + 1}"
+                                diarization_speakers.append(spk)
+                                all_speakers.add(spk)
+                except (json.JSONDecodeError, KeyError):
+                    pass
+            
+            # Fallback if no diarization
+            if not diarization_speakers:
+                if row["speaker"]:
+                    diarization_speakers = [row["speaker"]]
+                    all_speakers.add(row["speaker"])
+                else:
+                    spk = f"Speaker {len(all_speakers) + 1}"
+                    diarization_speakers = [spk]
+                    all_speakers.add(spk)
+            
+            transcripts.append({
+                "id": row["id"],
+                "speaker": diarization_speakers[0] if len(diarization_speakers) == 1 else ", ".join(diarization_speakers),
+                "transcript": row["transcript"] or "",
+                "timestamp": row["created_at"],
+                "duration_sec": row["duration_sec"],
+                "speakers_detected": len(diarization_speakers),
+            })
+        
+        # Calculate total duration
+        total_duration = sum(row["duration_sec"] or 0 for row in rows)
+        
+        # Build per-participant stats
+        participant_stats = {}
+        for spk in all_speakers:
+            participant_stats[spk] = {
+                "name": spk,
+                "word_count": 0,
+                "recording_count": 0,
+                "total_duration_sec": 0,
+                "transcripts": [],
+            }
+        
+        for t in transcripts:
+            speaker = t["speaker"]
+            if speaker in participant_stats:
+                words = len(t["transcript"].split()) if t["transcript"] else 0
+                participant_stats[speaker]["word_count"] += words
+                participant_stats[speaker]["recording_count"] += 1
+                participant_stats[speaker]["total_duration_sec"] += t["duration_sec"] or 0
+                participant_stats[speaker]["transcripts"].append(t["transcript"])
+        
+        # Build participant summaries (text snippets for each speaker)
+        participant_summaries = []
+        for spk, stats in sorted(participant_stats.items()):
+            # Combine all their transcripts
+            combined_text = " ".join(stats["transcripts"])
+            # Get first 500 chars as preview
+            preview = combined_text[:500] + "..." if len(combined_text) > 500 else combined_text
+            
+            participant_summaries.append({
+                "name": spk,
+                "word_count": stats["word_count"],
+                "recording_count": stats["recording_count"],
+                "total_duration_sec": stats["total_duration_sec"],
+                "text_preview": preview,
+                "full_text": combined_text,
+            })
+        
+        return {
+            "participants": sorted(all_speakers),
+            "participant_count": len(all_speakers),
+            "recording_count": len(rows),
+            "total_duration_sec": total_duration,
+            "transcripts": transcripts,
+            "participant_summaries": participant_summaries,
+        }
 
     # ── Audio storage ─────────────────────────────────────────────────
 
@@ -679,10 +1132,16 @@ class SpeechDB:
         speeches = self.count_speeches()
         analyses = self.conn.execute("SELECT COUNT(*) FROM analyses").fetchone()[0]
         audio_count = self.conn.execute("SELECT COUNT(*) FROM audio").fetchone()[0]
-        audio_size = self.conn.execute(
-            "SELECT COALESCE(SUM(size_bytes), 0) FROM audio"
-        ).fetchone()[0]
+        # Skip slow SUM(size_bytes) query — estimate from DB file size instead
+        # audio_size = self.conn.execute("SELECT COALESCE(SUM(size_bytes), 0) FROM audio").fetchone()[0]
         spectrograms = self.conn.execute("SELECT COUNT(*) FROM spectrograms").fetchone()[0]
+        
+        # Duration stats
+        duration_stats = self.conn.execute(
+            "SELECT COALESCE(SUM(duration_sec), 0), COALESCE(AVG(duration_sec), 0) FROM speeches WHERE duration_sec > 0"
+        ).fetchone()
+        total_seconds = duration_stats[0] or 0
+        avg_duration = duration_stats[1] or 0
 
         # Product distribution
         products = {}
@@ -690,16 +1149,226 @@ class SpeechDB:
             for p in json.loads(row[0]):
                 products[p] = products.get(p, 0) + 1
 
+        # Estimate audio size from DB file size (audio is ~50% of DB)
+        db_size_mb = round(os.path.getsize(self.db_path) / (1024 * 1024), 2) if self.db_path.exists() else 0
+        audio_size_mb = round(db_size_mb * 0.5, 2)  # Approximate
+        
         return {
             "speeches": speeches,
             "analyses": analyses,
             "audio_files": audio_count,
-            "audio_size_mb": round(audio_size / (1024 * 1024), 2),
+            "audio_size_mb": audio_size_mb,
             "spectrograms": spectrograms,
+            "total_minutes": round(total_seconds / 60, 1),
+            "avg_duration": round(avg_duration, 1),
             "products": products,
-            "db_size_mb": round(os.path.getsize(self.db_path) / (1024 * 1024), 2)
-            if self.db_path.exists() else 0,
+            "db_size_mb": db_size_mb,
         }
+
+
+    # ── Coach Messages ─────────────────────────────────────────────────────
+
+    def save_coach_message(
+        self,
+        user_id: int,
+        role: str,
+        content: str,
+        speech_id: Optional[int] = None,
+        model: Optional[str] = None,
+        project_id: Optional[int] = None,
+    ) -> int:
+        """Save a coach chat message. Returns message ID."""
+        cur = self.conn.execute(
+            """
+            INSERT INTO coach_messages (user_id, speech_id, role, content, model, project_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, speech_id, role, content, model, project_id),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def get_coach_messages(
+        self,
+        user_id: int,
+        limit: int = 100,
+        speech_id: Optional[int] = None,
+    ) -> List[dict]:
+        """Get coach messages for a user, optionally filtered by speech."""
+        if speech_id:
+            rows = self.conn.execute(
+                """
+                SELECT cm.*, s.title as speech_title
+                FROM coach_messages cm
+                LEFT JOIN speeches s ON s.id = cm.speech_id
+                WHERE cm.user_id = ? AND cm.speech_id = ?
+                ORDER BY cm.created_at DESC
+                LIMIT ?
+                """,
+                (user_id, speech_id, limit),
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """
+                SELECT cm.*, s.title as speech_title
+                FROM coach_messages cm
+                LEFT JOIN speeches s ON s.id = cm.speech_id
+                WHERE cm.user_id = ?
+                ORDER BY cm.created_at DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_user_coach_stats(self, user_id: int) -> dict:
+        """Get coach usage stats for a user."""
+        row = self.conn.execute(
+            """
+            SELECT 
+                COUNT(*) as total_messages,
+                COUNT(DISTINCT speech_id) as speeches_discussed,
+                MIN(created_at) as first_message,
+                MAX(created_at) as last_message
+            FROM coach_messages
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        return dict(row) if row else {}
+
+    # ── Speaker Embeddings (Voice Fingerprinting) ─────────────────────
+
+    def store_speaker_embedding(
+        self,
+        user_id: int,
+        speaker_name: str,
+        embedding: bytes,
+        speech_id: Optional[int] = None,
+    ) -> int:
+        """
+        Store or update a speaker's voice embedding.
+        
+        If an embedding already exists for this user+speaker, we average them
+        to create a more robust fingerprint over time.
+        
+        Args:
+            user_id: User who owns this speaker profile
+            speaker_name: Display name for the speaker
+            embedding: 256-dim float32 numpy array as bytes
+            speech_id: Reference recording (optional)
+        
+        Returns:
+            Embedding ID
+        """
+        import numpy as np
+        
+        # Check if embedding already exists for this user+speaker
+        existing = self.conn.execute(
+            "SELECT id, embedding, embedding_count FROM speaker_embeddings WHERE user_id = ? AND speaker_name = ?",
+            (user_id, speaker_name),
+        ).fetchone()
+        
+        if existing:
+            # Average the embeddings for more robust fingerprinting
+            old_embedding = np.frombuffer(existing["embedding"], dtype=np.float32)
+            new_embedding = np.frombuffer(embedding, dtype=np.float32)
+            count = existing["embedding_count"]
+            
+            # Weighted average: more weight to accumulated embedding
+            averaged = (old_embedding * count + new_embedding) / (count + 1)
+            averaged = averaged / np.linalg.norm(averaged)  # Re-normalize
+            
+            self.conn.execute(
+                """
+                UPDATE speaker_embeddings 
+                SET embedding = ?, embedding_count = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+                WHERE id = ?
+                """,
+                (averaged.tobytes(), count + 1, existing["id"]),
+            )
+            self.conn.commit()
+            return existing["id"]
+        else:
+            # Create new embedding
+            cur = self.conn.execute(
+                """
+                INSERT INTO speaker_embeddings (user_id, speaker_name, embedding, speech_id, embedding_count)
+                VALUES (?, ?, ?, ?, 1)
+                """,
+                (user_id, speaker_name, embedding, speech_id),
+            )
+            self.conn.commit()
+            return cur.lastrowid
+
+    def find_matching_speaker(
+        self,
+        user_id: int,
+        embedding: bytes,
+        threshold: float = 0.80,
+    ) -> Optional[dict]:
+        """
+        Find a matching speaker by voice embedding similarity.
+        
+        Args:
+            user_id: User to search within
+            embedding: Query embedding (256-dim float32 bytes)
+            threshold: Cosine similarity threshold (0.80 = quite confident match)
+        
+        Returns:
+            Dict with speaker_name and similarity, or None if no match
+        """
+        import numpy as np
+        
+        query_embed = np.frombuffer(embedding, dtype=np.float32)
+        
+        rows = self.conn.execute(
+            "SELECT id, speaker_name, embedding FROM speaker_embeddings WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+        
+        if not rows:
+            return None
+        
+        best_match = None
+        best_similarity = 0.0
+        
+        for row in rows:
+            stored_embed = np.frombuffer(row["embedding"], dtype=np.float32)
+            # Cosine similarity
+            similarity = float(np.dot(query_embed, stored_embed))
+            
+            if similarity > best_similarity and similarity >= threshold:
+                best_similarity = similarity
+                best_match = {
+                    "speaker_name": row["speaker_name"],
+                    "similarity": round(similarity, 3),
+                    "embedding_id": row["id"],
+                }
+        
+        return best_match
+
+    def get_speaker_embeddings(self, user_id: int) -> List[dict]:
+        """Get all speaker embeddings for a user (without the raw embedding data)."""
+        rows = self.conn.execute(
+            """
+            SELECT id, speaker_name, speech_id, embedding_count, created_at, updated_at
+            FROM speaker_embeddings
+            WHERE user_id = ?
+            ORDER BY updated_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_speaker_embedding(self, user_id: int, speaker_name: str) -> bool:
+        """Delete a speaker embedding."""
+        cur = self.conn.execute(
+            "DELETE FROM speaker_embeddings WHERE user_id = ? AND speaker_name = ?",
+            (user_id, speaker_name),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
 
 
 def _f(v) -> Optional[float]:

@@ -148,8 +148,8 @@ SCORING_PROFILES = {
         "description": "Balanced assessment across all speech dimensions",
         "weights": {
             "wpm": 0.12,
-            "pitch_variation": 0.10,
-            "voice_quality": 0.12,
+            "pitch_variation": 0.12,
+            "voice_quality": 0.14,
             "jitter": 0.08,
             "shimmer": 0.05,
             "vocal_fry": 0.05,
@@ -157,8 +157,8 @@ SCORING_PROFILES = {
             "syntactic_complexity": 0.10,
             "grade_level": 0.05,
             "repetition": 0.05,
-            "connectedness": 0.08,
-            "pitch_range": 0.05,
+            "connectedness": 0.0,  # DISABLED: 90% of recordings have 0, metric broken
+            "pitch_range": 0.09,
         },
         "repetition_direction": "lower_better",  # for general, less repetition is cleaner
     },
@@ -166,15 +166,15 @@ SCORING_PROFILES = {
         "description": "Emphasis on rhetorical skill, delivery, and expressiveness",
         "weights": {
             "wpm": 0.08,
-            "pitch_variation": 0.15,
-            "pitch_range": 0.10,
+            "pitch_variation": 0.17,
+            "pitch_range": 0.12,
             "voice_quality": 0.10,
             "jitter": 0.05,
             "vocal_fry": 0.05,
             "lexical_diversity": 0.12,
             "syntactic_complexity": 0.08,
-            "repetition": 0.15,
-            "connectedness": 0.07,
+            "repetition": 0.18,
+            "connectedness": 0.0,  # DISABLED: 90% of recordings have 0, metric broken
             "shimmer": 0.05,
         },
         "repetition_direction": "higher_better",  # orators use repetition deliberately
@@ -199,17 +199,17 @@ SCORING_PROFILES = {
         "description": "Professional presentation and delivery quality",
         "weights": {
             "wpm": 0.12,
-            "pitch_variation": 0.14,
-            "pitch_range": 0.08,
-            "voice_quality": 0.10,
+            "pitch_variation": 0.16,
+            "pitch_range": 0.10,
+            "voice_quality": 0.12,
             "jitter": 0.08,
             "shimmer": 0.05,
             "vocal_fry": 0.08,
             "lexical_diversity": 0.10,
             "syntactic_complexity": 0.08,
             "repetition": 0.05,
-            "connectedness": 0.07,
-            "grade_level": 0.05,
+            "connectedness": 0.0,  # DISABLED: 90% of recordings have 0, metric broken
+            "grade_level": 0.06,
         },
         "repetition_direction": "lower_better",
     },
@@ -227,6 +227,12 @@ SCORING_PROFILES = {
             "pitch_range": 0.05,
         },
         "repetition_direction": "lower_better",
+    },
+    "group": {
+        "description": "Multi-party meeting analysis with speaker tracking",
+        "weights": {},  # No scoring — focus on transcription, diarization, and LLM analysis
+        "repetition_direction": "lower_better",
+        "skip_scoring": True,  # Flag to skip numeric scoring
     },
 }
 
@@ -298,36 +304,36 @@ def _letter_grade(score: float) -> str:
     """
     Convert numeric score (0-100) to letter grade.
     
-    Thresholds are calibrated for percentile-based scoring where 50 = average.
-    - 80+ = A tier (top 20%)
-    - 65+ = B tier (above average)
-    - 50+ = C tier (average)
-    - 35+ = D tier (below average)
-    - <35 = F (poor)
+    Thresholds calibrated for bell-curve distribution:
+    - A: top 10% (>= 68.5)
+    - B: next 25% (>= 60)
+    - C: middle 30% (>= 52)
+    - D: next 25% (>= 41)
+    - F: bottom 10% (< 41)
     """
-    if score >= 90:
+    if score >= 75:
         return "A+"
-    elif score >= 85:
+    elif score >= 71:
         return "A"
-    elif score >= 80:
+    elif score >= 68.5:
         return "A-"
-    elif score >= 75:
-        return "B+"
-    elif score >= 70:
-        return "B"
     elif score >= 65:
-        return "B-"
+        return "B+"
+    elif score >= 62:
+        return "B"
     elif score >= 60:
+        return "B-"
+    elif score >= 57:
         return "C+"
-    elif score >= 55:
+    elif score >= 54:
         return "C"
-    elif score >= 50:
+    elif score >= 52:
         return "C-"
-    elif score >= 45:
+    elif score >= 48:
         return "D+"
-    elif score >= 40:
+    elif score >= 44:
         return "D"
-    elif score >= 35:
+    elif score >= 41:
         return "D-"
     else:
         return "F"
@@ -403,6 +409,129 @@ def _get_distributions(db) -> dict:
     _cache_timestamp = now
     logger.info(f"Loaded scoring distributions: {len(rows)} speeches, {len(col_list)} metrics")
     return distributions
+
+
+# ---------------------------------------------------------------------------
+# Summary Generation
+# ---------------------------------------------------------------------------
+
+def generate_summary(
+    speech_title: str,
+    speaker: str,
+    profile: str,
+    profile_description: str,
+    composite_score: float,
+    letter_grade: str,
+    metric_scores: dict,
+    category_scores: dict,
+    strengths: list,
+    improvements: list,
+    duration_sec: float = None,
+) -> str:
+    """
+    Generate a narrative summary paragraph explaining the speech analysis results.
+    
+    Returns a clear, readable summary suitable for display at the top of the results page.
+    """
+    # Determine overall assessment based on grade
+    if letter_grade.startswith('A'):
+        overall = "excellent"
+        assessment = "demonstrates outstanding communication skills"
+    elif letter_grade.startswith('B'):
+        overall = "good"
+        assessment = "shows solid communication abilities"
+    elif letter_grade.startswith('C'):
+        overall = "adequate"
+        assessment = "demonstrates competent communication"
+    elif letter_grade.startswith('D'):
+        overall = "below average"
+        assessment = "shows room for improvement in communication"
+    else:
+        overall = "needs significant work"
+        assessment = "has significant areas requiring development"
+    
+    # Build the summary parts
+    parts = []
+    
+    # Opening with title/speaker and overall score
+    speaker_text = f" by {speaker}" if speaker and speaker.lower() != "unknown speaker" else ""
+    title_text = speech_title if speech_title and speech_title.lower() != "untitled speech" else "This speech"
+    
+    duration_text = ""
+    if duration_sec:
+        mins = int(duration_sec // 60)
+        secs = int(duration_sec % 60)
+        if mins > 0:
+            duration_text = f" ({mins}m {secs}s)"
+        else:
+            duration_text = f" ({secs}s)"
+    
+    parts.append(
+        f"{title_text}{speaker_text}{duration_text} received an overall grade of **{letter_grade}** "
+        f"({composite_score:.1f}/100), which {assessment}."
+    )
+    
+    # Profile context
+    parts.append(
+        f"This analysis used the **{profile.replace('_', ' ').title()}** profile, "
+        f"which emphasizes {profile_description.lower()}."
+    )
+    
+    # Category highlights (top and bottom)
+    if category_scores:
+        sorted_cats = sorted(
+            [(k, v) for k, v in category_scores.items() if v.get('score') is not None],
+            key=lambda x: x[1]['score'],
+            reverse=True
+        )
+        if sorted_cats:
+            top_cat = sorted_cats[0]
+            top_name = top_cat[1].get('label', top_cat[0].replace('_', ' ').title())
+            top_score = top_cat[1]['score']
+            top_grade = top_cat[1].get('grade', '')
+            
+            if len(sorted_cats) > 1:
+                bottom_cat = sorted_cats[-1]
+                bottom_name = bottom_cat[1].get('label', bottom_cat[0].replace('_', ' ').title())
+                bottom_score = bottom_cat[1]['score']
+                
+                if top_score >= 75 and bottom_score < 65:
+                    parts.append(
+                        f"The strongest area is **{top_name}** ({top_grade}, {top_score:.0f}), "
+                        f"while **{bottom_name}** ({bottom_score:.0f}) offers the most opportunity for growth."
+                    )
+                elif top_score >= 75:
+                    parts.append(f"The analysis shows particular strength in **{top_name}** ({top_grade}, {top_score:.0f}).")
+            elif top_score >= 75:
+                parts.append(f"The analysis shows strength in **{top_name}** ({top_grade}, {top_score:.0f}).")
+    
+    # Specific strengths
+    if strengths:
+        strength_names = [s.split(':')[0].strip() for s in strengths[:2]]
+        if len(strength_names) == 1:
+            parts.append(f"Key strength: {strength_names[0]}.")
+        elif len(strength_names) >= 2:
+            parts.append(f"Key strengths include {strength_names[0]} and {strength_names[1]}.")
+    
+    # Improvement areas
+    if improvements:
+        improvement_names = [s.split(':')[0].strip() for s in improvements[:2]]
+        if len(improvement_names) == 1:
+            parts.append(f"For improvement, focus on {improvement_names[0]}.")
+        elif len(improvement_names) >= 2:
+            parts.append(f"For improvement, focus on {improvement_names[0]} and {improvement_names[1]}.")
+    
+    # Closing encouragement based on grade
+    if letter_grade.startswith('A'):
+        parts.append("This is a high-quality recording that demonstrates strong communication skills.")
+    elif letter_grade.startswith('B'):
+        parts.append("With some refinements in the noted areas, this could reach an excellent level.")
+    elif letter_grade.startswith('C'):
+        parts.append("Review the detailed metrics below and tap any metric for specific improvement tips.")
+    elif letter_grade.startswith('D') or letter_grade.startswith('F'):
+        parts.append("Consider the improvement tips for each metric and practice regularly to build skills.")
+    
+    return " ".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -521,6 +650,7 @@ def score_speech(
             "grade_color": _grade_color(grade),
             "weight": weight,
             "available": True,
+            "direction": direction,  # Needed for correct percentile interpretation
         }
 
     # Composite score
@@ -584,6 +714,27 @@ def score_speech(
         if data["score"] < 70:
             improvements.append(f"{data['label']}: {data['grade']} ({data['score']})")
 
+    # Get speech metadata for summary
+    speech = db.get_speech(speech_id)
+    speech_title = speech.get("title", "Untitled Speech") if speech else "Untitled Speech"
+    speaker = speech.get("speaker", "Unknown Speaker") if speech else "Unknown Speaker"
+    duration_sec = speech.get("duration_sec") if speech else None
+    
+    # Generate narrative summary
+    summary = generate_summary(
+        speech_title=speech_title,
+        speaker=speaker,
+        profile=profile,
+        profile_description=profile_def["description"],
+        composite_score=composite,
+        letter_grade=overall_grade,
+        metric_scores=metric_scores,
+        category_scores=category_scores,
+        strengths=strengths,
+        improvements=improvements,
+        duration_sec=duration_sec,
+    )
+
     return {
         "speech_id": speech_id,
         "profile": profile,
@@ -597,6 +748,7 @@ def score_speech(
         "improvements": improvements,
         "metrics_scored": sum(1 for m in metric_scores.values() if m.get("available")),
         "metrics_total": len(weights),
+        "summary": summary,
     }
 
 

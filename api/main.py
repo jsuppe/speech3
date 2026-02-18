@@ -145,6 +145,35 @@ app.add_middleware(
 )
 
 
+# Integrity middleware (logs device attestation status)
+@app.middleware("http")
+async def integrity_middleware(request: Request, call_next):
+    """Check device integrity token from mobile apps."""
+    from .integrity import should_skip_integrity, verify_play_integrity
+    
+    integrity_token = request.headers.get("X-Device-Integrity")
+    user_agent = request.headers.get("User-Agent", "")
+    api_key = request.headers.get("Authorization", "").replace("Bearer ", "")
+    
+    # Skip for web clients and API key auth
+    if should_skip_integrity(user_agent, api_key if api_key.startswith("sk-") else None):
+        return await call_next(request)
+    
+    if integrity_token:
+        # Debug bypass for development
+        if integrity_token == "debug_bypass":
+            request.state.integrity_status = "debug"
+        else:
+            is_valid, message, verdict = await verify_play_integrity(integrity_token)
+            request.state.integrity_status = "valid" if is_valid else "invalid"
+            if not is_valid:
+                logger.warning(f"Device integrity check failed: {message}")
+    else:
+        request.state.integrity_status = "missing"
+    
+    return await call_next(request)
+
+
 # HTTP exception handler (auth errors, etc.)
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -203,3 +232,24 @@ try:
     logger.info("Frontend dashboard routes registered.")
 except ImportError as e:
     logger.warning(f"Frontend not available: {e}")
+
+# Serve static files (images, etc.)
+try:
+    from fastapi.staticfiles import StaticFiles
+    import os
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "static")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir, html=True), name="static")
+        logger.info(f"Static files mounted at /static from {static_dir}")
+except Exception as e:
+    logger.warning(f"Could not mount static files: {e}")
+
+# Serve C23 WASM Compiler
+try:
+    from fastapi.staticfiles import StaticFiles
+    c23_dir = "/home/melchior/dev/c23-wasm-compiler"
+    if os.path.exists(c23_dir):
+        app.mount("/dev/c23wasm", StaticFiles(directory=c23_dir, html=True), name="c23wasm")
+        logger.info(f"C23 WASM compiler mounted at /dev/c23wasm")
+except Exception as e:
+    logger.warning(f"Could not mount C23 WASM compiler: {e}")

@@ -17,6 +17,8 @@ from .user_auth import (
     decode_token,
     get_user_by_id,
     user_required,
+    update_user_app_version,
+    get_all_users_with_versions,
 )
 
 logger = logging.getLogger("speechscore.auth_routes")
@@ -227,3 +229,55 @@ async def delete_account(user: dict = Depends(user_required)):
     logger.info("Deleted user account: user_id=%d, speeches=%d", user_id, len(speech_ids))
 
     return {"message": "Account and all associated data deleted.", "speeches_deleted": len(speech_ids)}
+
+
+# ---------------------------------------------------------------------------
+# App Version Tracking
+# ---------------------------------------------------------------------------
+
+class AppVersionReport(BaseModel):
+    app_version: str
+    patch_number: Optional[int] = None
+
+
+@auth_router.post("/version")
+async def report_app_version(body: AppVersionReport, user: dict = Depends(user_required)):
+    """
+    Report the current app version and Shorebird patch number.
+    Called on app startup after login.
+    """
+    db_path = config.DB_PATH
+    update_user_app_version(
+        db_path=db_path,
+        user_id=user["id"],
+        app_version=body.app_version,
+        patch_number=body.patch_number,
+    )
+    logger.info("Version report: user_id=%d, version=%s, patch=%s", 
+                user["id"], body.app_version, body.patch_number)
+    return {"status": "ok"}
+
+
+@auth_router.get("/admin/users/versions")
+async def get_user_versions(api_key: str = Query(None)):
+    """
+    Admin endpoint: Get all users with their app versions.
+    Requires API key for access (not user JWT).
+    """
+    from .auth import lookup_key
+    
+    # Verify API key
+    if not api_key:
+        raise HTTPException(status_code=401, detail="API key required")
+    
+    key_data = lookup_key(api_key)
+    if not key_data or not key_data.get("enabled"):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    db_path = config.DB_PATH
+    users = get_all_users_with_versions(db_path)
+    
+    return {
+        "users": users,
+        "total": len(users),
+    }

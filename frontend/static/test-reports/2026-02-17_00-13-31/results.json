@@ -1,0 +1,68 @@
+[
+  {
+    "scenario": "Health Check",
+    "step": "Check health endpoint",
+    "success": true,
+    "status_code": 200,
+    "duration_ms": 19.87481117248535,
+    "request_id": "2d28f68e",
+    "response_summary": "status=ok, gpu_available=True, gpu_name=NVIDIA GeForce RTX 3090",
+    "error": "",
+    "trace_file": ""
+  },
+  {
+    "scenario": "Health Check",
+    "step": "Check API version",
+    "success": true,
+    "status_code": 200,
+    "duration_ms": 137.7732753753662,
+    "request_id": "8e381bcf",
+    "response_summary": "<!DOCTYPE html>\n<html lang=\"en\" class=\"h-full bg-gray-950\">\n<head>\n    <meta charset=\"UTF-8\">\n    <m",
+    "error": "",
+    "trace_file": ""
+  },
+  {
+    "scenario": "Speech Analysis Flow",
+    "step": "List speeches",
+    "success": true,
+    "status_code": 200,
+    "duration_ms": 63.16995620727539,
+    "request_id": "44c413cb",
+    "response_summary": "speeches=[{'id': 24505, 'title': 'This , total=13, limit=5",
+    "error": "",
+    "trace_file": ""
+  },
+  {
+    "scenario": "Speech Analysis Flow",
+    "step": "Get single speech",
+    "success": true,
+    "status_code": 200,
+    "duration_ms": 24.761199951171875,
+    "request_id": "13fbbc58",
+    "response_summary": "speeches=[{'id': 24505, 'title': 'This , total=13, limit=1",
+    "error": "",
+    "trace_file": ""
+  },
+  {
+    "scenario": "Projects API",
+    "step": "List projects",
+    "success": false,
+    "status_code": 401,
+    "duration_ms": 6.176233291625977,
+    "request_id": "8a960699",
+    "response_summary": "error={'code': 'UNAUTHORIZED', 'mess",
+    "error": "",
+    "trace_file": ""
+  },
+  {
+    "scenario": "Pipeline Status",
+    "step": "Queue status",
+    "success": true,
+    "status_code": 200,
+    "duration_ms": 6.105899810791016,
+    "request_id": "ab02366f",
+    "response_summary": "queue_depth=0, max_queue_depth=20, currently_processing=None",
+    "error": "",
+    "trace_file": ""
+  }
+]

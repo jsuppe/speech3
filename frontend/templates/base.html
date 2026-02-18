@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}SpeechScore{% endblock %}</title>
+    <title>{% block title %}SpeakFit{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -48,19 +48,28 @@
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div class="flex h-14 items-center justify-between">
                     <div class="flex items-center gap-8">
-                        <a href="/" class="text-lg font-bold text-white tracking-tight">
-                            <span class="text-indigo-400">Speech</span>Score
+                        <a href="/dashboard" class="text-lg font-bold text-white tracking-tight">
+                            <span class="text-indigo-400">Speak</span>Fit
                         </a>
                         <div class="hidden sm:flex gap-1">
-                            <a href="/" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Dashboard</a>
+                            <a href="/dashboard" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/dashboard' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Dashboard</a>
                             <a href="/speeches" class="px-3 py-2 rounded-md text-sm font-medium {% if '/speeches' in request.url.path and request.url.path != '/' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Speeches</a>
                             <a href="/upload" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/upload' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Upload</a>
                             <a href="/compare" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/compare' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Compare</a>
                             <a href="/methodology" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/methodology' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Methodology</a>
+                            <a href="/admin" class="px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 {% if '/admin' in request.url.path %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">
+                                Dashboard
+                                <span class="bg-indigo-500/30 text-indigo-300 text-[10px] font-semibold px-1.5 py-0.5 rounded">ADMIN</span>
+                            </a>
                         </div>
                     </div>
-                    <div class="text-xs text-gray-500">
-                        API: <span class="text-green-400">●</span> localhost:8000
+                    <div class="flex items-center gap-4">
+                        <span class="text-xs text-gray-500">
+                            API: <span class="text-green-400">●</span> localhost:8000
+                        </span>
+                        <a href="/logout" class="text-xs text-gray-400 hover:text-white transition-colors">
+                            Logout
+                        </a>
                     </div>
                 </div>
             </div>

@@ -1,0 +1,697 @@
+{
+  "project": {
+    "name": "SpeakFit",
+    "version": "1.0.24"
+  },
+  "architecture": {
+    "app": {
+      "name": "Flutter App",
+      "color": "#4CAF50",
+      "y": 15,
+      "components": [
+        {
+          "name": "HomeScreen",
+          "size": 50,
+          "desc": "Main dashboard with recent recordings and quick actions",
+          "type": "screen"
+        },
+        {
+          "name": "ResultsScreen",
+          "size": 50,
+          "desc": "Analysis results display with score gauge and metrics",
+          "type": "screen"
+        },
+        {
+          "name": "APIService",
+          "size": 50,
+          "desc": "HTTP client for backend API communication",
+          "type": "service"
+        },
+        {
+          "name": "RecordScreen",
+          "size": 21,
+          "desc": "Audio recording UI",
+          "type": "screen"
+        },
+        {
+          "name": "CoachScreen",
+          "size": 10,
+          "desc": "AI speech coach",
+          "type": "screen"
+        },
+        {
+          "name": "HistoryScreen",
+          "size": 16,
+          "desc": "Past recordings",
+          "type": "screen"
+        },
+        {
+          "name": "SettingsScreen",
+          "size": 21,
+          "desc": "User preferences",
+          "type": "screen"
+        },
+        {
+          "name": "AuthService",
+          "size": 8,
+          "desc": "Google/Apple sign-in",
+          "type": "service"
+        }
+      ]
+    },
+    "api": {
+      "name": "FastAPI Backend",
+      "color": "#2196F3",
+      "y": 5,
+      "components": [
+        {
+          "name": "router",
+          "size": 50,
+          "desc": "All API endpoints - analyze, speeches, projects, coach",
+          "type": "router"
+        },
+        {
+          "name": "pipeline_runner",
+          "size": 50,
+          "desc": "Orchestrates all speech analysis modules",
+          "type": "module"
+        }
+      ]
+    },
+    "pipeline": {
+      "name": "Analysis Pipeline",
+      "color": "#FF9800",
+      "y": -5,
+      "components": [
+        {
+          "name": "Whisper_STT",
+          "size": 20,
+          "desc": "Speech-to-text (GPU)",
+          "type": "module"
+        },
+        {
+          "name": "audio_analysis",
+          "size": 8,
+          "desc": "Pitch, jitter, shimmer",
+          "type": "module"
+        }
+      ]
+    },
+    "data": {
+      "name": "Data Layer",
+      "color": "#9C27B0",
+      "y": -15,
+      "components": [
+        {
+          "name": "SQLite_DB",
+          "size": 52,
+          "desc": "11GB, 77K+ speeches",
+          "type": "database"
+        }
+      ]
+    }
+  },
+  "componentDetails": {
+    "HomeScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Main dashboard with recent recordings and quick actions",
+      "depends": [
+        "APIService",
+        "RecordScreen",
+        "HistoryScreen",
+        "CoachScreen"
+      ],
+      "external": [],
+      "file_path": "/home/melchior/speechscore_app/lib/screens/home_screen.dart",
+      "regions": [
+        {
+          "name": "AppBar",
+          "desc": "",
+          "x": 0,
+          "y": 0,
+          "w": 100,
+          "h": 8,
+          "style": "",
+          "deps": []
+        },
+        {
+          "name": "StatsWidget",
+          "desc": "",
+          "x": 5,
+          "y": 12,
+          "w": 90,
+          "h": 15,
+          "style": "",
+          "deps": []
+        },
+        {
+          "name": "RecordingList",
+          "desc": "",
+          "x": 5,
+          "y": 30,
+          "w": 90,
+          "h": 50,
+          "style": "list",
+          "deps": []
+        },
+        {
+          "name": "QuickRecordFAB",
+          "desc": "",
+          "x": 75,
+          "y": 85,
+          "w": 18,
+          "h": 10,
+          "style": "fab",
+          "deps": []
+        }
+      ]
+    },
+    "ResultsScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Analysis results display with score gauge and metrics",
+      "depends": [
+        "APIService",
+        "CoachScreen"
+      ],
+      "external": [],
+      "file_path": "/home/melchior/speechscore_app/lib/screens/results_screen.dart",
+      "regions": [
+        {
+          "name": "ScoreGauge",
+          "desc": "",
+          "x": 25,
+          "y": 10,
+          "w": 50,
+          "h": 25,
+          "style": "gauge",
+          "deps": []
+        },
+        {
+          "name": "MetricsGrid",
+          "desc": "",
+          "x": 5,
+          "y": 38,
+          "w": 90,
+          "h": 20,
+          "style": "",
+          "deps": []
+        },
+        {
+          "name": "AudioPlayback",
+          "desc": "",
+          "x": 5,
+          "y": 60,
+          "w": 90,
+          "h": 12,
+          "style": "",
+          "deps": []
+        },
+        {
+          "name": "TranscriptView",
+          "desc": "",
+          "x": 5,
+          "y": 74,
+          "w": 90,
+          "h": 18,
+          "style": "",
+          "deps": []
+        }
+      ]
+    },
+    "APIService": {
+      "color": "#4CAF50",
+      "type": "flow",
+      "desc": "HTTP client for backend API communication",
+      "depends": [
+        "AuthService"
+      ],
+      "external": [
+        "dio",
+        "flutter_secure_storage"
+      ],
+      "file_path": "/home/melchior/speechscore_app/lib/services/api_service.dart",
+      "nodes": [
+        {
+          "name": "AuthService",
+          "desc": "Dependency: AuthService",
+          "x": 30,
+          "y": 20,
+          "deps": []
+        }
+      ],
+      "connections": []
+    },
+    "router": {
+      "color": "#2196F3",
+      "type": "flow",
+      "desc": "All API endpoints - analyze, speeches, projects, coach",
+      "depends": [
+        "pipeline_runner",
+        "job_manager",
+        "auth",
+        "user_auth"
+      ],
+      "external": [],
+      "file_path": "/home/melchior/speech3/api/router.py",
+      "nodes": [
+        {
+          "name": "pipeline_runner",
+          "desc": "Dependency: pipeline_runner",
+          "x": 30,
+          "y": 20,
+          "deps": []
+        },
+        {
+          "name": "job_manager",
+          "desc": "Dependency: job_manager",
+          "x": 70,
+          "y": 20,
+          "deps": []
+        },
+        {
+          "name": "auth",
+          "desc": "Dependency: auth",
+          "x": 30,
+          "y": 50,
+          "deps": []
+        },
+        {
+          "name": "user_auth",
+          "desc": "Dependency: user_auth",
+          "x": 70,
+          "y": 50,
+          "deps": []
+        }
+      ],
+      "connections": []
+    },
+    "pipeline_runner": {
+      "color": "#2196F3",
+      "type": "flow",
+      "desc": "Orchestrates all speech analysis modules",
+      "depends": [
+        "Whisper STT",
+        "audio_analysis",
+        "text_analysis",
+        "diarization",
+        "SQLite DB"
+      ],
+      "external": [
+        "faster_whisper",
+        "spacy",
+        "numpy",
+        "torch"
+      ],
+      "file_path": "/home/melchior/speech3/api/pipeline_runner.py",
+      "nodes": [
+        {
+          "name": "Whisper STT",
+          "desc": "Dependency: Whisper STT",
+          "x": 30,
+          "y": 20,
+          "deps": []
+        },
+        {
+          "name": "audio_analysis",
+          "desc": "Dependency: audio_analysis",
+          "x": 70,
+          "y": 20,
+          "deps": []
+        },
+        {
+          "name": "text_analysis",
+          "desc": "Dependency: text_analysis",
+          "x": 30,
+          "y": 50,
+          "deps": []
+        },
+        {
+          "name": "diarization",
+          "desc": "Dependency: diarization",
+          "x": 70,
+          "y": 50,
+          "deps": []
+        },
+        {
+          "name": "SQLite DB",
+          "desc": "Dependency: SQLite DB",
+          "x": 30,
+          "y": 80,
+          "deps": []
+        }
+      ],
+      "connections": []
+    },
+    "RecordScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Audio recording UI",
+      "depends": [
+        "APIService"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "CoachScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "AI speech coach",
+      "depends": [
+        "APIService"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "HistoryScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Past recordings",
+      "depends": [
+        "APIService"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "SettingsScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "User preferences",
+      "depends": [
+        "APIService",
+        "AuthService"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "AuthService": {
+      "color": "#4CAF50",
+      "type": "flow",
+      "desc": "Google/Apple sign-in",
+      "depends": [],
+      "external": [
+        "google_sign_in"
+      ],
+      "file_path": ""
+    },
+    "Whisper_STT": {
+      "color": "#FF9800",
+      "type": "flow",
+      "desc": "Speech-to-text (GPU)",
+      "depends": [],
+      "external": [
+        "faster_whisper",
+        "CUDA"
+      ],
+      "file_path": ""
+    },
+    "audio_analysis": {
+      "color": "#FF9800",
+      "type": "flow",
+      "desc": "Pitch, jitter, shimmer",
+      "depends": [],
+      "external": [
+        "parselmouth"
+      ],
+      "file_path": ""
+    },
+    "SQLite_DB": {
+      "color": "#9C27B0",
+      "type": "schema",
+      "desc": "11GB, 77K+ speeches",
+      "depends": [],
+      "external": [
+        "sqlite3"
+      ],
+      "file_path": "",
+      "tables": [
+        {
+          "name": "speeches",
+          "desc": "Recording metadata",
+          "cols": [
+            "id",
+            "user_id",
+            "title",
+            "duration",
+            "created_at"
+          ]
+        },
+        {
+          "name": "analyses",
+          "desc": "Full JSON results",
+          "cols": [
+            "speech_id",
+            "results_json",
+            "score"
+          ]
+        },
+        {
+          "name": "users",
+          "desc": "User accounts",
+          "cols": [
+            "id",
+            "email",
+            "name",
+            "created_at"
+          ]
+        },
+        {
+          "name": "speaker_embeddings",
+          "desc": "Voice fingerprints",
+          "cols": [
+            "user_id",
+            "name",
+            "embedding"
+          ]
+        },
+        {
+          "name": "projects",
+          "desc": "Recording groupings",
+          "cols": [
+            "id",
+            "user_id",
+            "name",
+            "type"
+          ]
+        },
+        {
+          "name": "coach_messages",
+          "desc": "AI chat history",
+          "cols": [
+            "user_id",
+            "speech_id",
+            "role",
+            "content"
+          ]
+        }
+      ],
+      "relations": [
+        {
+          "from": 0,
+          "to": 1,
+          "label": "1:1"
+        },
+        {
+          "from": 2,
+          "to": 0,
+          "label": "1:N"
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "label": "1:N"
+        }
+      ]
+    }
+  },
+  "dependencyGraph": {
+    "HomeScreen": {
+      "internal": [
+        "APIService",
+        "RecordScreen",
+        "HistoryScreen",
+        "CoachScreen"
+      ],
+      "external": []
+    },
+    "ResultsScreen": {
+      "internal": [
+        "APIService",
+        "CoachScreen"
+      ],
+      "external": []
+    },
+    "APIService": {
+      "internal": [
+        "AuthService"
+      ],
+      "external": [
+        "dio",
+        "flutter_secure_storage"
+      ]
+    },
+    "router": {
+      "internal": [
+        "pipeline_runner",
+        "job_manager",
+        "auth",
+        "user_auth"
+      ],
+      "external": []
+    },
+    "pipeline_runner": {
+      "internal": [
+        "Whisper STT",
+        "audio_analysis",
+        "text_analysis",
+        "diarization",
+        "SQLite DB"
+      ],
+      "external": [
+        "faster_whisper",
+        "spacy",
+        "numpy",
+        "torch"
+      ]
+    },
+    "RecordScreen": {
+      "internal": [
+        "APIService"
+      ],
+      "external": []
+    },
+    "CoachScreen": {
+      "internal": [
+        "APIService"
+      ],
+      "external": []
+    },
+    "HistoryScreen": {
+      "internal": [
+        "APIService"
+      ],
+      "external": []
+    },
+    "SettingsScreen": {
+      "internal": [
+        "APIService",
+        "AuthService"
+      ],
+      "external": []
+    },
+    "AuthService": {
+      "internal": [],
+      "external": [
+        "google_sign_in"
+      ]
+    },
+    "Whisper_STT": {
+      "internal": [],
+      "external": [
+        "faster_whisper",
+        "CUDA"
+      ]
+    },
+    "audio_analysis": {
+      "internal": [],
+      "external": [
+        "parselmouth"
+      ]
+    },
+    "SQLite_DB": {
+      "internal": [],
+      "external": [
+        "sqlite3"
+      ]
+    }
+  },
+  "flows": {
+    "analyze_speech": {
+      "steps": [
+        {
+          "order": 1,
+          "name": "receive_request",
+          "desc": "Receive audio upload request",
+          "component": ""
+        },
+        {
+          "order": 2,
+          "name": "validate_upload",
+          "desc": "Validate file type and size",
+          "component": ""
+        },
+        {
+          "order": 3,
+          "name": "queue_or_process",
+          "desc": "Queue async job or process sync",
+          "component": ""
+        },
+        {
+          "order": 4,
+          "name": "run_pipeline",
+          "desc": "Execute analysis pipeline",
+          "component": ""
+        },
+        {
+          "order": 5,
+          "name": "persist_results",
+          "desc": "Save to database",
+          "component": ""
+        },
+        {
+          "order": 6,
+          "name": "return_response",
+          "desc": "Return results to client",
+          "component": ""
+        }
+      ]
+    },
+    "run_analysis": {
+      "steps": [
+        {
+          "order": 1,
+          "name": "load_audio",
+          "desc": "Load and convert audio file",
+          "component": ""
+        },
+        {
+          "order": 2,
+          "name": "transcribe",
+          "desc": "Run Whisper STT",
+          "component": ""
+        },
+        {
+          "order": 3,
+          "name": "analyze_audio",
+          "desc": "Extract audio features",
+          "component": ""
+        },
+        {
+          "order": 4,
+          "name": "analyze_text",
+          "desc": "Process transcript",
+          "component": ""
+        },
+        {
+          "order": 5,
+          "name": "score",
+          "desc": "Calculate overall score",
+          "component": ""
+        },
+        {
+          "order": 6,
+          "name": "persist",
+          "desc": "Save to database",
+          "component": ""
+        }
+      ]
+    }
+  },
+  "meta": {
+    "generated_at": "2026-02-17T10:44:14.861849",
+    "generator": "arch-viz by Gemma \ud83d\udc8e",
+    "component_count": 13,
+    "flow_count": 2
+  }
+}

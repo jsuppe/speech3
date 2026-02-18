@@ -127,9 +127,25 @@ def _ensure_users_table(db_path: str):
             avatar_url TEXT,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
             last_login TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            app_version TEXT,                -- e.g., '1.0.22+23'
+            patch_number INTEGER,            -- Shorebird patch number
+            last_seen TEXT,                  -- Last app heartbeat timestamp
             UNIQUE(provider, provider_id)
         )
     """)
+    
+    # Add version tracking columns if they don't exist
+    cur.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "app_version" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN app_version TEXT")
+        logger.info("Added app_version column to users table.")
+    if "patch_number" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN patch_number INTEGER")
+        logger.info("Added patch_number column to users table.")
+    if "last_seen" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN last_seen TEXT")
+        logger.info("Added last_seen column to users table.")
 
     # Add user_id column to speeches if it doesn't exist
     cur.execute("PRAGMA table_info(speeches)")
@@ -305,6 +321,35 @@ def get_user_by_id(db_path: str, user_id: int) -> Optional[Dict[str, Any]]:
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def update_user_app_version(db_path: str, user_id: int, app_version: str, patch_number: int = None):
+    """Update user's app version and last_seen timestamp."""
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cur.execute("""
+        UPDATE users 
+        SET app_version = ?, patch_number = ?, last_seen = ?
+        WHERE id = ?
+    """, (app_version, patch_number, now, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_all_users_with_versions(db_path: str) -> list:
+    """Get all users with their app version info."""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, email, name, app_version, patch_number, last_seen, last_login, created_at
+        FROM users
+        ORDER BY last_seen DESC NULLS LAST
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------

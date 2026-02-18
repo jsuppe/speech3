@@ -1,14 +1,49 @@
 {% extends "base.html" %}
-{% block title %}{{ speech.title }} — SpeechScore{% endblock %}
+{% block title %}{{ speech.title }} — SpeakFit{% endblock %}
 
 {% block content %}
 <div class="fade-in">
     <!-- Back + Title -->
     <div class="mb-6">
         <a href="/speeches" class="text-sm text-gray-400 hover:text-white transition-colors">← Back to library</a>
-        <h1 class="text-2xl font-bold text-white mt-2">{{ speech.title }}</h1>
+        
+        <!-- Editable Title -->
+        <div class="flex items-center gap-2 mt-2 group">
+            <h1 id="titleDisplay" class="text-2xl font-bold text-white cursor-pointer hover:text-indigo-300 transition-colors" 
+                onclick="startEditTitle()" title="Click to edit">{{ speech.title }}</h1>
+            <input type="text" id="titleInput" 
+                   class="hidden text-2xl font-bold text-white bg-gray-800 border border-indigo-500 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                   value="{{ speech.title }}"
+                   onkeydown="handleTitleKey(event)"
+                   onblur="cancelEditTitle()">
+            <button onclick="startEditTitle()" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-indigo-400 transition-all" title="Edit title">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                </svg>
+            </button>
+            <span id="titleSaving" class="hidden text-xs text-indigo-400">Saving...</span>
+            <span id="titleSaved" class="hidden text-xs text-green-400">✓ Saved</span>
+        </div>
+        
+        <!-- Editable Speaker + Other Info -->
         <div class="flex items-center gap-4 mt-1 text-sm text-gray-400">
-            {% if speech.speaker %}<span>{{ speech.speaker }}</span>{% endif %}
+            <div class="flex items-center gap-1 group">
+                <span id="speakerDisplay" class="cursor-pointer hover:text-indigo-300 transition-colors" 
+                      onclick="startEditSpeaker()" title="Click to edit">{{ speech.speaker or 'Unknown Speaker' }}</span>
+                <input type="text" id="speakerInput"
+                       class="hidden text-sm text-white bg-gray-800 border border-indigo-500 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       value="{{ speech.speaker or '' }}"
+                       placeholder="Speaker name"
+                       onkeydown="handleSpeakerKey(event)"
+                       onblur="cancelEditSpeaker()">
+                <button onclick="startEditSpeaker()" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-indigo-400 transition-all" title="Edit speaker">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                </button>
+                <span id="speakerSaving" class="hidden text-xs text-indigo-400">Saving...</span>
+                <span id="speakerSaved" class="hidden text-xs text-green-400">✓</span>
+            </div>
             {% if speech.year %}<span>{{ speech.year }}</span>{% endif %}
             {% if speech.duration_sec %}<span>{{ "%.1f"|format(speech.duration_sec) }}s</span>{% endif %}
             {% if speech.category %}<span>{{ speech.category }}</span>{% endif %}
@@ -16,7 +51,7 @@
         <div class="flex gap-1.5 mt-2">
             {% for p in speech.products %}
             <span class="px-2 py-0.5 text-xs rounded-full
-                {% if p == 'SpeechScore' %}bg-indigo-500/20 text-indigo-300
+                {% if p == 'SpeakFit' %}bg-indigo-500/20 text-indigo-300
                 {% elif p == 'OratoScore' %}bg-amber-500/20 text-amber-300
                 {% elif p == 'PitchPerfect' %}bg-green-500/20 text-green-300
                 {% elif p == 'ReadAloud' %}bg-cyan-500/20 text-cyan-300
@@ -29,7 +64,7 @@
     <!-- Overall Score Card -->
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-white">Speech Score</h2>
+            <h2 class="text-lg font-semibold text-white">SpeakFit Score</h2>
             <div class="flex items-center gap-2">
                 <label class="text-sm text-gray-400">Profile:</label>
                 <select id="profileSelect" onchange="window.location.href='/speeches/{{ speech.id }}?profile=' + this.value"
@@ -241,6 +276,129 @@
 
 {% block scripts %}
 <script>
+// Inline editing functions
+const speechId = {{ speech.id }};
+
+function startEditTitle() {
+    document.getElementById('titleDisplay').classList.add('hidden');
+    const input = document.getElementById('titleInput');
+    input.classList.remove('hidden');
+    input.focus();
+    input.select();
+}
+
+function cancelEditTitle() {
+    setTimeout(() => {
+        document.getElementById('titleInput').classList.add('hidden');
+        document.getElementById('titleDisplay').classList.remove('hidden');
+    }, 150);
+}
+
+function handleTitleKey(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveTitle();
+    } else if (event.key === 'Escape') {
+        document.getElementById('titleInput').value = document.getElementById('titleDisplay').textContent;
+        cancelEditTitle();
+    }
+}
+
+async function saveTitle() {
+    const input = document.getElementById('titleInput');
+    const display = document.getElementById('titleDisplay');
+    const saving = document.getElementById('titleSaving');
+    const saved = document.getElementById('titleSaved');
+    const newTitle = input.value.trim();
+    
+    if (!newTitle) return;
+    
+    input.classList.add('hidden');
+    display.classList.remove('hidden');
+    saving.classList.remove('hidden');
+    
+    try {
+        const response = await fetch(`/api/speeches/${speechId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newTitle })
+        });
+        
+        if (response.ok) {
+            display.textContent = newTitle;
+            saving.classList.add('hidden');
+            saved.classList.remove('hidden');
+            setTimeout(() => saved.classList.add('hidden'), 2000);
+        } else {
+            const err = await response.json();
+            alert('Failed to save: ' + (err.error?.message || 'Unknown error'));
+            saving.classList.add('hidden');
+        }
+    } catch (e) {
+        alert('Failed to save: ' + e.message);
+        saving.classList.add('hidden');
+    }
+}
+
+function startEditSpeaker() {
+    document.getElementById('speakerDisplay').classList.add('hidden');
+    const input = document.getElementById('speakerInput');
+    input.classList.remove('hidden');
+    input.focus();
+    input.select();
+}
+
+function cancelEditSpeaker() {
+    setTimeout(() => {
+        document.getElementById('speakerInput').classList.add('hidden');
+        document.getElementById('speakerDisplay').classList.remove('hidden');
+    }, 150);
+}
+
+function handleSpeakerKey(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveSpeaker();
+    } else if (event.key === 'Escape') {
+        document.getElementById('speakerInput').value = document.getElementById('speakerDisplay').textContent;
+        cancelEditSpeaker();
+    }
+}
+
+async function saveSpeaker() {
+    const input = document.getElementById('speakerInput');
+    const display = document.getElementById('speakerDisplay');
+    const saving = document.getElementById('speakerSaving');
+    const saved = document.getElementById('speakerSaved');
+    const newSpeaker = input.value.trim() || 'Unknown Speaker';
+    
+    input.classList.add('hidden');
+    display.classList.remove('hidden');
+    saving.classList.remove('hidden');
+    
+    try {
+        const response = await fetch(`/api/speeches/${speechId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ speaker: newSpeaker })
+        });
+        
+        if (response.ok) {
+            display.textContent = newSpeaker;
+            saving.classList.add('hidden');
+            saved.classList.remove('hidden');
+            setTimeout(() => saved.classList.add('hidden'), 2000);
+        } else {
+            const err = await response.json();
+            alert('Failed to save: ' + (err.error?.message || 'Unknown error'));
+            saving.classList.add('hidden');
+        }
+    } catch (e) {
+        alert('Failed to save: ' + e.message);
+        saving.classList.add('hidden');
+    }
+}
+
 {% if score %}
 // Score data from backend
 const scoreData = {{ score_json|safe }};

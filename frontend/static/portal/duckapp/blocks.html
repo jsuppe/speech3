@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Duck App - 3D Architecture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            touch-action: none;
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            outline: none;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            z-index: 1000;
+        }
+        #loading .spinner {
+            width: 50px; height: 50px;
+            border: 4px solid #333;
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #ui {
+            position: absolute;
+            top: 12px; left: 12px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #ui h1 {
+            color: #fff;
+            font-size: 1.1rem;
+            margin-bottom: 2px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        #ui .subtitle {
+            color: #999;
+            font-size: 0.7rem;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        #info-panel {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            padding: 60px 20px 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 100;
+            max-height: 50vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #info-panel.visible { transform: translateY(0); }
+        #info-panel h2 {
+            color: #fff;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+        #info-panel .type-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        #info-panel .desc {
+            color: #aaa;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+        #info-panel .fields-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        #info-panel .field-tag {
+            background: rgba(255,255,255,0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-family: monospace;
+            color: #61afef;
+        }
+        #info-panel .close-btn {
+            position: absolute;
+            top: 15px; right: 15px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        
+        #layer-nav {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 12px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        #layer-nav button {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 0;
+        }
+        #layer-nav button.active {
+            border-color: #fff;
+            transform: scale(1.3);
+        }
+        #layer-nav button:active { transform: scale(0.9); }
+        
+        #reset-btn {
+            position: absolute;
+            top: 12px; right: 12px;
+            padding: 10px 14px;
+            background: rgba(0,0,0,0.6);
+            border: none;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        #reset-btn:active { background: rgba(255,255,255,0.2); }
+        
+        #hint {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255,255,255,0.5);
+            font-size: 0.85rem;
+            text-align: center;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+        #hint.hidden { opacity: 0; }
+        #hint .gesture { font-size: 2rem; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+<canvas id="renderCanvas"></canvas>
+
+<div id="loading">
+    <div class="spinner"></div>
+    <p>Loading architecture...</p>
+</div>
+
+<div id="ui">
+    <h1>🦆 Duck App</h1>
+    <p class="subtitle">Pinch to zoom • Drag to rotate • Tap to select</p>
+</div>
+
+<button id="reset-btn" onclick="resetCamera()">⟲ Reset</button>
+
+<div id="layer-nav"></div>
+
+<div id="info-panel">
+    <button class="close-btn" onclick="closePanel()">×</button>
+    <h2 id="panel-name">Component</h2>
+    <span id="panel-type" class="type-badge">type</span>
+    <p id="panel-desc" class="desc"></p>
+    <div id="panel-fields" class="fields-list"></div>
+</div>
+
+<div id="hint">
+    <div class="gesture">👆</div>
+    Tap a block to explore
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+<script>
+let canvas, engine, scene, camera;
+let archData = null;
+let componentMeshes = [];
+let selectedMesh = null;
+let interacted = false;
+
+const LAYER_COLORS = {
+    app: new BABYLON.Color3(0.3, 0.69, 0.31),      // #4CAF50
+    games: new BABYLON.Color3(1, 0.34, 0.13),      // #FF5722
+    social: new BABYLON.Color3(0.01, 0.66, 0.96),  // #03A9F4
+    services: new BABYLON.Color3(0.61, 0.15, 0.69),// #9C27B0
+    data: new BABYLON.Color3(0.38, 0.49, 0.55)     // #607D8B
+};
+
+const LAYER_HEX = {
+    app: '#4CAF50',
+    games: '#FF5722', 
+    social: '#03A9F4',
+    services: '#9C27B0',
+    data: '#607D8B'
+};
+
+async function init() {
+    const response = await fetch('architecture-enhanced.json');
+    archData = await response.json();
+    
+    document.getElementById('loading').style.display = 'none';
+    
+    createScene();
+    buildArchitecture();
+    buildLayerNav();
+    
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener('resize', () => engine.resize());
+}
+
+function createScene() {
+    canvas = document.getElementById('renderCanvas');
+    engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color4(0.1, 0.1, 0.18, 1);
+    
+    // ArcRotateCamera - perfect for mobile!
+    camera = new BABYLON.ArcRotateCamera(
+        'camera',
+        Math.PI / 4,      // alpha (horizontal rotation)
+        Math.PI / 3,      // beta (vertical angle)
+        80,               // radius (zoom)
+        new BABYLON.Vector3(0, 0, 0),  // target
+        scene
+    );
+    camera.attachControl(canvas, true);
+    
+    // Mobile-friendly settings
+    camera.lowerRadiusLimit = 30;
+    camera.upperRadiusLimit = 150;
+    camera.lowerBetaLimit = 0.2;
+    camera.upperBetaLimit = Math.PI / 2.1;
+    camera.panningSensibility = 500;
+    camera.pinchPrecision = 50;
+    camera.wheelPrecision = 20;
+    camera.inertia = 0.9;
+    camera.panningInertia = 0.9;
+    
+    // Touch-specific tuning
+    camera.inputs.attached.pointers.multiTouchPanAndZoom = true;
+    camera.inputs.attached.pointers.pinchInwards = true;
+    
+    // Lighting
+    const ambient = new BABYLON.HemisphericLight('ambient', new BABYLON.Vector3(0, 1, 0), scene);
+    ambient.intensity = 0.6;
+    ambient.groundColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+    
+    const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-1, -2, -1), scene);
+    dir.intensity = 0.5;
+    
+    // Ground grid
+    const gridMat = new BABYLON.GridMaterial('grid', scene);
+    gridMat.majorUnitFrequency = 5;
+    gridMat.minorUnitVisibility = 0.3;
+    gridMat.gridRatio = 2;
+    gridMat.mainColor = new BABYLON.Color3(0.15, 0.15, 0.2);
+    gridMat.lineColor = new BABYLON.Color3(0.25, 0.25, 0.35);
+    gridMat.opacity = 0.8;
+    
+    const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, scene);
+    ground.material = gridMat;
+    ground.position.y = -30;
+    
+    // Tap detection
+    scene.onPointerObservable.add((pointerInfo) => {
+        if (!interacted) {
+            interacted = true;
+            document.getElementById('hint').classList.add('hidden');
+        }
+        
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERTAP) {
+            const hit = scene.pick(scene.pointerX, scene.pointerY);
+            if (hit.pickedMesh && hit.pickedMesh.metadata) {
+                selectComponent(hit.pickedMesh);
+            } else {
+                deselectComponent();
+            }
+        }
+    });
+}
+
+function buildArchitecture() {
+    const layers = archData.architecture || {};
+    const layerKeys = Object.keys(layers).filter(k => layers[k].components?.length > 0);
+    
+    layerKeys.forEach((layerKey, layerIndex) => {
+        const layer = layers[layerKey];
+        const y = 10 - layerIndex * 12;
+        const color = LAYER_COLORS[layerKey] || new BABYLON.Color3(0.5, 0.5, 0.5);
+        
+        const components = layer.components || [];
+        const cols = Math.ceil(Math.sqrt(components.length));
+        const rows = Math.ceil(components.length / cols);
+        
+        // Platform
+        const platformWidth = cols * 7 + 6;
+        const platformDepth = rows * 7 + 6;
+        const platform = BABYLON.MeshBuilder.CreateBox('platform_' + layerKey, {
+            width: platformWidth,
+            height: 0.5,
+            depth: platformDepth
+        }, scene);
+        platform.position.y = y - 0.5;
+        
+        const platMat = new BABYLON.StandardMaterial('platMat_' + layerKey, scene);
+        platMat.diffuseColor = color;
+        platMat.alpha = 0.2;
+        platMat.specularColor = new BABYLON.Color3(0, 0, 0);
+        platform.material = platMat;
+        
+        // Components
+        components.forEach((comp, i) => {
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            
+            const details = archData.components?.[comp.name] || {};
+            const fileInfo = archData.files?.[Object.keys(archData.files || {}).find(f => 
+                archData.files[f].classes?.some(c => c.name === comp.name)
+            )] || {};
+            const cls = fileInfo.classes?.find(c => c.name === comp.name) || {};
+            const fieldCount = cls.fields?.length || 0;
+            
+            const height = Math.max(3, fieldCount > 0 ? fieldCount * 0.5 + 2 : (comp.size || 10) / 4);
+            
+            const box = BABYLON.MeshBuilder.CreateBox('comp_' + comp.name, {
+                width: 5,
+                height: height,
+                depth: 5
+            }, scene);
+            
+            box.position.x = (col - cols/2 + 0.5) * 7;
+            box.position.y = y + height/2;
+            box.position.z = (row - rows/2 + 0.5) * 7;
+            
+            const mat = new BABYLON.StandardMaterial('mat_' + comp.name, scene);
+            mat.diffuseColor = color;
+            mat.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+            mat.specularPower = 32;
+            box.material = mat;
+            
+            // Store metadata
+            box.metadata = {
+                name: comp.name,
+                desc: comp.desc,
+                type: comp.type,
+                layerKey: layerKey,
+                layer: layer.name,
+                fields: cls.fields || [],
+                methods: details.methods || [],
+                color: color,
+                originalY: box.position.y
+            };
+            
+            // Edge highlight
+            box.enableEdgesRendering();
+            box.edgesWidth = 2;
+            box.edgesColor = new BABYLON.Color4(1, 1, 1, 0.3);
+            
+            componentMeshes.push(box);
+        });
+    });
+    
+    // Center camera target on scene
+    camera.target = new BABYLON.Vector3(0, -5, 0);
+}
+
+function buildLayerNav() {
+    const nav = document.getElementById('layer-nav');
+    nav.innerHTML = '';
+    
+    const layers = archData.architecture || {};
+    Object.entries(layers).forEach(([key, layer], i) => {
+        if (!layer.components?.length) return;
+        
+        const btn = document.createElement('button');
+        btn.style.background = LAYER_HEX[key] || '#888';
+        btn.title = layer.name;
+        btn.onclick = () => focusLayer(key, i);
+        nav.appendChild(btn);
+    });
+}
+
+function focusLayer(layerKey, index) {
+    const y = 10 - index * 12;
+    
+    // Stop existing and set directly
+    scene.stopAnimation(camera);
+    camera.target.y = y;
+    camera.radius = 50;
+    
+    // Update nav
+    document.querySelectorAll('#layer-nav button').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+    });
+    
+    closePanel();
+}
+
+function selectComponent(mesh) {
+    // Deselect previous
+    if (selectedMesh && selectedMesh !== mesh) {
+        scene.stopAnimation(selectedMesh);
+        selectedMesh.edgesColor = new BABYLON.Color4(1, 1, 1, 0.3);
+        selectedMesh.position.y = selectedMesh.metadata.originalY;
+    }
+    
+    // If tapping same mesh, deselect it
+    if (selectedMesh === mesh) {
+        deselectComponent();
+        return;
+    }
+    
+    selectedMesh = mesh;
+    scene.stopAnimation(mesh);
+    mesh.edgesColor = new BABYLON.Color4(1, 1, 1, 1);
+    
+    // Pop up - direct set, no animation stacking issues
+    mesh.position.y = mesh.metadata.originalY + 2;
+    
+    // Show info panel
+    const meta = mesh.metadata;
+    document.getElementById('panel-name').textContent = meta.name;
+    
+    const typeEl = document.getElementById('panel-type');
+    typeEl.textContent = meta.type || 'component';
+    typeEl.style.background = LAYER_HEX[meta.layerKey] || '#888';
+    
+    document.getElementById('panel-desc').textContent = meta.desc || meta.layer;
+    
+    const fieldsEl = document.getElementById('panel-fields');
+    if (meta.fields.length > 0) {
+        fieldsEl.innerHTML = meta.fields.map(f => 
+            `<span class="field-tag">${f.name}: ${f.type}</span>`
+        ).join('');
+    } else if (meta.methods.length > 0) {
+        fieldsEl.innerHTML = meta.methods.slice(0, 8).map(m => 
+            `<span class="field-tag">${m.name}()</span>`
+        ).join('');
+    } else {
+        fieldsEl.innerHTML = '';
+    }
+    
+    document.getElementById('info-panel').classList.add('visible');
+}
+
+function deselectComponent() {
+    if (selectedMesh) {
+        scene.stopAnimation(selectedMesh);
+        selectedMesh.edgesColor = new BABYLON.Color4(1, 1, 1, 0.3);
+        selectedMesh.position.y = selectedMesh.metadata.originalY;
+        selectedMesh = null;
+    }
+    closePanel();
+}
+
+function closePanel() {
+    document.getElementById('info-panel').classList.remove('visible');
+}
+
+function resetCamera() {
+    // Stop any existing camera animations
+    scene.stopAnimation(camera);
+    
+    // Direct set - no animation stacking
+    camera.alpha = Math.PI / 4;
+    camera.beta = Math.PI / 3;
+    camera.radius = 80;
+    camera.target = new BABYLON.Vector3(0, -5, 0);
+    
+    deselectComponent();
+    
+    document.querySelectorAll('#layer-nav button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+}
+
+init();
+</script>
+</body>
+</html>

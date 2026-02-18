@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — SpeakFit{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+        <p class="text-sm text-gray-400 mt-1">Platform analytics and user statistics</p>
+    </div>
+
+    <!-- Top Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-3xl font-bold text-white">{{ stats.total_users }}</div>
+            <div class="text-sm text-gray-400 mt-1">Total Users</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-3xl font-bold text-white">{{ stats.total_recordings }}</div>
+            <div class="text-sm text-gray-400 mt-1">Total Recordings</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-3xl font-bold text-green-400">{{ stats.active_7d }}</div>
+            <div class="text-sm text-gray-400 mt-1">Active (7 days)</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-3xl font-bold text-indigo-400">{{ stats.active_30d }}</div>
+            <div class="text-sm text-gray-400 mt-1">Active (30 days)</div>
+        </div>
+    </div>
+
+    <!-- Secondary Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-white">{{ stats.recordings_today }}</div>
+            <div class="text-sm text-gray-400 mt-1">Recordings Today</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-white">{{ stats.recordings_week }}</div>
+            <div class="text-sm text-gray-400 mt-1">This Week</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-amber-400">{{ "%.1f"|format(stats.storage_mb) }} MB</div>
+            <div class="text-sm text-gray-400 mt-1">Storage Used</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-white">{{ "%.1f"|format(stats.avg_score) if stats.avg_score else 'N/A' }}</div>
+            <div class="text-sm text-gray-400 mt-1">Avg Score</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+        <!-- Recordings Over Time -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Recordings Over Time (30 days)</h2>
+            <canvas id="recordingsChart" height="200"></canvas>
+        </div>
+
+        <!-- Users Over Time -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">User Signups (30 days)</h2>
+            <canvas id="usersChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- More Charts -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+        <!-- Score Distribution -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Score Distribution</h2>
+            <canvas id="scoreChart" height="200"></canvas>
+        </div>
+
+        <!-- Recordings by Category -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Recordings by Category</h2>
+            <canvas id="categoryChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Users Table -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-white">Top Users by Recordings</h2>
+            <a href="#all-users" class="text-sm text-indigo-400 hover:text-indigo-300">View all ↓</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-800">
+                        <th class="text-left py-2 pr-4 font-medium">User</th>
+                        <th class="text-left py-2 pr-4 font-medium">Email</th>
+                        <th class="text-right py-2 pr-4 font-medium">Recordings</th>
+                        <th class="text-right py-2 pr-4 font-medium">Avg Score</th>
+                        <th class="text-right py-2 font-medium">Joined</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in top_users %}
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/admin/users/{{ u.id }}'">
+                        <td class="py-3 pr-4">
+                            <div class="flex items-center gap-3">
+                                {% if u.picture %}
+                                <img src="{{ u.picture }}" alt="" class="w-8 h-8 rounded-full">
+                                {% else %}
+                                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs font-bold">
+                                    {{ u.name[0] if u.name else '?' }}
+                                </div>
+                                {% endif %}
+                                <span class="text-white font-medium">{{ u.name or 'Unknown' }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 pr-4 text-gray-400">{{ u.email }}</td>
+                        <td class="py-3 pr-4 text-right text-white font-mono">{{ u.speech_count }}</td>
+                        <td class="py-3 pr-4 text-right">
+                            {% if u.avg_score %}
+                            <span class="{% if u.avg_score >= 80 %}text-green-400{% elif u.avg_score >= 60 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                                {{ "%.1f"|format(u.avg_score) }}
+                            </span>
+                            {% else %}
+                            <span class="text-gray-500">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right text-gray-400">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- All Users Section -->
+    <div id="all-users" class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <div class="flex items-center gap-3 mb-4">
+            <h2 class="text-lg font-semibold text-white">All Users</h2>
+            <span class="bg-indigo-500/20 text-indigo-400 text-xs font-medium px-2 py-0.5 rounded">{{ all_users|length }} total</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-800">
+                        <th class="text-left py-2 pr-4 font-medium">User</th>
+                        <th class="text-left py-2 pr-4 font-medium">Email</th>
+                        <th class="text-left py-2 pr-4 font-medium">Provider</th>
+                        <th class="text-right py-2 pr-4 font-medium">Recordings</th>
+                        <th class="text-right py-2 pr-4 font-medium">Joined</th>
+                        <th class="text-right py-2 font-medium">Last Login</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in all_users %}
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/admin/users/{{ u.id }}'">
+                        <td class="py-3 pr-4">
+                            <div class="flex items-center gap-3">
+                                {% if u.picture %}
+                                <img src="{{ u.picture }}" alt="" class="w-8 h-8 rounded-full">
+                                {% else %}
+                                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs font-bold">
+                                    {{ u.name[0] if u.name else '?' }}
+                                </div>
+                                {% endif %}
+                                <span class="text-white font-medium">{{ u.name or 'Unknown' }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 pr-4 text-gray-400">{{ u.email }}</td>
+                        <td class="py-3 pr-4">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                                {% if u.provider == 'google' %}bg-blue-900/50 text-blue-300{% else %}bg-gray-700 text-gray-400{% endif %}">
+                                {{ u.provider | capitalize if u.provider else 'Unknown' }}
+                            </span>
+                        </td>
+                        <td class="py-3 pr-4 text-right text-white font-mono">{{ u.speech_count or 0 }}</td>
+                        <td class="py-3 pr-4 text-right text-gray-400">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+                        <td class="py-3 text-right text-gray-400">{{ u.last_login[:10] if u.last_login else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Recent Recordings</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-800">
+                        <th class="text-left py-2 pr-4 font-medium">Title</th>
+                        <th class="text-left py-2 pr-4 font-medium">User</th>
+                        <th class="text-right py-2 pr-4 font-medium">Score</th>
+                        <th class="text-right py-2 font-medium">When</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recent_recordings %}
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/speeches/{{ r.id }}'">
+                        <td class="py-3 pr-4 text-white">{{ r.title[:50] }}{% if r.title|length > 50 %}...{% endif %}</td>
+                        <td class="py-3 pr-4 text-gray-400">{{ r.user_name or 'Unknown' }}</td>
+                        <td class="py-3 pr-4 text-right">
+                            {% if r.score %}
+                            <span class="{% if r.score >= 80 %}text-green-400{% elif r.score >= 60 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                                {{ "%.1f"|format(r.score) }}
+                            </span>
+                            {% else %}
+                            <span class="text-gray-500">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right text-gray-400">{{ r.created_at[:16].replace('T', ' ') if r.created_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {{ chart_data | safe }};
+
+Chart.defaults.color = '#9ca3af';
+Chart.defaults.borderColor = '#1f2937';
+
+// Recordings over time
+new Chart(document.getElementById('recordingsChart'), {
+    type: 'line',
+    data: {
+        labels: chartData.recordings_by_day.map(d => d.date),
+        datasets: [{
+            label: 'Recordings',
+            data: chartData.recordings_by_day.map(d => d.count),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: {
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+        }
+    }
+});
+
+// User signups over time
+new Chart(document.getElementById('usersChart'), {
+    type: 'line',
+    data: {
+        labels: chartData.users_by_day.map(d => d.date),
+        datasets: [{
+            label: 'New Users',
+            data: chartData.users_by_day.map(d => d.count),
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: {
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+        }
+    }
+});
+
+// Score distribution histogram
+const scoreBins = ['0-20', '20-40', '40-60', '60-80', '80-100'];
+new Chart(document.getElementById('scoreChart'), {
+    type: 'bar',
+    data: {
+        labels: scoreBins,
+        datasets: [{
+            data: chartData.score_distribution,
+            backgroundColor: ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'],
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true },
+            x: { title: { display: true, text: 'Score Range' } }
+        }
+    }
+});
+
+// Category distribution
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: chartData.categories.map(c => c.category || 'Uncategorized'),
+        datasets: [{
+            data: chartData.categories.map(c => c.count),
+            backgroundColor: ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b'],
+        }]
+    },
+    options: {
+        plugins: {
+            legend: { position: 'right' }
+        }
+    }
+});
+</script>
+{% endblock %}

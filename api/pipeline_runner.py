@@ -2,6 +2,19 @@
 Pipeline runner — wraps voice_pipeline.py logic into callable functions.
 Models are loaded once at module level and reused across requests.
 All analysis results are automatically persisted to SQLite (speechscore.db).
+
+@arch component=pipeline_runner layer=api type=module
+@arch depends=[Whisper STT, audio_analysis, text_analysis, diarization, SQLite DB]
+@arch external=[faster_whisper, spacy, numpy, torch]
+@arch description="Orchestrates all speech analysis modules"
+
+@arch.flow run_analysis
+@arch.step 1: load_audio "Load and convert audio file"
+@arch.step 2: transcribe "Run Whisper STT"
+@arch.step 3: analyze_audio "Extract audio features"
+@arch.step 4: analyze_text "Process transcript"
+@arch.step 5: score "Calculate overall score"
+@arch.step 6: persist "Save to database"
 """
 
 import os
@@ -22,52 +35,130 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger("speechscore.pipeline")
 
+
+def generate_title_from_transcript(transcript: str, max_words: int = 8) -> str:
+    """
+    Generate a concise title from transcript content.
+    Uses the first meaningful sentence or phrase, cleaned up for display.
+    
+    Args:
+        transcript: Full transcript text
+        max_words: Maximum words in the title (default 8)
+    
+    Returns:
+        A clean, readable title string
+    """
+    if not transcript or not transcript.strip():
+        return None
+    
+    text = transcript.strip()
+    
+    # Try to get the first sentence
+    import re
+    
+    # Split on sentence-ending punctuation
+    sentences = re.split(r'[.!?]+', text)
+    first_sentence = sentences[0].strip() if sentences else text
+    
+    # Clean up the text
+    # Remove filler words from the start
+    filler_starts = ['um', 'uh', 'so', 'well', 'okay', 'ok', 'like', 'you know', 'i mean']
+    words = first_sentence.split()
+    
+    # Skip leading fillers
+    while words and words[0].lower().rstrip(',') in filler_starts:
+        words.pop(0)
+    
+    if not words:
+        # Fallback to original if all words were fillers
+        words = first_sentence.split()
+    
+    # Take up to max_words
+    title_words = words[:max_words]
+    
+    # Join and clean
+    title = ' '.join(title_words)
+    
+    # Remove trailing punctuation except for sentence-ending ones
+    title = title.rstrip(',;:')
+    
+    # Add ellipsis if we truncated
+    if len(words) > max_words:
+        title = title.rstrip('.!?') + '...'
+    
+    # Capitalize first letter
+    if title:
+        title = title[0].upper() + title[1:] if len(title) > 1 else title.upper()
+    
+    # Ensure reasonable length (not too short)
+    if len(title) < 10 and len(text) > len(title):
+        # Title too short, try getting more words
+        words = text.split()[:max_words + 3]
+        title = ' '.join(words)
+        if len(text.split()) > len(words):
+            title = title.rstrip('.!?,;:') + '...'
+        title = title[0].upper() + title[1:] if len(title) > 1 else title.upper()
+    
+    return title if title else None
+
 # ---------------------------------------------------------------------------
 # Global model holders — populated by preload_models()
 # ---------------------------------------------------------------------------
+import threading
+
 _whisper_model = None
 _models_loaded = False
+_models_lock = threading.Lock()
 _speech_db = None
+_db_lock = threading.Lock()
 
 
 def get_db():
-    """Lazy-load the SpeechDB singleton."""
+    """Lazy-load the SpeechDB singleton (thread-safe)."""
     global _speech_db
     if _speech_db is None:
-        from speech_db import SpeechDB
-        _speech_db = SpeechDB()
-        logger.info(f"SpeechDB initialized at {_speech_db.db_path}")
+        with _db_lock:
+            if _speech_db is None:  # Double-check after acquiring lock
+                from speech_db import SpeechDB
+                _speech_db = SpeechDB()
+                logger.info(f"SpeechDB initialized at {_speech_db.db_path}")
     return _speech_db
 
 
 def preload_models():
-    """Load all heavy models once. Call at startup."""
+    """Load all heavy models once. Call at startup (thread-safe)."""
     global _whisper_model, _models_loaded
 
     if _models_loaded:
         return
 
-    logger.info("Pre-loading models...")
+    with _models_lock:
+        # Double-check after acquiring lock to prevent race condition
+        if _models_loaded:
+            return
 
-    # Whisper
-    from faster_whisper import WhisperModel
-    t0 = time.time()
-    _whisper_model = WhisperModel("large-v3", device="cuda", compute_type="float16")
-    logger.info(f"Whisper large-v3 loaded in {time.time() - t0:.1f}s")
+        logger.info("Pre-loading models...")
 
-    # Pre-import heavy modules so first request is fast
-    t1 = time.time()
-    import audio_quality  # noqa: F401
-    import analysis3_module  # noqa: F401
-    import advanced_text_analysis  # noqa: F401
-    import rhetorical_analysis  # noqa: F401
-    import sentiment_analysis  # noqa: F401
-    import audio_analysis  # noqa: F401
-    import advanced_audio_analysis  # noqa: F401
-    logger.info(f"Analysis modules imported in {time.time() - t1:.1f}s")
+        # Whisper
+        from faster_whisper import WhisperModel
+        t0 = time.time()
+        _whisper_model = WhisperModel("large-v3", device="cuda", compute_type="float16")
+        logger.info(f"Whisper large-v3 loaded in {time.time() - t0:.1f}s")
 
-    _models_loaded = True
-    logger.info("All models pre-loaded.")
+        # Pre-import heavy modules so first request is fast
+        t1 = time.time()
+        import audio_quality  # noqa: F401
+        import analysis3_module
+        analysis3_module.preload_models()  # Load spaCy + SentenceTransformer
+        import advanced_text_analysis  # noqa: F401
+        import rhetorical_analysis  # noqa: F401
+        import sentiment_analysis  # noqa: F401
+        import audio_analysis  # noqa: F401
+        import advanced_audio_analysis  # noqa: F401
+        logger.info(f"Analysis modules imported in {time.time() - t1:.1f}s")
+
+        _models_loaded = True
+        logger.info("All models pre-loaded.")
 
 
 def is_model_loaded() -> bool:
@@ -75,16 +166,75 @@ def is_model_loaded() -> bool:
 
 
 def get_audio_duration(audio_path: str) -> float:
-    """Get audio duration in seconds using ffprobe."""
+    """Get audio duration in seconds using ffprobe.
+    
+    Tries multiple methods since browser-recorded WebM files often
+    don't have duration in the format header.
+    """
+    # Method 1: Try format duration (fast)
     try:
         result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
              "-of", "csv=p=0", audio_path],
             capture_output=True, text=True, timeout=10
         )
-        return float(result.stdout.strip())
+        duration = float(result.stdout.strip())
+        if duration > 0:
+            return duration
     except Exception:
-        return 0.0
+        pass
+    
+    # Method 2: Try stream duration (for files without format duration)
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-select_streams", "a:0",
+             "-show_entries", "stream=duration",
+             "-of", "csv=p=0", audio_path],
+            capture_output=True, text=True, timeout=10
+        )
+        duration = float(result.stdout.strip())
+        if duration > 0:
+            return duration
+    except Exception:
+        pass
+    
+    # Method 3: Decode to get actual duration (slower but reliable for browser WebM)
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             "-i", audio_path],
+            capture_output=True, text=True, timeout=30
+        )
+        duration = float(result.stdout.strip())
+        if duration > 0:
+            return duration
+    except Exception:
+        pass
+    
+    # Method 4: Use ffmpeg to decode and count frames (last resort)
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-i", audio_path, "-f", "null", "-"],
+            capture_output=True, text=True, timeout=60
+        )
+        # Parse duration from ffmpeg stderr output
+        import re
+        match = re.search(r"Duration: (\d+):(\d+):(\d+)\.(\d+)", result.stderr)
+        if match:
+            h, m, s, cs = match.groups()
+            return int(h) * 3600 + int(m) * 60 + int(s) + int(cs) / 100
+        
+        # Try to find "time=" at the end
+        match = re.search(r"time=(\d+):(\d+):(\d+)\.(\d+)", result.stderr)
+        if match:
+            h, m, s, cs = match.groups()
+            return int(h) * 3600 + int(m) * 60 + int(s) + int(cs) / 100
+    except Exception:
+        pass
+    
+    logger.warning(f"Could not determine duration for {audio_path}")
+    return 0.0
 
 
 def convert_to_wav(input_path: str) -> str:
@@ -113,6 +263,7 @@ def run_pipeline(
     quality_gate: str = "warn",
     preset: str = None,
     modules_requested: list = None,
+    known_speaker: str = None,
 ) -> dict:
     """
     Run the speech analysis pipeline on an audio file.
@@ -125,6 +276,7 @@ def run_pipeline(
         quality_gate: "warn" (default), "block", or "skip".
         preset: Name of preset used (for metadata only).
         modules_requested: Original module list from request (for metadata).
+        known_speaker: Speaker name from metadata (used for diarization if single speaker).
     """
     from . import config as api_config
 
@@ -233,16 +385,56 @@ def run_pipeline(
 
     # --- Speaker Diarization ---
     diarization_result = None
+    speaker_registration_result = None
+    speaker_match_result = None
     if _want("diarization") and segment_list:
         _report("diarization")
         td = time.time()
         try:
-            from diarization import run_diarization, get_speaker_stats
+            from diarization import run_diarization, get_speaker_stats, register_diarized_speakers, match_speakers_to_profiles
             # Run diarization and update segment_list in place
-            segment_list = run_diarization(audio_path, segment_list)
+            # Pass known_speaker so single-speaker recordings use the actual name
+            segment_list = run_diarization(audio_path, segment_list, known_speaker=known_speaker)
+            
+            # Try to match diarized speakers against stored voice profiles
+            if user_id:
+                try:
+                    from speech_db import get_db
+                    db = get_db()
+                    segment_list, speaker_match_result = match_speakers_to_profiles(
+                        db=db,
+                        user_id=user_id,
+                        audio_path=audio_path,
+                        segments=segment_list,
+                        match_threshold=0.80,
+                    )
+                    if speaker_match_result.get("matches"):
+                        logger.info(f"Speaker matching: {len(speaker_match_result['matches'])} matches found")
+                except Exception as e:
+                    logger.warning(f"Speaker profile matching failed: {e}")
+            
             diarization_result = get_speaker_stats(segment_list)
             timing["diarization_sec"] = round(time.time() - td, 2)
             modules_run.append("diarization")
+            
+            # Register diarized speakers as voice fingerprints for future matching
+            if user_id and diarization_result.get("num_speakers", 0) > 0:
+                try:
+                    if db is None:
+                        from speech_db import get_db
+                        db = get_db()
+                    speaker_registration_result = register_diarized_speakers(
+                        db=db,
+                        user_id=user_id,
+                        audio_path=audio_path,
+                        segments=segment_list,
+                        speech_id=None,  # Will be set after persist
+                        min_duration_per_speaker=2.0,  # At least 2 seconds of speech
+                    )
+                    if speaker_registration_result.get("registered") or speaker_registration_result.get("matched"):
+                        logger.info(f"Speaker registration: {speaker_registration_result}")
+                except Exception as e:
+                    logger.warning(f"Speaker registration failed: {e}")
         except Exception as e:
             logger.warning(f"Diarization failed: {e}")
             diarization_result = {"error": str(e)}
@@ -366,6 +558,10 @@ def run_pipeline(
         result["audio_quality"] = quality
     if diarization_result is not None:
         result["diarization"] = diarization_result
+    if speaker_match_result is not None and speaker_match_result.get("matches"):
+        result["speaker_matches"] = speaker_match_result
+    if speaker_registration_result is not None:
+        result["speaker_profiles"] = speaker_registration_result
     if analysis is not None:
         result["speech3_text_analysis"] = analysis
     if advanced_text is not None:
@@ -418,6 +614,7 @@ def persist_result(
     source_url: str = None,
     spectrogram_path: str = None,
     user_id: int = None,
+    profile: str = "general",
 ) -> int | None:
     """
     Persist analysis result + audio (as Opus) to SQLite.
@@ -425,16 +622,89 @@ def persist_result(
     """
     try:
         db = get_db()
-        audio_hash = db.get_audio_hash(original_audio_path)
-        duration = db.get_audio_duration(original_audio_path)
+        
+        # Check if audio file still exists (may have been cleaned up)
+        audio_exists = os.path.exists(original_audio_path)
+        if not audio_exists:
+            logger.warning(f"Audio file no longer exists: {original_audio_path}")
+        
+        # Get audio hash and duration (use result data as fallback)
+        if audio_exists:
+            audio_hash = db.get_audio_hash(original_audio_path)
+            duration = db.get_audio_duration(original_audio_path)
+        else:
+            # Generate a unique hash from filename + timestamp
+            import hashlib
+            audio_hash = hashlib.sha256(f"{filename or original_audio_path}_{time.time()}".encode()).hexdigest()[:32]
+            # Try to get duration from result
+            duration = result.get("audio_metrics", {}).get("duration_sec") or result.get("processing", {}).get("duration_sec") or 0
 
-        # Auto-generate title from filename if not provided
+        # Auto-generate title from transcript if not provided
         if not title:
-            title = filename or os.path.basename(original_audio_path)
-            # Strip extension and clean up
-            title = os.path.splitext(title)[0].replace("_", " ").replace("-", " ").strip()
+            transcript_text = result.get("transcript", "")
+            if transcript_text:
+                title = generate_title_from_transcript(transcript_text)
+            
+            # Fallback to filename if transcript-based title failed
+            if not title:
+                title = filename or os.path.basename(original_audio_path)
+                # Strip extension and clean up
+                title = os.path.splitext(title)[0].replace("_", " ").replace("-", " ").strip()
+            
+            # Final fallback
             if not title:
                 title = f"Upload {time.strftime('%Y-%m-%d %H:%M')}"
+            
+            logger.info(f"Auto-generated title from transcript: '{title}'")
+        
+        # Speaker fingerprinting: try to identify speaker from voice
+        speaker_fingerprint_result = None
+        if user_id and audio_exists:
+            try:
+                from speaker_fingerprint import process_audio_for_speaker
+                speaker_fingerprint_result = process_audio_for_speaker(
+                    db=db,
+                    user_id=user_id,
+                    audio_path=original_audio_path,
+                    provided_speaker=speaker,
+                    speech_id=None,  # Will update after speech is created
+                    auto_register=True,
+                    match_threshold=0.80,
+                )
+                
+                if speaker_fingerprint_result.get("embedding_extracted"):
+                    if speaker:
+                        # Speaker was provided - we registered their voice
+                        if speaker_fingerprint_result.get("is_new_speaker"):
+                            logger.info(f"Registered new voice profile for speaker: '{speaker}'")
+                        else:
+                            logger.info(f"Updated voice profile for speaker: '{speaker}'")
+                    else:
+                        # Try to identify speaker from voice
+                        identified = speaker_fingerprint_result.get("speaker_identified")
+                        if identified:
+                            similarity = speaker_fingerprint_result.get("similarity", 0)
+                            speaker = identified
+                            logger.info(f"Voice match: '{speaker}' ({similarity:.0%} confidence)")
+                            # Add to result for API response
+                            result["speaker_detected"] = {
+                                "name": speaker,
+                                "confidence": round(similarity, 2),
+                                "method": "voice_fingerprint",
+                            }
+            except Exception as e:
+                logger.warning(f"Speaker fingerprinting failed: {e}")
+        
+        # Fallback: Auto-set speaker from user account if still not provided
+        if not speaker and user_id:
+            try:
+                from .user_auth import get_user_by_id
+                user = get_user_by_id(user_id)
+                if user and user.get("name"):
+                    speaker = user["name"]
+                    logger.info(f"Auto-set speaker from user account: '{speaker}'")
+            except Exception as e:
+                logger.warning(f"Failed to get user name for speaker: {e}")
 
         # Check for duplicate audio
         existing = db.find_speech_by_hash(audio_hash)
@@ -454,13 +724,17 @@ def persist_result(
                 products=products or ["SpeechScore"],
                 audio_hash=audio_hash,
                 user_id=user_id,
+                profile=profile,
             )
 
-            # Store audio as Opus
-            try:
-                db.store_audio(speech_id, original_audio_path)
-            except Exception as e:
-                logger.warning(f"Failed to encode audio to Opus: {e}")
+            # Store audio as Opus (if file still exists)
+            if audio_exists:
+                try:
+                    db.store_audio(speech_id, original_audio_path)
+                except Exception as e:
+                    logger.warning(f"Failed to encode audio to Opus: {e}")
+            else:
+                logger.warning(f"Skipping audio storage - file no longer exists")
 
         # Store transcription
         transcript_text = result.get("transcript", "")
@@ -480,7 +754,7 @@ def persist_result(
         # Store spectrogram — use provided path or auto-generate
         if spectrogram_path and os.path.exists(spectrogram_path):
             db.store_spectrogram_from_file(speech_id, spectrogram_path)
-        else:
+        elif audio_exists:
             # Auto-generate spectrogram from the original audio
             png_data = _generate_spectrogram_bytes(original_audio_path)
             if png_data:

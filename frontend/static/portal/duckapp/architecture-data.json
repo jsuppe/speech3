@@ -1,0 +1,806 @@
+{
+  "project": {
+    "name": "Duck App",
+    "version": "1.0.0"
+  },
+  "architecture": {
+    "app": {
+      "name": "Flutter App",
+      "color": "#4CAF50",
+      "y": 20,
+      "components": [
+        {
+          "name": "FeedScreen",
+          "size": 15,
+          "desc": "Main feed (boats/posts)",
+          "type": "screen"
+        },
+        {
+          "name": "PondScreen",
+          "size": 12,
+          "desc": "User profile/settings",
+          "type": "screen"
+        },
+        {
+          "name": "DuckPackScreen",
+          "size": 14,
+          "desc": "Duck collection/inventory",
+          "type": "screen"
+        },
+        {
+          "name": "DuckDetailScreen",
+          "size": 10,
+          "desc": "Single duck view",
+          "type": "screen"
+        },
+        {
+          "name": "HelpScreen",
+          "size": 8,
+          "desc": "App help/guide",
+          "type": "screen"
+        },
+        {
+          "name": "ThemeSettingsScreen",
+          "size": 8,
+          "desc": "Theme customization",
+          "type": "screen"
+        },
+        {
+          "name": "FilterSettingsScreen",
+          "size": 8,
+          "desc": "Content filter config",
+          "type": "screen"
+        },
+        {
+          "name": "FleetScreen",
+          "size": 12,
+          "desc": "User's boats (posts)",
+          "type": "screen"
+        },
+        {
+          "name": "BoatDetailScreen",
+          "size": 12,
+          "desc": "Single post view",
+          "type": "screen"
+        },
+        {
+          "name": "MyBoatsScreen",
+          "size": 10,
+          "desc": "Manage my boats",
+          "type": "screen"
+        }
+      ]
+    },
+    "api": {
+      "name": "API Layer",
+      "color": "#2196F3",
+      "y": 5,
+      "components": []
+    },
+    "pipeline": {
+      "name": "Pipeline",
+      "color": "#FF9800",
+      "y": -5,
+      "components": []
+    },
+    "data": {
+      "name": "Data Layer",
+      "color": "#607D8B",
+      "y": -20,
+      "components": [
+        {
+          "name": "MockData",
+          "size": 20,
+          "desc": "Mock boats, users, messages, ducks",
+          "type": "module"
+        },
+        {
+          "name": "DuckModel",
+          "size": 8,
+          "desc": "Duck types with rarity/abilities",
+          "type": "model"
+        },
+        {
+          "name": "BoatModel",
+          "size": 8,
+          "desc": "Post model (boats = posts)",
+          "type": "model"
+        },
+        {
+          "name": "UserModel",
+          "size": 6,
+          "desc": "User profile model",
+          "type": "model"
+        }
+      ]
+    },
+    "games": {
+      "name": "Mini-Games",
+      "color": "#FF5722",
+      "y": 10,
+      "components": [
+        {
+          "name": "WizarduckScreen",
+          "size": 15,
+          "desc": "Wizarduck game",
+          "type": "screen"
+        },
+        {
+          "name": "FireBrigadeScreen",
+          "size": 12,
+          "desc": "Fire Brigade game",
+          "type": "screen"
+        },
+        {
+          "name": "PenaltyKickScreen",
+          "size": 10,
+          "desc": "Penalty kick game",
+          "type": "screen"
+        },
+        {
+          "name": "DuckMatchScreen",
+          "size": 10,
+          "desc": "Duck matching game",
+          "type": "screen"
+        },
+        {
+          "name": "DuckHunterScreen",
+          "size": 12,
+          "desc": "Duck hunter game",
+          "type": "screen"
+        },
+        {
+          "name": "DuckAceScreen",
+          "size": 12,
+          "desc": "Duck ace game",
+          "type": "screen"
+        },
+        {
+          "name": "DuckDiveScreen",
+          "size": 12,
+          "desc": "Duck dive game",
+          "type": "screen"
+        },
+        {
+          "name": "DuckStackScreen",
+          "size": 12,
+          "desc": "Duck stack game",
+          "type": "screen"
+        },
+        {
+          "name": "WaddleRunScreen",
+          "size": 12,
+          "desc": "Waddle run game",
+          "type": "screen"
+        }
+      ]
+    },
+    "social": {
+      "name": "Social Features",
+      "color": "#03A9F4",
+      "y": 0,
+      "components": [
+        {
+          "name": "MessagesScreen",
+          "size": 10,
+          "desc": "DM inbox",
+          "type": "screen"
+        },
+        {
+          "name": "ChatListScreen",
+          "size": 10,
+          "desc": "Chat conversations list",
+          "type": "screen"
+        },
+        {
+          "name": "ChatScreen",
+          "size": 12,
+          "desc": "Individual chat",
+          "type": "screen"
+        },
+        {
+          "name": "FriendsScreen",
+          "size": 10,
+          "desc": "Friends list",
+          "type": "screen"
+        },
+        {
+          "name": "ContactsScreen",
+          "size": 8,
+          "desc": "Contact management",
+          "type": "screen"
+        },
+        {
+          "name": "CrewsScreen",
+          "size": 10,
+          "desc": "Group management",
+          "type": "screen"
+        },
+        {
+          "name": "CrewDetailScreen",
+          "size": 10,
+          "desc": "Single crew view",
+          "type": "screen"
+        },
+        {
+          "name": "UserProfileScreen",
+          "size": 10,
+          "desc": "Other user profiles",
+          "type": "screen"
+        },
+        {
+          "name": "ShareToScreen",
+          "size": 8,
+          "desc": "Share content externally",
+          "type": "screen"
+        }
+      ]
+    },
+    "services": {
+      "name": "Services",
+      "color": "#9C27B0",
+      "y": -10,
+      "components": [
+        {
+          "name": "UpdateService",
+          "size": 8,
+          "desc": "Shorebird OTA updates",
+          "type": "service"
+        },
+        {
+          "name": "VersionService",
+          "size": 6,
+          "desc": "App version tracking",
+          "type": "service"
+        },
+        {
+          "name": "SharingService",
+          "size": 8,
+          "desc": "Share intents handling",
+          "type": "service"
+        },
+        {
+          "name": "ThemeProvider",
+          "size": 8,
+          "desc": "Theme state management",
+          "type": "service"
+        },
+        {
+          "name": "CompanionController",
+          "size": 10,
+          "desc": "Duck companions controller",
+          "type": "service"
+        }
+      ]
+    }
+  },
+  "componentDetails": {
+    "FeedScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Main feed (boats/posts)",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "PondScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "User profile/settings",
+      "depends": [
+        "MockData",
+        "ThemeProvider"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckPackScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Duck collection/inventory",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckDetailScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Single duck view",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "HelpScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "App help/guide",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "ThemeSettingsScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Theme customization",
+      "depends": [
+        "ThemeProvider"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "FilterSettingsScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Content filter config",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "FleetScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "User's boats (posts)",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "BoatDetailScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Single post view",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "MyBoatsScreen": {
+      "color": "#4CAF50",
+      "type": "phone",
+      "desc": "Manage my boats",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "MessagesScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "DM inbox",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "ChatListScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Chat conversations list",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "ChatScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Individual chat",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "FriendsScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Friends list",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "ContactsScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Contact management",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "CrewsScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Group management",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "CrewDetailScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Single crew view",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "UserProfileScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Other user profiles",
+      "depends": [
+        "MockData"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "ShareToScreen": {
+      "color": "#03A9F4",
+      "type": "phone",
+      "desc": "Share content externally",
+      "depends": [
+        "SharingService"
+      ],
+      "external": [],
+      "file_path": ""
+    },
+    "WizarduckScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Wizarduck game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "FireBrigadeScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Fire Brigade game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "PenaltyKickScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Penalty kick game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckMatchScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Duck matching game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckHunterScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Duck hunter game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckAceScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Duck ace game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckDiveScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Duck dive game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckStackScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Duck stack game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "WaddleRunScreen": {
+      "color": "#FF5722",
+      "type": "phone",
+      "desc": "Waddle run game",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "UpdateService": {
+      "color": "#9C27B0",
+      "type": "flow",
+      "desc": "Shorebird OTA updates",
+      "depends": [],
+      "external": [
+        "shorebird_code_push"
+      ],
+      "file_path": ""
+    },
+    "VersionService": {
+      "color": "#9C27B0",
+      "type": "flow",
+      "desc": "App version tracking",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "SharingService": {
+      "color": "#9C27B0",
+      "type": "flow",
+      "desc": "Share intents handling",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "ThemeProvider": {
+      "color": "#9C27B0",
+      "type": "flow",
+      "desc": "Theme state management",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "CompanionController": {
+      "color": "#9C27B0",
+      "type": "flow",
+      "desc": "Duck companions controller",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "MockData": {
+      "color": "#607D8B",
+      "type": "flow",
+      "desc": "Mock boats, users, messages, ducks",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "DuckModel": {
+      "color": "#607D8B",
+      "type": "flow",
+      "desc": "Duck types with rarity/abilities",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "BoatModel": {
+      "color": "#607D8B",
+      "type": "flow",
+      "desc": "Post model (boats = posts)",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    },
+    "UserModel": {
+      "color": "#607D8B",
+      "type": "flow",
+      "desc": "User profile model",
+      "depends": [],
+      "external": [],
+      "file_path": ""
+    }
+  },
+  "dependencyGraph": {
+    "FeedScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "PondScreen": {
+      "internal": [
+        "MockData",
+        "ThemeProvider"
+      ],
+      "external": []
+    },
+    "DuckPackScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "DuckDetailScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "HelpScreen": {
+      "internal": [],
+      "external": []
+    },
+    "ThemeSettingsScreen": {
+      "internal": [
+        "ThemeProvider"
+      ],
+      "external": []
+    },
+    "FilterSettingsScreen": {
+      "internal": [],
+      "external": []
+    },
+    "FleetScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "BoatDetailScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "MyBoatsScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "MessagesScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "ChatListScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "ChatScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "FriendsScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "ContactsScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "CrewsScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "CrewDetailScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "UserProfileScreen": {
+      "internal": [
+        "MockData"
+      ],
+      "external": []
+    },
+    "ShareToScreen": {
+      "internal": [
+        "SharingService"
+      ],
+      "external": []
+    },
+    "WizarduckScreen": {
+      "internal": [],
+      "external": []
+    },
+    "FireBrigadeScreen": {
+      "internal": [],
+      "external": []
+    },
+    "PenaltyKickScreen": {
+      "internal": [],
+      "external": []
+    },
+    "DuckMatchScreen": {
+      "internal": [],
+      "external": []
+    },
+    "DuckHunterScreen": {
+      "internal": [],
+      "external": []
+    },
+    "DuckAceScreen": {
+      "internal": [],
+      "external": []
+    },
+    "DuckDiveScreen": {
+      "internal": [],
+      "external": []
+    },
+    "DuckStackScreen": {
+      "internal": [],
+      "external": []
+    },
+    "WaddleRunScreen": {
+      "internal": [],
+      "external": []
+    },
+    "UpdateService": {
+      "internal": [],
+      "external": [
+        "shorebird_code_push"
+      ]
+    },
+    "VersionService": {
+      "internal": [],
+      "external": []
+    },
+    "SharingService": {
+      "internal": [],
+      "external": []
+    },
+    "ThemeProvider": {
+      "internal": [],
+      "external": []
+    },
+    "CompanionController": {
+      "internal": [],
+      "external": []
+    },
+    "MockData": {
+      "internal": [],
+      "external": []
+    },
+    "DuckModel": {
+      "internal": [],
+      "external": []
+    },
+    "BoatModel": {
+      "internal": [],
+      "external": []
+    },
+    "UserModel": {
+      "internal": [],
+      "external": []
+    }
+  },
+  "flows": {},
+  "meta": {
+    "generated_at": "2026-02-17T10:53:45.942690",
+    "generator": "arch-viz by Gemma \ud83d\udc8e",
+    "component_count": 37,
+    "flow_count": 0
+  }
+}

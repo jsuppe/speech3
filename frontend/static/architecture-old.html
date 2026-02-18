@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SpeakFit Architecture - 3D View</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #info {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.8); color: white;
+            padding: 15px; border-radius: 8px; max-width: 300px;
+            transition: all 0.3s ease;
+        }
+        #info h3 { margin-top: 0; }
+        #controls {
+            position: absolute; bottom: 10px; left: 10px;
+            background: rgba(0,0,0,0.8); color: white;
+            padding: 10px; border-radius: 8px;
+        }
+        .layer-btn { margin: 2px; padding: 5px 10px; cursor: pointer; border-radius: 4px; border: none; }
+        
+        #detail-panel {
+            position: absolute;
+            top: 0; left: 0;
+            width: 65%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+            z-index: 100;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #detail-panel.visible {
+            transform: translateX(0);
+        }
+        #detail-panel h2 {
+            color: white;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #444;
+            flex-shrink: 0;
+        }
+        #detail-canvas-container {
+            flex: 1;
+            position: relative;
+            margin-top: 10px;
+        }
+        #detail-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        #component-tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+            max-width: 250px;
+            border: 1px solid #444;
+            z-index: 200;
+        }
+        #component-tooltip h4 {
+            margin: 0 0 5px 0;
+            color: #4CAF50;
+        }
+        #component-tooltip p {
+            margin: 0;
+            color: #aaa;
+        }
+        #view-toggle {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: rgba(0,0,0,0.8);
+            padding: 5px;
+            border-radius: 6px;
+        }
+        #view-toggle button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            background: #333;
+            color: #aaa;
+        }
+        #view-toggle button.active {
+            background: #4CAF50;
+            color: white;
+        }
+        #full-graph-panel {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            z-index: 200;
+            display: none;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #full-graph-panel.visible {
+            display: block;
+        }
+        #full-graph-panel h2 {
+            color: white;
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #444;
+        }
+        #full-graph-canvas {
+            width: 100%;
+            height: calc(100% - 60px);
+            background: #12121f;
+            border-radius: 8px;
+        }
+        #back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 101;
+            display: none;
+        }
+        #back-btn.visible { display: block; }
+        
+        #mini-view {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 35%;
+            height: 45%;
+            border: 2px solid #444;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+            background: #1a1a2e;
+            cursor: pointer;
+        }
+        #mini-view.visible { display: block; }
+        #mini-view:hover { border-color: #4CAF50; }
+        #mini-label {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #4CAF50;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        #selected-indicator {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+<div id="info">
+    <h3>🏗️ SpeakFit Architecture</h3>
+    <p id="hover-info">Hover over components • Click to zoom in<br><br>
+    <em>Drag to rotate • Scroll to zoom</em></p>
+</div>
+<div id="controls">
+    <strong>Layers:</strong>
+    <button class="layer-btn" style="background:#4CAF50" onclick="toggleLayer('app')">📱 App</button>
+    <button class="layer-btn" style="background:#2196F3" onclick="toggleLayer('api')">⚡ API</button>
+    <button class="layer-btn" style="background:#FF9800" onclick="toggleLayer('pipeline')">🔬 Pipeline</button>
+    <button class="layer-btn" style="background:#9C27B0" onclick="toggleLayer('data')">💾 Data</button>
+    <span style="margin-left:15px">|</span>
+    <button class="layer-btn" style="background:#e74c3c" onclick="showFullGraph()">🕸️ Full Graph</button>
+</div>
+
+<div id="full-graph-panel">
+    <h2>🕸️ Full Dependency Graph <button onclick="hideFullGraph()" style="float:right;background:#e74c3c;border:none;color:white;padding:5px 15px;border-radius:4px;cursor:pointer">✕ Close</button></h2>
+    <canvas id="full-graph-canvas"></canvas>
+</div>
+
+<div id="detail-panel">
+    <h2 id="detail-title">Component Details</h2>
+    <div id="detail-canvas-container">
+        <canvas id="detail-canvas"></canvas>
+        <div id="component-tooltip"></div>
+        <div id="view-toggle">
+            <button id="btn-structure" class="active" onclick="setView('structure')">📐 Structure</button>
+            <button id="btn-deps" onclick="setView('deps')">📚 Dependencies</button>
+        </div>
+    </div>
+</div>
+<button id="back-btn" onclick="zoomOut()">← Back to Overview</button>
+
+<div id="mini-view" onclick="zoomOut()">
+    <canvas id="mini-canvas"></canvas>
+    <span id="selected-indicator"></span>
+    <span id="mini-label">📍 Click to return</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// C4 Component-level details with visual layout
+const componentDetails = {
+    // App Layer - UI Screens (phone mockups)
+    "HomeScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Navigation header with menu", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "StatsWidget", desc: "Weekly progress summary", x: 5, y: 12, w: 90, h: 15, deps: ["APIService"] },
+            { name: "RecordingCard", desc: "Recent recordings with scores", x: 5, y: 30, w: 90, h: 20, deps: ["APIService"] },
+            { name: "RecordingCard", desc: "Another recording entry", x: 5, y: 52, w: 90, h: 20, deps: ["APIService"] },
+            { name: "CoachTip", desc: "Daily coaching suggestion", x: 5, y: 75, w: 90, h: 12, deps: ["CoachService"] },
+            { name: "QuickRecord FAB", desc: "Floating action button", x: 75, y: 85, w: 18, h: 10, deps: ["RecordScreen"], style: "fab" }
+        ]
+    },
+    "RecordScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Back button + title", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "ProfileSelector", desc: "Scoring profile dropdown", x: 10, y: 12, w: 80, h: 8, deps: ["APIService"] },
+            { name: "WaveformVisualizer", desc: "Real-time audio waveform", x: 5, y: 25, w: 90, h: 35, deps: [], style: "waveform" },
+            { name: "Timer", desc: "Recording duration display", x: 35, y: 62, w: 30, h: 8, deps: [] },
+            { name: "RecordingControls", desc: "Start/stop/pause buttons", x: 20, y: 75, w: 60, h: 15, deps: [], style: "controls" }
+        ]
+    },
+    "ResultsScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Back + share buttons", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "ScoreGauge", desc: "Animated circular score", x: 25, y: 10, w: 50, h: 25, deps: [], style: "gauge" },
+            { name: "MetricsGrid", desc: "WPM, pitch, clarity metrics", x: 5, y: 38, w: 90, h: 20, deps: [] },
+            { name: "AudioPlayback", desc: "Playback with waveform", x: 5, y: 60, w: 90, h: 12, deps: [] },
+            { name: "TranscriptView", desc: "Tappable word transcript", x: 5, y: 74, w: 90, h: 18, deps: [] },
+            { name: "ShareButton", desc: "Export results", x: 80, y: 2, w: 15, h: 5, deps: [] }
+        ]
+    },
+    "CoachScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Coach header", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "ContextLoader", desc: "Recording context banner", x: 5, y: 10, w: 90, h: 8, deps: ["APIService"] },
+            { name: "ChatInterface", desc: "Message bubbles", x: 5, y: 20, w: 90, h: 55, deps: [], style: "chat" },
+            { name: "SuggestionChips", desc: "Quick reply options", x: 5, y: 77, w: 90, h: 8, deps: [] },
+            { name: "InputField", desc: "Type message", x: 5, y: 88, w: 75, h: 8, deps: [] },
+            { name: "SendButton", desc: "Send message", x: 82, y: 88, w: 13, h: 8, deps: [], style: "fab" }
+        ]
+    },
+    "APIService": {
+        color: "#4CAF50",
+        type: "flow",
+        nodes: [
+            { name: "DioClient", desc: "HTTP client with interceptors", x: 50, y: 15, deps: [] },
+            { name: "AuthInterceptor", desc: "Adds JWT to requests", x: 25, y: 40, deps: ["AuthService"] },
+            { name: "RetryLogic", desc: "Auto retry on failure", x: 75, y: 40, deps: [] },
+            { name: "CacheManager", desc: "Local response caching", x: 50, y: 65, deps: [] },
+            { name: "→ Backend API", desc: "Remote server calls", x: 50, y: 90, deps: [], style: "external" }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 1, to: 3 }, { from: 2, to: 3 }, { from: 3, to: 4 }
+        ]
+    },
+    // API Layer - Flow diagrams
+    "router.py": {
+        color: "#2196F3",
+        type: "flow",
+        nodes: [
+            { name: "POST /v1/analyze", desc: "Upload audio for analysis", x: 20, y: 25, deps: ["pipeline_runner"] },
+            { name: "GET /v1/speeches", desc: "List user recordings", x: 50, y: 25, deps: ["speech_db"] },
+            { name: "GET /v1/speeches/{id}", desc: "Get analysis JSON", x: 80, y: 25, deps: ["speech_db"] },
+            { name: "POST /v1/coach/chat", desc: "AI coach conversation", x: 20, y: 55, deps: ["ollama"] },
+            { name: "POST /v1/auth/google", desc: "Google OAuth login", x: 50, y: 55, deps: ["user_auth"] },
+            { name: "CRUD /v1/projects", desc: "Project management", x: 80, y: 55, deps: ["speech_db"] },
+            { name: "job_manager", desc: "Async job queue", x: 20, y: 85, deps: [], style: "internal" },
+            { name: "speech_db", desc: "SQLite database", x: 65, y: 85, deps: [], style: "internal" }
+        ],
+        connections: [
+            { from: 0, to: 6 }, { from: 1, to: 7 }, { from: 2, to: 7 }, { from: 4, to: 7 }, { from: 5, to: 7 }
+        ]
+    },
+    "pipeline_runner": {
+        color: "#2196F3",
+        type: "pipeline",
+        stages: [
+            { name: "convert_to_wav()", desc: "FFmpeg audio conversion", deps: ["ffmpeg"] },
+            { name: "preload_models()", desc: "Load Whisper, spaCy, BERT", deps: ["faster_whisper", "spacy"] },
+            { name: "run_pipeline()", desc: "Orchestrate analysis", deps: ["audio_quality", "transcription"] },
+            { name: "persist_analysis()", desc: "Save to database", deps: ["speech_db"] }
+        ]
+    },
+    "job_manager": {
+        color: "#2196F3",
+        type: "flow",
+        nodes: [
+            { name: "JobQueue", desc: "In-memory async queue", x: 50, y: 15, deps: [] },
+            { name: "ThreadPoolExecutor", desc: "Single GPU worker", x: 25, y: 45, deps: [] },
+            { name: "ProgressTracker", desc: "Real-time status", x: 75, y: 45, deps: [] },
+            { name: "WebhookNotifier", desc: "POST callback URL", x: 50, y: 75, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 1, to: 3 }, { from: 2, to: 3 }
+        ]
+    },
+    // Pipeline Layer
+    "Whisper STT": {
+        color: "#FF9800",
+        type: "pipeline",
+        stages: [
+            { name: "Audio Input", desc: "WAV/OPUS audio file", deps: [] },
+            { name: "faster_whisper", desc: "CTranslate2 optimized", deps: ["CUDA"] },
+            { name: "large-v3 model", desc: "1.5B params, best accuracy", deps: [] },
+            { name: "Word timestamps", desc: "Per-word timing", deps: [] },
+            { name: "Transcript + Timing", desc: "Output JSON", deps: [] }
+        ]
+    },
+    "audio_analysis": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "Pitch extraction", desc: "F0 via autocorrelation", x: 25, y: 25, deps: ["praat"] },
+            { name: "Jitter/Shimmer", desc: "Voice perturbation", x: 75, y: 25, deps: ["praat"] },
+            { name: "HNR", desc: "Harmonics-to-noise", x: 25, y: 60, deps: ["praat"] },
+            { name: "Speaking rate", desc: "Words per minute", x: 75, y: 60, deps: [] }
+        ],
+        connections: []
+    },
+    "diarization": {
+        color: "#FF9800",
+        type: "pipeline",
+        stages: [
+            { name: "Audio segments", desc: "Split by silence", deps: [] },
+            { name: "Resemblyzer", desc: "Extract embeddings", deps: ["resemblyzer"] },
+            { name: "Clustering", desc: "Agglomerative grouping", deps: ["sklearn"] },
+            { name: "Speaker matching", desc: "Match voice profiles", deps: ["speaker_embeddings"] },
+            { name: "Timeline", desc: "Who spoke when", deps: [] }
+        ]
+    },
+    "sentiment": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "VADER", desc: "Rule-based scoring", x: 50, y: 20, deps: ["nltk"] },
+            { name: "Per-segment", desc: "Score each utterance", x: 30, y: 55, deps: [] },
+            { name: "Emotional arc", desc: "Trajectory over time", x: 70, y: 55, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 0, to: 2 }
+        ]
+    },
+    // Data Layer
+    "SQLite DB": {
+        color: "#9C27B0",
+        type: "schema",
+        tables: [
+            { name: "speeches", desc: "Recording metadata (77K+ rows)", cols: ["id", "user_id", "title", "duration", "created_at"] },
+            { name: "analyses", desc: "Full JSON results", cols: ["speech_id", "results_json", "score"] },
+            { name: "users", desc: "User accounts", cols: ["id", "email", "name", "created_at"] },
+            { name: "speaker_embeddings", desc: "Voice fingerprints", cols: ["user_id", "name", "embedding[256]"] },
+            { name: "projects", desc: "Recording groupings", cols: ["id", "user_id", "name", "type"] },
+            { name: "coach_messages", desc: "AI chat history", cols: ["user_id", "speech_id", "role", "content"] }
+        ],
+        relations: [
+            { from: 0, to: 1, label: "1:1" },
+            { from: 2, to: 0, label: "1:N" },
+            { from: 2, to: 3, label: "1:N" },
+            { from: 2, to: 4, label: "1:N" },
+            { from: 2, to: 5, label: "1:N" }
+        ]
+    },
+    
+    // === MISSING APP COMPONENTS ===
+    "HistoryScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Search + filter buttons", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "SearchBar", desc: "Search recordings", x: 5, y: 10, w: 90, h: 8, deps: [] },
+            { name: "FilterChips", desc: "Date, score, category filters", x: 5, y: 20, w: 90, h: 6, deps: [] },
+            { name: "RecordingList", desc: "Scrollable recording history", x: 5, y: 28, w: 90, h: 65, deps: ["APIService"], style: "list" },
+            { name: "SortButton", desc: "Sort by date/score", x: 80, y: 2, w: 15, h: 5, deps: [] }
+        ]
+    },
+    "ProjectsScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Projects header", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "ProjectCard", desc: "Project with recording count", x: 5, y: 12, w: 90, h: 18, deps: ["APIService"] },
+            { name: "ProjectCard", desc: "Another project", x: 5, y: 32, w: 90, h: 18, deps: ["APIService"] },
+            { name: "ProjectCard", desc: "Group meeting project", x: 5, y: 52, w: 90, h: 18, deps: ["APIService"] },
+            { name: "EmptyState", desc: "No projects placeholder", x: 5, y: 72, w: 90, h: 15, deps: [] },
+            { name: "CreateProject FAB", desc: "New project button", x: 75, y: 85, w: 18, h: 10, deps: [], style: "fab" }
+        ]
+    },
+    "SettingsScreen": {
+        color: "#4CAF50",
+        type: "phone",
+        regions: [
+            { name: "AppBar", desc: "Settings header", x: 0, y: 0, w: 100, h: 8, deps: [] },
+            { name: "ProfileSection", desc: "User avatar + name", x: 5, y: 10, w: 90, h: 15, deps: ["AuthService"] },
+            { name: "ScoringProfiles", desc: "Manage scoring profiles", x: 5, y: 28, w: 90, h: 10, deps: ["APIService"] },
+            { name: "SpeakerProfiles", desc: "Voice fingerprint management", x: 5, y: 40, w: 90, h: 10, deps: ["APIService"] },
+            { name: "NotificationSettings", desc: "Push notification prefs", x: 5, y: 52, w: 90, h: 10, deps: [] },
+            { name: "DataExport", desc: "Export all recordings", x: 5, y: 64, w: 90, h: 10, deps: ["APIService"] },
+            { name: "SignOutButton", desc: "Logout", x: 5, y: 80, w: 90, h: 10, deps: ["AuthService"], style: "danger" }
+        ]
+    },
+    "AuthService": {
+        color: "#4CAF50",
+        type: "flow",
+        nodes: [
+            { name: "GoogleSignIn", desc: "Google OAuth flow", x: 30, y: 20, deps: ["google_sign_in"] },
+            { name: "AppleSignIn", desc: "Apple OAuth flow", x: 70, y: 20, deps: ["sign_in_with_apple"] },
+            { name: "TokenManager", desc: "JWT storage + refresh", x: 50, y: 50, deps: ["flutter_secure_storage"] },
+            { name: "AuthState", desc: "Riverpod auth provider", x: 50, y: 80, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 2 }, { from: 1, to: 2 }, { from: 2, to: 3 }
+        ]
+    },
+    
+    // === MISSING API COMPONENTS ===
+    "main.py": {
+        color: "#2196F3",
+        type: "flow",
+        nodes: [
+            { name: "FastAPI app", desc: "Application instance", x: 50, y: 15, deps: [] },
+            { name: "lifespan()", desc: "Startup/shutdown hooks", x: 25, y: 40, deps: [] },
+            { name: "preload_models()", desc: "Load ML models at start", x: 75, y: 40, deps: ["pipeline_runner"] },
+            { name: "CORS middleware", desc: "Cross-origin config", x: 25, y: 70, deps: [] },
+            { name: "Static files", desc: "Serve /static/", x: 75, y: 70, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 1, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }
+        ]
+    },
+    "auth": {
+        color: "#2196F3",
+        type: "flow",
+        nodes: [
+            { name: "verify_api_key()", desc: "Check X-API-Key header", x: 50, y: 20, deps: [] },
+            { name: "API_KEYS dict", desc: "Valid keys from config", x: 25, y: 50, deps: [] },
+            { name: "HTTPException", desc: "401 on invalid key", x: 75, y: 50, deps: [] },
+            { name: "Depends()", desc: "FastAPI dependency", x: 50, y: 80, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }
+        ]
+    },
+    "user_auth": {
+        color: "#2196F3",
+        type: "flow",
+        nodes: [
+            { name: "verify_google_token()", desc: "Validate Google ID token", x: 30, y: 15, deps: ["google-auth"] },
+            { name: "create_jwt()", desc: "Issue access + refresh", x: 70, y: 15, deps: ["python-jose"] },
+            { name: "verify_jwt()", desc: "Decode and validate JWT", x: 30, y: 45, deps: ["python-jose"] },
+            { name: "get_current_user()", desc: "Extract user from token", x: 70, y: 45, deps: [] },
+            { name: "refresh_token()", desc: "Issue new access token", x: 50, y: 75, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 1, to: 2 }, { from: 2, to: 3 }, { from: 3, to: 4 }
+        ]
+    },
+    "rate_limiter": {
+        color: "#2196F3",
+        type: "flow",
+        nodes: [
+            { name: "RateLimiter class", desc: "Token bucket algorithm", x: 50, y: 20, deps: [] },
+            { name: "requests dict", desc: "IP → timestamp list", x: 25, y: 50, deps: [] },
+            { name: "check_rate_limit()", desc: "Allow or reject request", x: 75, y: 50, deps: [] },
+            { name: "429 Too Many", desc: "Rate limit exceeded", x: 50, y: 80, deps: [], style: "external" }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 2, to: 3 }
+        ]
+    },
+    
+    // === MISSING PIPELINE COMPONENTS ===
+    "audio_quality": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "calculate_snr()", desc: "Signal-to-noise ratio", x: 25, y: 25, deps: ["numpy"] },
+            { name: "detect_clipping()", desc: "Find clipped samples", x: 75, y: 25, deps: ["numpy"] },
+            { name: "check_duration()", desc: "Validate length", x: 25, y: 60, deps: [] },
+            { name: "confidence_score", desc: "Overall quality gate", x: 75, y: 60, deps: [] }
+        ],
+        connections: []
+    },
+    "advanced_audio": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "Formant extraction", desc: "F1, F2, F3 frequencies", x: 25, y: 20, deps: ["praat"] },
+            { name: "Pitch contour", desc: "F0 over time", x: 75, y: 20, deps: ["praat"] },
+            { name: "Uptalk detection", desc: "Rising intonation patterns", x: 25, y: 50, deps: [] },
+            { name: "Vocal fry", desc: "Creaky voice detection", x: 75, y: 50, deps: [] },
+            { name: "Rate variability", desc: "Speaking pace changes", x: 25, y: 80, deps: [] },
+            { name: "Emphasis detection", desc: "Stressed words/syllables", x: 75, y: 80, deps: [] }
+        ],
+        connections: []
+    },
+    "text_analysis": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "spaCy NLP", desc: "Tokenization + POS tagging", x: 50, y: 15, deps: ["spacy"] },
+            { name: "Filler words", desc: "um, uh, like, you know", x: 25, y: 45, deps: [] },
+            { name: "Sentence complexity", desc: "Clause depth analysis", x: 75, y: 45, deps: [] },
+            { name: "Vocabulary diversity", desc: "Type-token ratio", x: 50, y: 75, deps: [] }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }
+        ]
+    },
+    "advanced_text": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "Flesch-Kincaid", desc: "Readability grade level", x: 25, y: 20, deps: ["textstat"] },
+            { name: "Named entities", desc: "People, places, orgs", x: 75, y: 20, deps: ["spacy"] },
+            { name: "Discourse markers", desc: "however, therefore, etc", x: 25, y: 55, deps: [] },
+            { name: "Perspective analysis", desc: "First/second/third person", x: 75, y: 55, deps: [] },
+            { name: "Topic coherence", desc: "Semantic similarity flow", x: 50, y: 85, deps: ["sentence_transformers"] }
+        ],
+        connections: []
+    },
+    "rhetorical": {
+        color: "#FF9800",
+        type: "flow",
+        nodes: [
+            { name: "Anaphora", desc: "Repeated phrase starts", x: 25, y: 25, deps: [] },
+            { name: "Epistrophe", desc: "Repeated phrase ends", x: 75, y: 25, deps: [] },
+            { name: "Repetition score", desc: "Intentional vs filler", x: 25, y: 60, deps: [] },
+            { name: "Rhythm analysis", desc: "Syllable stress patterns", x: 75, y: 60, deps: ["nltk"] }
+        ],
+        connections: []
+    },
+    
+    // === MISSING DATA COMPONENTS ===
+    "speeches": {
+        color: "#9C27B0",
+        type: "schema",
+        tables: [
+            { name: "speeches", desc: "Main recording table", cols: ["id INTEGER PK", "user_id FK", "title TEXT", "speaker TEXT", "duration REAL", "category TEXT", "created_at TIMESTAMP"] }
+        ],
+        relations: []
+    },
+    "analyses": {
+        color: "#9C27B0",
+        type: "schema",
+        tables: [
+            { name: "analyses", desc: "Analysis results", cols: ["id INTEGER PK", "speech_id FK UNIQUE", "results_json TEXT", "overall_score REAL", "transcript TEXT", "word_timings JSON"] }
+        ],
+        relations: []
+    },
+    "users": {
+        color: "#9C27B0",
+        type: "schema",
+        tables: [
+            { name: "users", desc: "User accounts", cols: ["id INTEGER PK", "email TEXT UNIQUE", "name TEXT", "google_id TEXT", "apple_id TEXT", "created_at TIMESTAMP", "last_login TIMESTAMP"] }
+        ],
+        relations: []
+    },
+    "projects": {
+        color: "#9C27B0",
+        type: "schema",
+        tables: [
+            { name: "projects", desc: "Recording groups", cols: ["id INTEGER PK", "user_id FK", "name TEXT", "description TEXT", "type TEXT", "default_profile TEXT", "created_at TIMESTAMP"] }
+        ],
+        relations: []
+    },
+    "audio_files": {
+        color: "#9C27B0",
+        type: "flow",
+        nodes: [
+            { name: "Upload", desc: "Receive audio blob", x: 20, y: 30, deps: [] },
+            { name: "Convert", desc: "Transcode to OPUS", x: 50, y: 30, deps: ["ffmpeg"] },
+            { name: "Store", desc: "Save to disk", x: 80, y: 30, deps: [] },
+            { name: "/audio/{id}", desc: "File storage path", x: 50, y: 70, deps: [], style: "external" }
+        ],
+        connections: [
+            { from: 0, to: 1 }, { from: 1, to: 2 }, { from: 2, to: 3 }
+        ]
+    }
+};
+
+// Connection labels
+const connectionLabels = [
+    { from: "app", to: "api", label: "REST API\n(JSON/HTTP)", x: 12, y: 10 },
+    { from: "api", to: "pipeline", label: "Python calls\n(in-process)", x: 12, y: 0 },
+    { from: "pipeline", to: "data", label: "SQL queries\n(SQLite)", x: 8, y: -10 },
+    { from: "api", to: "data", label: "Direct DB\n(auth/lookup)", x: -12, y: -5 }
+];
+
+// SpeakFit Architecture Data
+const architecture = {
+    app: {
+        name: "Flutter App",
+        color: 0x4CAF50,
+        y: 15,
+        components: [
+            { name: "HomeScreen", size: 16, desc: "Main dashboard" },
+            { name: "RecordScreen", size: 21, desc: "Audio recording UI" },
+            { name: "ResultsScreen", size: 35, desc: "Analysis display" },
+            { name: "CoachScreen", size: 10, desc: "AI speech coach" },
+            { name: "HistoryScreen", size: 16, desc: "Past recordings" },
+            { name: "ProjectsScreen", size: 13, desc: "Project management" },
+            { name: "SettingsScreen", size: 21, desc: "User preferences" },
+            { name: "APIService", size: 16, desc: "Backend communication" },
+            { name: "AuthService", size: 8, desc: "Google/Apple sign-in" },
+        ]
+    },
+    api: {
+        name: "FastAPI Backend",
+        color: 0x2196F3,
+        y: 5,
+        components: [
+            { name: "main.py", size: 8, desc: "App entry, lifespan" },
+            { name: "router.py", size: 85, desc: "All API endpoints" },
+            { name: "pipeline_runner", size: 28, desc: "Analysis orchestration" },
+            { name: "job_manager", size: 15, desc: "Async job queue" },
+            { name: "auth", size: 9, desc: "API key auth" },
+            { name: "user_auth", size: 12, desc: "JWT/OAuth" },
+            { name: "rate_limiter", size: 6, desc: "Request throttling" },
+        ]
+    },
+    pipeline: {
+        name: "Analysis Pipeline",
+        color: 0xFF9800,
+        y: -5,
+        components: [
+            { name: "Whisper STT", size: 20, desc: "Speech-to-text (GPU)" },
+            { name: "audio_analysis", size: 8, desc: "Pitch, jitter, shimmer" },
+            { name: "audio_quality", size: 4, desc: "SNR, clipping detection" },
+            { name: "advanced_audio", size: 13, desc: "Formants, vocal fry" },
+            { name: "text_analysis", size: 4, desc: "Complexity, fluency" },
+            { name: "advanced_text", size: 8, desc: "Readability, entities" },
+            { name: "sentiment", size: 3, desc: "Emotion detection" },
+            { name: "rhetorical", size: 5, desc: "Repetition, rhythm" },
+            { name: "diarization", size: 16, desc: "Speaker identification" },
+        ]
+    },
+    data: {
+        name: "Data Layer",
+        color: 0x9C27B0,
+        y: -15,
+        components: [
+            { name: "SQLite DB", size: 52, desc: "11GB, 77K+ speeches" },
+            { name: "speeches", size: 20, desc: "Recording metadata" },
+            { name: "analyses", size: 15, desc: "Full analysis JSON" },
+            { name: "users", size: 10, desc: "User accounts" },
+            { name: "projects", size: 8, desc: "Project groupings" },
+            { name: "audio_files", size: 30, desc: "Opus audio storage" },
+        ]
+    }
+};
+
+let isZoomedIn = false;
+let selectedComponent = null;
+let selectedMesh = null;
+let currentView = 'structure'; // 'structure' or 'deps'
+
+// Dependency graph - what each component depends on
+const dependencyGraph = {
+    // App Layer
+    "HomeScreen": { internal: ["APIService", "CoachScreen"], external: ["flutter", "riverpod"] },
+    "RecordScreen": { internal: ["APIService"], external: ["flutter", "audio_waveforms", "permission_handler"] },
+    "ResultsScreen": { internal: ["APIService", "CoachScreen"], external: ["flutter", "fl_chart"] },
+    "CoachScreen": { internal: ["APIService"], external: ["flutter", "riverpod"] },
+    "HistoryScreen": { internal: ["APIService"], external: ["flutter", "riverpod"] },
+    "ProjectsScreen": { internal: ["APIService"], external: ["flutter", "riverpod"] },
+    "SettingsScreen": { internal: ["APIService", "AuthService"], external: ["flutter", "riverpod"] },
+    "APIService": { internal: ["AuthService"], external: ["dio", "flutter_secure_storage"] },
+    "AuthService": { internal: [], external: ["google_sign_in", "sign_in_with_apple", "flutter_secure_storage"] },
+    
+    // API Layer
+    "main.py": { internal: ["router.py", "pipeline_runner"], external: ["fastapi", "uvicorn", "starlette"] },
+    "router.py": { internal: ["pipeline_runner", "job_manager", "auth", "user_auth"], external: ["fastapi", "pydantic"] },
+    "pipeline_runner": { internal: ["Whisper STT", "audio_analysis", "text_analysis", "diarization", "SQLite DB"], external: ["faster_whisper", "spacy", "numpy"] },
+    "job_manager": { internal: ["pipeline_runner"], external: ["asyncio", "concurrent.futures"] },
+    "auth": { internal: [], external: ["fastapi"] },
+    "user_auth": { internal: ["SQLite DB"], external: ["python-jose", "google-auth", "passlib"] },
+    "rate_limiter": { internal: [], external: ["time", "collections"] },
+    
+    // Pipeline Layer
+    "Whisper STT": { internal: [], external: ["faster_whisper", "torch", "CUDA"] },
+    "audio_analysis": { internal: [], external: ["parselmouth", "praat", "numpy"] },
+    "audio_quality": { internal: [], external: ["numpy", "scipy"] },
+    "advanced_audio": { internal: [], external: ["parselmouth", "praat", "numpy", "librosa"] },
+    "text_analysis": { internal: [], external: ["spacy", "en_core_web_sm"] },
+    "advanced_text": { internal: [], external: ["spacy", "textstat", "sentence_transformers"] },
+    "sentiment": { internal: [], external: ["nltk", "vaderSentiment"] },
+    "rhetorical": { internal: [], external: ["nltk", "re"] },
+    "diarization": { internal: ["SQLite DB"], external: ["resemblyzer", "sklearn", "numpy"] },
+    
+    // Data Layer
+    "SQLite DB": { internal: [], external: ["sqlite3", "aiosqlite"] },
+    "speeches": { internal: ["SQLite DB"], external: [] },
+    "analyses": { internal: ["SQLite DB"], external: [] },
+    "users": { internal: ["SQLite DB"], external: [] },
+    "projects": { internal: ["SQLite DB"], external: [] },
+    "audio_files": { internal: [], external: ["ffmpeg", "pathlib"] }
+};
+
+// Recursively get full dependency chain
+function getFullDependencyChain(componentName, visited = new Set()) {
+    if (visited.has(componentName)) return { internal: [], external: [] };
+    visited.add(componentName);
+    
+    const deps = dependencyGraph[componentName] || { internal: [], external: [] };
+    let allInternal = [...deps.internal];
+    let allExternal = [...deps.external];
+    
+    // Recursively get dependencies of internal deps
+    for (const intDep of deps.internal) {
+        const subDeps = getFullDependencyChain(intDep, visited);
+        allInternal = [...allInternal, ...subDeps.internal];
+        allExternal = [...allExternal, ...subDeps.external];
+    }
+    
+    // Dedupe
+    return {
+        internal: [...new Set(allInternal)],
+        external: [...new Set(allExternal)]
+    };
+}
+
+// Three.js setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(40, 30, 40);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+// Mini-view renderer (for thumbnail while zoomed in)
+const miniCanvas = document.getElementById('mini-canvas');
+const miniRenderer = new THREE.WebGLRenderer({ canvas: miniCanvas, antialias: true });
+const miniCamera = new THREE.PerspectiveCamera(60, 1.4, 0.1, 1000);
+miniCamera.position.set(50, 40, 50);
+miniCamera.lookAt(0, 0, 0);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+directional.position.set(20, 40, 20);
+scene.add(directional);
+
+// Grid
+const grid = new THREE.GridHelper(60, 20, 0x444444, 0x333333);
+grid.position.y = -20;
+scene.add(grid);
+
+// Objects
+const objects = [];
+const layers = {};
+const labelSprites = [];
+
+Object.entries(architecture).forEach(([layerKey, layer]) => {
+    layers[layerKey] = [];
+    const cols = Math.ceil(Math.sqrt(layer.components.length));
+    
+    layer.components.forEach((comp, i) => {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        
+        const height = Math.max(1.5, comp.size / 8);
+        const geometry = new THREE.BoxGeometry(3.5, height, 3.5);
+        const material = new THREE.MeshPhongMaterial({ 
+            color: layer.color,
+            transparent: true,
+            opacity: 0.85,
+            shininess: 30
+        });
+        
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(
+            (col - cols/2) * 5.5,
+            layer.y + height/2,
+            (row - 1) * 5.5
+        );
+        mesh.userData = { 
+            name: comp.name, 
+            layer: layer.name,
+            size: comp.size,
+            desc: comp.desc,
+            layerKey: layerKey,
+            hasDetails: !!componentDetails[comp.name]
+        };
+        
+        scene.add(mesh);
+        objects.push(mesh);
+        layers[layerKey].push(mesh);
+        
+        // Edges
+        const edges = new THREE.EdgesGeometry(geometry);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.4, transparent: true }));
+        line.position.copy(mesh.position);
+        scene.add(line);
+        layers[layerKey].push(line);
+    });
+    
+    // Platform
+    const platformGeom = new THREE.BoxGeometry(35, 0.3, 25);
+    const platformMat = new THREE.MeshPhongMaterial({ color: layer.color, opacity: 0.2, transparent: true });
+    const platform = new THREE.Mesh(platformGeom, platformMat);
+    platform.position.set(0, layer.y - 0.5, 0);
+    scene.add(platform);
+    layers[layerKey].push(platform);
+    
+    // Layer label
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.strokeStyle = '#' + layer.color.toString(16).padStart(6, '0');
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, 508, 124);
+    ctx.fillStyle = '#' + layer.color.toString(16).padStart(6, '0');
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(layer.name, 256, 80);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(20, 5, 1);
+    sprite.position.set(-25, layer.y + 2, 0);
+    scene.add(sprite);
+    layers[layerKey].push(sprite);
+    labelSprites.push(sprite);
+});
+
+// Connection lines with labels
+const createLabeledConnection = (fromY, toY, xOffset, labelText, labelX, labelY) => {
+    const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(xOffset, fromY - 1, 0),
+        new THREE.Vector3(xOffset + 5, (fromY + toY) / 2, 3),
+        new THREE.Vector3(xOffset, toY + 1, 0)
+    ]);
+    const points = curve.getPoints(20);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: 0x888888, opacity: 0.6, transparent: true });
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
+    
+    // Label
+    if (labelText) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200; canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, 200, 80);
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        const lines = labelText.split('\n');
+        lines.forEach((l, i) => ctx.fillText(l, 100, 30 + i * 20));
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(8, 3, 1);
+        sprite.position.set(labelX, labelY, 2);
+        scene.add(sprite);
+        labelSprites.push(sprite);
+    }
+    
+    return line;
+};
+
+createLabeledConnection(15, 5, -5, "REST API\n(JSON/HTTP)", 5, 10);
+createLabeledConnection(15, 5, 5, null, 0, 0);
+createLabeledConnection(5, -5, -3, "Python calls\n(in-process)", 7, 0);
+createLabeledConnection(5, -5, 3, null, 0, 0);
+createLabeledConnection(-5, -15, 0, "SQL queries\n(SQLite)", 8, -10);
+createLabeledConnection(5, -15, 10, "Direct DB\n(auth)", 18, -5);
+
+// Raycaster
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredObject = null;
+
+function onMouseMove(event) {
+    if (isZoomedIn) return;
+    
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(objects);
+    
+    if (hoveredObject) {
+        hoveredObject.material.emissive.setHex(0x000000);
+        hoveredObject.scale.set(1, 1, 1);
+    }
+    
+    const infoEl = document.getElementById('hover-info');
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        const data = obj.userData;
+        const clickHint = data.hasDetails ? '<br><strong style="color:#4CAF50">🔍 Click to zoom in</strong>' : '';
+        infoEl.innerHTML = `<strong>${data.name}</strong><br>
+            Layer: ${data.layer}<br>
+            Size: ${data.size}KB<br>
+            <em>${data.desc}</em>${clickHint}`;
+        obj.material.emissive.setHex(0x333333);
+        obj.scale.set(1.1, 1.1, 1.1);
+        hoveredObject = obj;
+        document.body.style.cursor = data.hasDetails ? 'pointer' : 'default';
+    } else {
+        infoEl.innerHTML = 'Hover over components • Click to zoom in<br><br><em>Drag to rotate • Scroll to zoom</em>';
+        hoveredObject = null;
+        document.body.style.cursor = 'default';
+    }
+}
+
+function onClick(event) {
+    if (isZoomedIn) return;
+    
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(objects);
+    
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        const data = obj.userData;
+        
+        if (componentDetails[data.name]) {
+            zoomIn(data.name, obj);
+        }
+    }
+}
+
+// Detail visualization renderers
+const detailCanvas = document.getElementById('detail-canvas');
+const detailCtx = detailCanvas.getContext('2d');
+const tooltip = document.getElementById('component-tooltip');
+let detailRegions = []; // For hit testing
+
+function renderPhoneUI(details, w, h) {
+    const ctx = detailCtx;
+    const phoneW = Math.min(w * 0.4, 280);
+    const phoneH = phoneW * 2;
+    const phoneX = (w - phoneW) / 2;
+    const phoneY = (h - phoneH) / 2;
+    
+    // Phone frame
+    ctx.fillStyle = '#222';
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(phoneX - 10, phoneY - 30, phoneW + 20, phoneH + 60, 25);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Screen
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(phoneX, phoneY, phoneW, phoneH);
+    
+    // Status bar
+    ctx.fillStyle = '#333';
+    ctx.fillRect(phoneX, phoneY, phoneW, phoneH * 0.04);
+    
+    // Regions
+    detailRegions = [];
+    details.regions.forEach((region, i) => {
+        const rx = phoneX + (region.x / 100) * phoneW;
+        const ry = phoneY + (region.y / 100) * phoneH;
+        const rw = (region.w / 100) * phoneW;
+        const rh = (region.h / 100) * phoneH;
+        
+        // Store for hit testing
+        detailRegions.push({ ...region, rx, ry, rw, rh });
+        
+        // Draw region
+        ctx.fillStyle = region.style === 'fab' ? details.color : 'rgba(255,255,255,0.08)';
+        ctx.strokeStyle = details.color;
+        ctx.lineWidth = 2;
+        
+        if (region.style === 'fab') {
+            ctx.beginPath();
+            ctx.arc(rx + rw/2, ry + rh/2, Math.min(rw, rh)/2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        } else if (region.style === 'gauge') {
+            ctx.beginPath();
+            ctx.arc(rx + rw/2, ry + rh/2, Math.min(rw, rh)/2 - 5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('87', rx + rw/2, ry + rh/2 + 6);
+        } else if (region.style === 'waveform') {
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.fillRect(rx, ry, rw, rh);
+            ctx.strokeStyle = details.color;
+            ctx.beginPath();
+            for (let wx = 0; wx < rw; wx += 3) {
+                const wy = ry + rh/2 + Math.sin(wx * 0.15) * (rh * 0.3) * Math.random();
+                ctx.lineTo(rx + wx, wy);
+            }
+            ctx.stroke();
+        } else if (region.style === 'chat') {
+            // Chat bubbles
+            ctx.fillStyle = 'rgba(100,100,100,0.3)';
+            ctx.beginPath(); ctx.roundRect(rx + 5, ry + 10, rw * 0.6, rh * 0.15, 8); ctx.fill();
+            ctx.fillStyle = details.color + '40';
+            ctx.beginPath(); ctx.roundRect(rx + rw * 0.3, ry + rh * 0.25, rw * 0.65, rh * 0.2, 8); ctx.fill();
+            ctx.fillStyle = 'rgba(100,100,100,0.3)';
+            ctx.beginPath(); ctx.roundRect(rx + 5, ry + rh * 0.5, rw * 0.5, rh * 0.12, 8); ctx.fill();
+        } else if (region.style === 'controls') {
+            // Record button
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(rx + rw/2, ry + rh/2, rh * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (region.style === 'list') {
+            // Scrollable list
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.fillRect(rx, ry, rw, rh);
+            ctx.strokeStyle = details.color + '60';
+            for (let ly = 0; ly < 5; ly++) {
+                const itemY = ry + 8 + ly * (rh / 5);
+                ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                ctx.beginPath();
+                ctx.roundRect(rx + 5, itemY, rw - 10, rh / 6, 4);
+                ctx.fill();
+            }
+        } else if (region.style === 'danger') {
+            // Danger/destructive button
+            ctx.fillStyle = '#e74c3c';
+            ctx.strokeStyle = '#c0392b';
+            ctx.beginPath();
+            ctx.roundRect(rx, ry, rw, rh, 6);
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            ctx.roundRect(rx, ry, rw, rh, 6);
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        if (region.style !== 'gauge' && region.style !== 'fab') {
+            ctx.fillText(region.name, rx + rw/2, ry + rh/2 + 4);
+        }
+    });
+}
+
+function renderFlowDiagram(details, w, h) {
+    const ctx = detailCtx;
+    const margin = 80;
+    
+    detailRegions = [];
+    
+    // Draw connections first
+    if (details.connections) {
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        details.connections.forEach(conn => {
+            const from = details.nodes[conn.from];
+            const to = details.nodes[conn.to];
+            const fx = margin + (from.x / 100) * (w - margin * 2);
+            const fy = margin + (from.y / 100) * (h - margin * 2);
+            const tx = margin + (to.x / 100) * (w - margin * 2);
+            const ty = margin + (to.y / 100) * (h - margin * 2);
+            
+            ctx.beginPath();
+            ctx.moveTo(fx, fy);
+            ctx.lineTo(tx, ty);
+            ctx.stroke();
+            
+            // Arrow
+            const angle = Math.atan2(ty - fy, tx - fx);
+            ctx.beginPath();
+            ctx.moveTo(tx - 15 * Math.cos(angle - 0.3), ty - 15 * Math.sin(angle - 0.3));
+            ctx.lineTo(tx, ty);
+            ctx.lineTo(tx - 15 * Math.cos(angle + 0.3), ty - 15 * Math.sin(angle + 0.3));
+            ctx.stroke();
+        });
+    }
+    
+    // Draw nodes
+    details.nodes.forEach((node, i) => {
+        const nx = margin + (node.x / 100) * (w - margin * 2);
+        const ny = margin + (node.y / 100) * (h - margin * 2);
+        const nw = 120;
+        const nh = 50;
+        
+        detailRegions.push({ ...node, rx: nx - nw/2, ry: ny - nh/2, rw: nw, rh: nh });
+        
+        ctx.fillStyle = node.style === 'external' ? '#333' : (node.style === 'internal' ? '#2a2a4e' : 'rgba(255,255,255,0.1)');
+        ctx.strokeStyle = details.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(nx - nw/2, ny - nh/2, nw, nh, 8);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(node.name, nx, ny + 4);
+    });
+}
+
+function renderPipeline(details, w, h) {
+    const ctx = detailCtx;
+    const stageW = 140;
+    const stageH = 60;
+    const gap = 30;
+    const totalW = details.stages.length * stageW + (details.stages.length - 1) * gap;
+    const startX = (w - totalW) / 2;
+    const y = h / 2;
+    
+    detailRegions = [];
+    
+    details.stages.forEach((stage, i) => {
+        const x = startX + i * (stageW + gap);
+        
+        detailRegions.push({ ...stage, rx: x, ry: y - stageH/2, rw: stageW, rh: stageH });
+        
+        // Box
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.strokeStyle = details.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y - stageH/2, stageW, stageH, 8);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Arrow to next
+        if (i < details.stages.length - 1) {
+            ctx.strokeStyle = '#666';
+            ctx.beginPath();
+            ctx.moveTo(x + stageW + 5, y);
+            ctx.lineTo(x + stageW + gap - 5, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x + stageW + gap - 12, y - 6);
+            ctx.lineTo(x + stageW + gap - 5, y);
+            ctx.lineTo(x + stageW + gap - 12, y + 6);
+            ctx.stroke();
+        }
+        
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(stage.name, x + stageW/2, y + 4);
+    });
+}
+
+function renderSchema(details, w, h) {
+    const ctx = detailCtx;
+    const tableW = 160;
+    const tableH = 100;
+    const cols = 3;
+    const rows = Math.ceil(details.tables.length / cols);
+    const gapX = 40;
+    const gapY = 40;
+    const totalW = cols * tableW + (cols - 1) * gapX;
+    const totalH = rows * tableH + (rows - 1) * gapY;
+    const startX = (w - totalW) / 2;
+    const startY = (h - totalH) / 2;
+    
+    detailRegions = [];
+    const tablePositions = [];
+    
+    // Draw tables
+    details.tables.forEach((table, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = startX + col * (tableW + gapX);
+        const y = startY + row * (tableH + gapY);
+        
+        tablePositions.push({ x: x + tableW/2, y: y + tableH/2 });
+        detailRegions.push({ ...table, rx: x, ry: y, rw: tableW, rh: tableH });
+        
+        // Table box
+        ctx.fillStyle = '#2a2a4e';
+        ctx.strokeStyle = details.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, tableW, tableH, 6);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Header
+        ctx.fillStyle = details.color;
+        ctx.beginPath();
+        ctx.roundRect(x, y, tableW, 25, [6, 6, 0, 0]);
+        ctx.fill();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(table.name, x + tableW/2, y + 17);
+        
+        // Columns
+        ctx.fillStyle = '#aaa';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        table.cols.slice(0, 4).forEach((col, ci) => {
+            ctx.fillText(col, x + 8, y + 40 + ci * 14);
+        });
+        if (table.cols.length > 4) {
+            ctx.fillText('...', x + 8, y + 40 + 4 * 14);
+        }
+    });
+    
+    // Draw relations
+    if (details.relations) {
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        details.relations.forEach(rel => {
+            const from = tablePositions[rel.from];
+            const to = tablePositions[rel.to];
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+        });
+    }
+}
+
+function renderDependencyStack(componentName, w, h) {
+    const ctx = detailCtx;
+    const deps = getFullDependencyChain(componentName);
+    const details = componentDetails[componentName];
+    const color = details ? details.color : '#888';
+    
+    detailRegions = [];
+    
+    // Layout
+    const boxW = 180;
+    const boxH = 40;
+    const gapY = 15;
+    const arrowH = 20;
+    
+    // Calculate layers
+    const layers = [
+        { label: componentName, items: [componentName], color: color, type: 'self' },
+        { label: 'Internal Dependencies', items: deps.internal, color: '#2196F3', type: 'internal' },
+        { label: 'External Packages', items: deps.external, color: '#9C27B0', type: 'external' }
+    ].filter(l => l.items.length > 0);
+    
+    let currentY = 40;
+    
+    layers.forEach((layer, layerIdx) => {
+        // Layer label
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'left';
+        if (layer.type !== 'self') {
+            ctx.fillText(layer.label + ':', 30, currentY);
+            currentY += 20;
+        }
+        
+        // Items in this layer
+        const cols = Math.min(layer.items.length, 3);
+        const rows = Math.ceil(layer.items.length / cols);
+        const totalW = cols * boxW + (cols - 1) * 20;
+        const startX = (w - totalW) / 2;
+        
+        layer.items.forEach((item, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x = startX + col * (boxW + 20);
+            const y = currentY + row * (boxH + 10);
+            
+            detailRegions.push({ 
+                name: item, 
+                desc: layer.type === 'external' ? 'External package' : (componentDetails[item]?.type || 'Component'),
+                rx: x, ry: y, rw: boxW, rh: boxH,
+                deps: dependencyGraph[item]?.external || []
+            });
+            
+            // Box
+            ctx.fillStyle = layer.type === 'self' ? layer.color : 'rgba(255,255,255,0.1)';
+            ctx.strokeStyle = layer.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(x, y, boxW, boxH, 6);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Icon based on type
+            let icon = '📦';
+            if (layer.type === 'self') icon = '🎯';
+            else if (layer.type === 'internal') icon = '🔗';
+            else if (layer.type === 'external') icon = '📚';
+            
+            // Text
+            ctx.fillStyle = '#fff';
+            ctx.font = '13px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${icon} ${item}`, x + boxW/2, y + boxH/2 + 4);
+        });
+        
+        currentY += rows * (boxH + 10) + gapY;
+        
+        // Arrow to next layer
+        if (layerIdx < layers.length - 1) {
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(w/2, currentY - gapY/2);
+            ctx.lineTo(w/2, currentY + arrowH/2);
+            ctx.stroke();
+            // Arrow head
+            ctx.beginPath();
+            ctx.moveTo(w/2 - 8, currentY + arrowH/2 - 10);
+            ctx.lineTo(w/2, currentY + arrowH/2);
+            ctx.lineTo(w/2 + 8, currentY + arrowH/2 - 10);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#444';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('depends on', w/2 + 40, currentY);
+            
+            currentY += arrowH;
+        }
+    });
+}
+
+function renderDetailVisualization(componentName) {
+    const details = componentDetails[componentName];
+    const container = document.getElementById('detail-canvas-container');
+    const w = container.clientWidth;
+    const h = container.clientHeight - 50; // Account for toggle buttons
+    
+    detailCanvas.width = w;
+    detailCanvas.height = h;
+    
+    detailCtx.fillStyle = '#1a1a2e';
+    detailCtx.fillRect(0, 0, w, h);
+    
+    if (currentView === 'deps') {
+        renderDependencyStack(componentName, w, h);
+        return;
+    }
+    
+    if (!details) {
+        // No structure details, show deps by default
+        renderDependencyStack(componentName, w, h);
+        return;
+    }
+    
+    switch (details.type) {
+        case 'phone': renderPhoneUI(details, w, h); break;
+        case 'flow': renderFlowDiagram(details, w, h); break;
+        case 'pipeline': renderPipeline(details, w, h); break;
+        case 'schema': renderSchema(details, w, h); break;
+    }
+}
+
+function setView(view) {
+    currentView = view;
+    document.getElementById('btn-structure').classList.toggle('active', view === 'structure');
+    document.getElementById('btn-deps').classList.toggle('active', view === 'deps');
+    if (selectedComponent) {
+        renderDetailVisualization(selectedComponent);
+    }
+}
+window.setView = setView;
+
+// Full graph visualization
+const fullGraphCanvas = document.getElementById('full-graph-canvas');
+const fullGraphCtx = fullGraphCanvas.getContext('2d');
+
+function showFullGraph() {
+    document.getElementById('full-graph-panel').classList.add('visible');
+    renderFullGraph();
+}
+window.showFullGraph = showFullGraph;
+
+function hideFullGraph() {
+    document.getElementById('full-graph-panel').classList.remove('visible');
+}
+window.hideFullGraph = hideFullGraph;
+
+function renderFullGraph() {
+    const canvas = fullGraphCanvas;
+    const ctx = fullGraphCtx;
+    const container = canvas.parentElement;
+    const w = container.clientWidth - 40;
+    const h = container.clientHeight - 80;
+    
+    canvas.width = w;
+    canvas.height = h;
+    
+    ctx.fillStyle = '#12121f';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Layer definitions with positions
+    const layerDefs = {
+        app: { y: 0.12, color: '#4CAF50', label: '📱 Flutter App' },
+        api: { y: 0.35, color: '#2196F3', label: '⚡ FastAPI Backend' },
+        pipeline: { y: 0.58, color: '#FF9800', label: '🔬 Analysis Pipeline' },
+        data: { y: 0.78, color: '#9C27B0', label: '💾 Data Layer' },
+        external: { y: 0.95, color: '#666', label: '📚 External Packages' }
+    };
+    
+    // Gather all external deps
+    const allExternal = new Set();
+    Object.values(dependencyGraph).forEach(d => d.external.forEach(e => allExternal.add(e)));
+    
+    // Position all nodes
+    const nodePositions = {};
+    const nodeColors = {};
+    const boxW = 100;
+    const boxH = 32;
+    
+    // Position internal components by layer
+    Object.entries(architecture).forEach(([layerKey, layer]) => {
+        const yPos = layerDefs[layerKey].y * h;
+        const count = layer.components.length;
+        const totalW = count * (boxW + 15);
+        const startX = (w - totalW) / 2;
+        
+        layer.components.forEach((comp, i) => {
+            nodePositions[comp.name] = { 
+                x: startX + i * (boxW + 15) + boxW/2, 
+                y: yPos,
+                layer: layerKey
+            };
+            nodeColors[comp.name] = layerDefs[layerKey].color;
+        });
+    });
+    
+    // Position external packages
+    const extArray = [...allExternal];
+    const extCount = extArray.length;
+    const extTotalW = extCount * 70;
+    const extStartX = (w - extTotalW) / 2;
+    extArray.forEach((pkg, i) => {
+        nodePositions[pkg] = {
+            x: extStartX + i * 70 + 35,
+            y: layerDefs.external.y * h,
+            layer: 'external'
+        };
+        nodeColors[pkg] = layerDefs.external.color;
+    });
+    
+    // Draw layer labels
+    Object.entries(layerDefs).forEach(([key, layer]) => {
+        ctx.fillStyle = layer.color;
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(layer.label, 15, layer.y * h + 5);
+        
+        // Layer line
+        ctx.strokeStyle = layer.color + '30';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(150, layer.y * h);
+        ctx.lineTo(w - 20, layer.y * h);
+        ctx.stroke();
+    });
+    
+    // Draw dependency connections
+    ctx.lineWidth = 1;
+    Object.entries(dependencyGraph).forEach(([compName, deps]) => {
+        const fromPos = nodePositions[compName];
+        if (!fromPos) return;
+        
+        // Internal dependencies
+        deps.internal.forEach(dep => {
+            const toPos = nodePositions[dep];
+            if (!toPos) return;
+            
+            ctx.strokeStyle = '#4CAF5050';
+            ctx.beginPath();
+            ctx.moveTo(fromPos.x, fromPos.y + boxH/2);
+            
+            // Curved line
+            const midY = (fromPos.y + toPos.y) / 2;
+            ctx.bezierCurveTo(
+                fromPos.x, midY,
+                toPos.x, midY,
+                toPos.x, toPos.y - boxH/2
+            );
+            ctx.stroke();
+        });
+        
+        // External dependencies
+        deps.external.forEach(dep => {
+            const toPos = nodePositions[dep];
+            if (!toPos) return;
+            
+            ctx.strokeStyle = '#9C27B020';
+            ctx.beginPath();
+            ctx.moveTo(fromPos.x, fromPos.y + boxH/2);
+            ctx.lineTo(toPos.x, toPos.y - 12);
+            ctx.stroke();
+        });
+    });
+    
+    // Draw nodes
+    Object.entries(nodePositions).forEach(([name, pos]) => {
+        const isExternal = pos.layer === 'external';
+        const bw = isExternal ? 60 : boxW;
+        const bh = isExternal ? 24 : boxH;
+        
+        // Box
+        ctx.fillStyle = isExternal ? '#222' : '#1a1a2e';
+        ctx.strokeStyle = nodeColors[name];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(pos.x - bw/2, pos.y - bh/2, bw, bh, 4);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = isExternal ? '9px Arial' : '10px Arial';
+        ctx.textAlign = 'center';
+        
+        // Truncate long names
+        let label = name;
+        if (label.length > 12) label = label.slice(0, 11) + '…';
+        ctx.fillText(label, pos.x, pos.y + 3);
+    });
+    
+    // Legend
+    ctx.fillStyle = '#666';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Green lines: internal deps | Purple lines: external deps', 15, h - 10);
+}
+
+// Tooltip handling for detail view
+detailCanvas.addEventListener('mousemove', (e) => {
+    const rect = detailCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    let found = null;
+    for (const region of detailRegions) {
+        if (x >= region.rx && x <= region.rx + region.rw && 
+            y >= region.ry && y <= region.ry + region.rh) {
+            found = region;
+            break;
+        }
+    }
+    
+    if (found) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX - detailCanvas.parentElement.offsetLeft + 15) + 'px';
+        tooltip.style.top = (e.clientY - detailCanvas.parentElement.offsetTop - 50) + 'px';
+        tooltip.innerHTML = `<h4>${found.name}</h4><p>${found.desc}</p>` + 
+            (found.deps && found.deps.length ? `<p style="color:#888;font-size:11px">→ ${found.deps.join(', ')}</p>` : '');
+        detailCanvas.style.cursor = 'pointer';
+    } else {
+        tooltip.style.display = 'none';
+        detailCanvas.style.cursor = 'default';
+    }
+});
+
+detailCanvas.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+});
+
+function zoomIn(componentName, meshObj) {
+    isZoomedIn = true;
+    selectedComponent = componentName;
+    selectedMesh = meshObj;
+    
+    const details = componentDetails[componentName];
+    const detailPanel = document.getElementById('detail-panel');
+    const detailTitle = document.getElementById('detail-title');
+    const backBtn = document.getElementById('back-btn');
+    const miniView = document.getElementById('mini-view');
+    const selectedIndicator = document.getElementById('selected-indicator');
+    
+    // Set title with type indicator
+    const typeIcons = { phone: '📱', flow: '🔀', pipeline: '⚡', schema: '🗄️' };
+    detailTitle.innerHTML = `${typeIcons[details.type] || '🔍'} ${componentName} <span style="color:${details.color}">■</span>`;
+    
+    // Show panels
+    detailPanel.classList.add('visible');
+    backBtn.classList.add('visible');
+    miniView.classList.add('visible');
+    
+    // Render visualization after panel animation
+    setTimeout(() => renderDetailVisualization(componentName), 100);
+    
+    // Update mini-view indicator
+    selectedIndicator.innerHTML = `<span style="color:${details.color}">●</span> ${componentName}`;
+    
+    // Size the mini renderer
+    const miniViewRect = miniView.getBoundingClientRect();
+    miniRenderer.setSize(miniViewRect.width, miniViewRect.height);
+    miniCamera.aspect = miniViewRect.width / miniViewRect.height;
+    miniCamera.updateProjectionMatrix();
+    
+    // Highlight the selected object
+    meshObj.material.emissive.setHex(0x666666);
+    
+    // Disable main controls
+    controls.enabled = false;
+}
+
+function zoomOut() {
+    isZoomedIn = false;
+    selectedComponent = null;
+    selectedMesh = null;
+    
+    document.getElementById('detail-panel').classList.remove('visible');
+    document.getElementById('back-btn').classList.remove('visible');
+    document.getElementById('mini-view').classList.remove('visible');
+    
+    // Reset all objects
+    objects.forEach(obj => {
+        obj.material.emissive.setHex(0x000000);
+        obj.scale.set(1, 1, 1);
+    });
+    
+    controls.enabled = true;
+}
+
+window.addEventListener('mousemove', onMouseMove);
+window.addEventListener('click', onClick);
+
+// Toggle layers
+window.toggleLayer = function(layerKey) {
+    const visible = !layers[layerKey][0].visible;
+    layers[layerKey].forEach(obj => obj.visible = visible);
+    event.target.style.opacity = visible ? 1 : 0.4;
+};
+
+// Animation
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    labelSprites.forEach(sprite => sprite.quaternion.copy(camera.quaternion));
+    renderer.render(scene, camera);
+    
+    // Render mini-view when zoomed in
+    if (isZoomedIn) {
+        // Rotate mini camera slowly for visual interest
+        const time = Date.now() * 0.0003;
+        miniCamera.position.x = Math.cos(time) * 60;
+        miniCamera.position.z = Math.sin(time) * 60;
+        miniCamera.lookAt(0, 0, 0);
+        
+        // Make labels face mini camera too
+        labelSprites.forEach(sprite => sprite.quaternion.copy(miniCamera.quaternion));
+        miniRenderer.render(scene, miniCamera);
+        // Restore for main view
+        labelSprites.forEach(sprite => sprite.quaternion.copy(camera.quaternion));
+    }
+}
+animate();
+
+// Resize
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Re-render detail view if zoomed in
+    if (isZoomedIn && selectedComponent) {
+        setTimeout(() => renderDetailVisualization(selectedComponent), 100);
+    }
+});
+</script>
+</body>
+</html>

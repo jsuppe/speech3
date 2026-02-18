@@ -1,0 +1,140 @@
+@startuml SpeechScore_Pipeline
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam rectangleBorderColor #333333
+
+title <b>SpeechScore Audio Analysis Pipeline</b>
+
+package "Input" #ECEFF1 {
+  [Audio File] as input
+  note bottom of input
+    Formats: MP3, WAV, AAC
+    OGG, M4A, FLAC, WebM
+    Max: 50MB / 10 min
+  end note
+}
+
+package "Pre-Processing" #E0E0E0 {
+  [FFmpeg] as ffmpeg
+  [16kHz Mono WAV] as wav
+  ffmpeg --> wav
+}
+
+package "Quality Gate" #FFF3E0 {
+  [SNR Analysis] as snr
+  [Confidence Level] as confidence
+  note bottom of confidence
+    HIGH (>15dB)
+    MEDIUM (8-15dB)
+    LOW (3-8dB)
+    UNUSABLE (<3dB)
+  end note
+}
+
+package "Transcription" #E3F2FD {
+  [Whisper large-v3] as whisper
+  [Word Timestamps] as timestamps
+  [Language Detection] as lang
+  [VAD Filter] as vad
+}
+
+package "Speaker Analysis" #F3E5F5 {
+  [Diarization\n(Resemblyzer)] as diarize
+  [Voice Fingerprint\n(256-dim)] as fingerprint
+}
+
+package "Text Analysis" #E8F5E9 {
+  package "Core Text" {
+    [Word Count] as wc
+    [Lexical Diversity] as lex
+    [Syntactic Complexity] as syn
+    [Fluency Score] as flu
+    [Connectedness] as conn
+    [Key Terms (NER)] as ner
+  }
+  
+  package "Advanced Text" {
+    [Readability\nFlesch-Kincaid] as read
+    [Discourse Structure] as disc
+    [Question Density] as quest
+    [Perspective] as persp
+  }
+  
+  package "Rhetorical" {
+    [Anaphora] as ana
+    [Epistrophe] as epi
+    [Repetition] as rep
+    [Rhythm] as rhy
+  }
+  
+  package "Sentiment" {
+    [RoBERTa Model] as rob
+    [Segment Arc] as arc
+    [Trajectory] as traj
+  }
+}
+
+package "Audio Analysis" #E3F2FD {
+  package "Core Audio (Praat)" {
+    [Pitch F0] as pitch
+    [Intensity] as intens
+    [Jitter/Shimmer/HNR] as jshn
+    [Pause Analysis] as pause
+    [Speaking Rate] as wpm
+  }
+  
+  package "Advanced Audio" {
+    [Formants F1-F3] as form
+    [Pitch Contour] as cont
+    [Uptalk Detection] as upt
+    [Vocal Fry] as fry
+    [Rate Variability] as rvar
+    [Emphasis] as emph
+  }
+}
+
+package "Scoring Engine" #FFF9C4 {
+  [Profile Weights] as prof
+  [Metric Normalization] as norm
+  [Percentile Ranking] as perc
+  [Category Scores] as cats
+  [Overall Score 0-100] as score
+  note bottom of prof
+    Profiles:
+    General, Oratory
+    Reading, Presentation
+    Clinical
+  end note
+}
+
+package "Output" #C8E6C9 {
+  [JSON Response] as json
+  [Spectrogram] as spec
+  [SQLite DB] as db
+}
+
+input --> ffmpeg
+wav --> snr
+confidence --> whisper : if >= LOW
+whisper --> diarize
+whisper --> "Core Text"
+whisper --> "Core Audio (Praat)"
+diarize --> fingerprint
+"Core Text" --> "Advanced Text"
+"Core Text" --> "Rhetorical"
+"Core Text" --> "Sentiment"
+"Core Audio (Praat)" --> "Advanced Audio"
+"Sentiment" --> prof
+"Advanced Audio" --> prof
+"Rhetorical" --> prof
+fingerprint --> prof
+norm --> perc
+perc --> cats
+cats --> score
+score --> json
+score --> db
+
+@enduml

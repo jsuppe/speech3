@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name or user.email }} - SpeakFit{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Back link -->
+    <a href="/users" class="inline-flex items-center text-gray-400 hover:text-white mb-6 transition-colors">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Users
+    </a>
+
+    <!-- User Header -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
+        <div class="flex items-start gap-6">
+            {% if user.avatar_url %}
+            <img src="{{ user.avatar_url }}" alt="" class="w-20 h-20 rounded-full">
+            {% else %}
+            <div class="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white text-2xl font-bold">
+                {{ user.name[0] if user.name else '?' }}
+            </div>
+            {% endif %}
+            
+            <div class="flex-1">
+                <h1 class="text-2xl font-bold text-white mb-1">{{ user.name or 'Unknown User' }}</h1>
+                <p class="text-gray-400 mb-4">{{ user.email }}</p>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-gray-800 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-white">{{ speeches | length }}</div>
+                        <div class="text-xs text-gray-400 uppercase">Recordings</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3">
+                        <div class="text-sm font-medium text-white">{{ user.provider | capitalize }}</div>
+                        <div class="text-xs text-gray-400 uppercase">Provider</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3">
+                        <div class="text-sm font-medium text-white">{{ user.created_at[:10] if user.created_at else '-' }}</div>
+                        <div class="text-xs text-gray-400 uppercase">Signed Up</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3">
+                        <div class="text-sm font-medium text-white">{{ user.last_login[:10] if user.last_login else '-' }}</div>
+                        <div class="text-xs text-gray-400 uppercase">Last Login</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User's Speeches -->
+    <div class="mb-6">
+        <h2 class="text-xl font-bold text-white mb-4">Recordings</h2>
+        
+        {% if speeches %}
+        <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-gray-800 text-left">
+                        <th class="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Title</th>
+                        <th class="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
+                        <th class="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Quality</th>
+                        <th class="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Score</th>
+                        <th class="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-4 text-xs font-medium text-gray-400 uppercase tracking-wider"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for speech in speeches %}
+                    <tr class="hover:bg-gray-800/50 transition-colors">
+                        <td class="px-6 py-4">
+                            <a href="/speeches/{{ speech.id }}" class="text-white font-medium hover:text-indigo-400 transition-colors">
+                                {{ speech.title or 'Untitled' }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 text-gray-300">
+                            {% if speech.duration_sec %}
+                            {{ (speech.duration_sec // 60) | int }}:{{ '%02d' | format((speech.duration_sec % 60) | int) }}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if speech.quality_level %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                {% if speech.quality_level == 'HIGH' %}bg-green-900/50 text-green-300
+                                {% elif speech.quality_level == 'MEDIUM' %}bg-yellow-900/50 text-yellow-300
+                                {% elif speech.quality_level == 'LOW' %}bg-orange-900/50 text-orange-300
+                                {% else %}bg-red-900/50 text-red-300{% endif %}">
+                                {{ speech.quality_level }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-300">
+                            {% if speech.score is not none %}
+                            <span class="font-medium {% if speech.score >= 70 %}text-green-400{% elif speech.score >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                                {{ '%.1f' | format(speech.score) }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-400 text-sm">{{ speech.created_at[:10] if speech.created_at else '-' }}</td>
+                        <td class="px-6 py-4">
+                            <a href="/speeches/{{ speech.id }}" class="text-indigo-400 hover:text-indigo-300 text-sm">
+                                View →
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-12 text-center">
+            <p class="text-gray-400">This user hasn't made any recordings yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Coach Messages -->
+    <div class="mb-6">
+        <h2 class="text-xl font-bold text-white mb-4">Coach Messages</h2>
+        
+        {% if coach_messages %}
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3 max-h-96 overflow-y-auto">
+            {% for msg in coach_messages %}
+            <div class="{% if msg.role == 'user' %}ml-8{% else %}mr-8{% endif %}">
+                <div class="{% if msg.role == 'user' %}bg-indigo-900/30 border-indigo-700{% else %}bg-gray-800 border-gray-700{% endif %} border rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-medium {% if msg.role == 'user' %}text-indigo-400{% else %}text-green-400{% endif %}">
+                            {{ 'User' if msg.role == 'user' else 'Coach' }}
+                        </span>
+                        <span class="text-xs text-gray-500">{{ msg.created_at[:16].replace('T', ' ') }}</span>
+                    </div>
+                    <p class="text-sm text-gray-200">{{ msg.content[:500] }}{% if msg.content|length > 500 %}...{% endif %}</p>
+                    {% if msg.speech_title %}
+                    <div class="mt-2 text-xs text-gray-500">
+                        Re: {{ msg.speech_title }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Showing last {{ coach_messages|length }} messages</p>
+        {% else %}
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center">
+            <p class="text-gray-500 text-sm">No coach messages yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
