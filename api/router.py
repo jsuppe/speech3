@@ -41,6 +41,7 @@ from .job_manager import manager as job_manager, QueueFullError
 from .auth import auth_required, admin_required
 from .user_auth import get_current_user, decode_token, flexible_auth
 from .rate_limiter import rate_limiter, TIER_LIMITS
+from .metrics import metrics
 from .usage import usage_tracker
 
 # Ensure speech3 root is on the path for scoring import
@@ -100,6 +101,29 @@ async def health(request: Request):
         whisper_model="large-v3" if pipeline_runner.is_model_loaded() else None,
         uptime_sec=round(uptime, 1)
     )
+
+
+@router.get("/metrics", tags=["Health"])
+async def get_metrics(key_data: dict = Depends(auth_required)):
+    """
+    Get API metrics (latency, error rates, queue stats, pipeline performance).
+    Requires admin API key.
+    """
+    if key_data.get("tier") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get metrics snapshot
+    metrics_data = metrics.get_metrics()
+    
+    # Add queue stats
+    queue_stats = job_manager.get_queue_stats()
+    metrics_data["queue"].update({
+        "current_depth": queue_stats["queue_depth"],
+        "max_depth": queue_stats["max_queue_depth"],
+        "estimated_wait_sec": queue_stats["estimated_wait_sec"],
+    })
+    
+    return metrics_data
 
 
 # ---------------------------------------------------------------------------
