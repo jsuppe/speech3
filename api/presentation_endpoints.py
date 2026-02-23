@@ -155,31 +155,49 @@ async def analyze_content(
     else:
         logger.warning("No segments data in transcription")
     
-    # Get emotion data from oratory analysis
+    # Get emotion data from oratory analysis (with caching)
     emotion_data = None
     audio_path = speech['source_file'] if speech else None
     
     if audio_path:
-        try:
-            from .oratory_analysis import get_oratory_analyzer
-            oratory = get_oratory_analyzer()
-            
-            # Run quick emotion analysis only
-            oratory_result = oratory.analyze(audio_path, word_timestamps=segments)
-            
-            # Convert to emotion data format expected by content analyzer
-            emotion_data = []
-            for seg in oratory_result.segments:
-                emotion_data.append({
-                    "start_time": seg.start_time,
-                    "end_time": seg.end_time,
-                    "primary_emotion": seg.primary_emotion,
-                    "confidence": seg.emotion_confidence,
-                    "all_emotions": seg.emotion_scores
-                })
-            logger.info(f"Got emotion data for {len(emotion_data)} segments")
-        except Exception as e:
-            logger.warning(f"Could not get emotion data: {e}")
+        # Check cache first
+        cached = db.execute(
+            "SELECT emotion_data FROM oratory_cache WHERE speech_id = ? AND segment_duration = 0.5",
+            (speech_id,)
+        ).fetchone()
+        
+        if cached:
+            emotion_data = json.loads(cached['emotion_data'])
+            logger.info(f"Using cached emotion data: {len(emotion_data)} segments")
+        else:
+            try:
+                from .oratory_analysis import get_oratory_analyzer
+                oratory = get_oratory_analyzer()
+                
+                # Run emotion analysis with 0.5s granularity
+                oratory_result = oratory.analyze(audio_path, word_timestamps=segments)
+                
+                # Convert to emotion data format expected by content analyzer
+                emotion_data = []
+                for seg in oratory_result.segments:
+                    emotion_data.append({
+                        "start_time": seg.start_time,
+                        "end_time": seg.end_time,
+                        "primary_emotion": seg.primary_emotion,
+                        "confidence": seg.emotion_confidence,
+                        "all_emotions": seg.emotion_scores
+                    })
+                logger.info(f"Got emotion data for {len(emotion_data)} segments")
+                
+                # Cache the results
+                db.execute(
+                    "INSERT OR REPLACE INTO oratory_cache (speech_id, emotion_data, segment_duration) VALUES (?, ?, 0.5)",
+                    (speech_id, json.dumps(emotion_data))
+                )
+                db.commit()
+                logger.info(f"Cached emotion data for speech {speech_id}")
+            except Exception as e:
+                logger.warning(f"Could not get emotion data: {e}")
     
     # Run content analysis
     logger.info(f"Calling content analyzer with {len(segments)} segments and {len(emotion_data) if emotion_data else 0} emotion data")
