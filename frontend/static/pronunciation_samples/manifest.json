@@ -1,0 +1,393 @@
+{
+  "grades": {
+    "A+": {
+      "info": {
+        "score_range": "95-100",
+        "description": "Exceptional clarity, perfect articulation, professional broadcast quality",
+        "characteristics": [
+          "Crystal clear consonants",
+          "Perfect vowel formation",
+          "Ideal pacing"
+        ]
+      },
+      "samples": {
+        "clarity": [
+          {
+            "file": "A+_clarity_0.mp3",
+            "text": "The quick brown fox jumps over the lazy dog.",
+            "url": "/static/pronunciation_samples/A+_clarity_0.mp3"
+          },
+          {
+            "file": "A+_clarity_1.mp3",
+            "text": "She sells seashells by the seashore.",
+            "url": "/static/pronunciation_samples/A+_clarity_1.mp3"
+          },
+          {
+            "file": "A+_clarity_2.mp3",
+            "text": "Peter Piper picked a peck of pickled peppers.",
+            "url": "/static/pronunciation_samples/A+_clarity_2.mp3"
+          }
+        ],
+        "consonants": [
+          {
+            "file": "A+_consonants_0.mp3",
+            "text": "The thirty-three thieves thought they thrilled the throne.",
+            "url": "/static/pronunciation_samples/A+_consonants_0.mp3"
+          },
+          {
+            "file": "A+_consonants_1.mp3",
+            "text": "Red lorry, yellow lorry, red lorry, yellow lorry.",
+            "url": "/static/pronunciation_samples/A+_consonants_1.mp3"
+          },
+          {
+            "file": "A+_consonants_2.mp3",
+            "text": "Rubber baby buggy bumpers bounce brightly.",
+            "url": "/static/pronunciation_samples/A+_consonants_2.mp3"
+          }
+        ],
+        "vowels": [
+          {
+            "file": "A+_vowels_0.mp3",
+            "text": "How now brown cow, allow me to show you how.",
+            "url": "/static/pronunciation_samples/A+_vowels_0.mp3"
+          },
+          {
+            "file": "A+_vowels_1.mp3",
+            "text": "The rain in Spain stays mainly in the plain.",
+            "url": "/static/pronunciation_samples/A+_vowels_1.mp3"
+          },
+          {
+            "file": "A+_vowels_2.mp3",
+            "text": "Around the rugged rocks the ragged rascal ran.",
+            "url": "/static/pronunciation_samples/A+_vowels_2.mp3"
+          }
+        ]
+      }
+    },
+    "A": {
+      "info": {
+        "score_range": "90-94",
+        "description": "Excellent pronunciation, very clear and confident delivery",
+        "characteristics": [
+          "Clear articulation",
+          "Consistent quality",
+          "Natural rhythm"
+        ]
+      },
+      "samples": {
+        "clarity": [
+          {
+            "file": "A_clarity_0.mp3",
+            "text": "The quick brown fox jumps over the lazy dog.",
+            "url": "/static/pronunciation_samples/A_clarity_0.mp3"
+          },
+          {
+            "file": "A_clarity_1.mp3",
+            "text": "She sells seashells by the seashore.",
+            "url": "/static/pronunciation_samples/A_clarity_1.mp3"
+          },
+          {
+            "file": "A_clarity_2.mp3",
+            "text": "Peter Piper picked a peck of pickled peppers.",
+            "url": "/static/pronunciation_samples/A_clarity_2.mp3"
+          }
+        ],
+        "consonants": [
+          {
+            "file": "A_consonants_0.mp3",
+            "text": "The thirty-three thieves thought they thrilled the throne.",
+            "url": "/static/pronunciation_samples/A_consonants_0.mp3"
+          },
+          {
+            "file": "A_consonants_1.mp3",
+            "text": "Red lorry, yellow lorry, red lorry, yellow lorry.",
+            "url": "/static/pronunciation_samples/A_consonants_1.mp3"
+          },
+          {
+            "file": "A_consonants_2.mp3",
+            "text": "Rubber baby buggy bumpers bounce brightly.",
+            "url": "/static/pronunciation_samples/A_consonants_2.mp3"
+          }
+        ],
+        "vowels": [
+          {
+            "file": "A_vowels_0.mp3",
+            "text": "How now brown cow, allow me to show you how.",
+            "url": "/static/pronunciation_samples/A_vowels_0.mp3"
+          },
+          {
+            "file": "A_vowels_1.mp3",
+            "text": "The rain in Spain stays mainly in the plain.",
+            "url": "/static/pronunciation_samples/A_vowels_1.mp3"
+          },
+          {
+            "file": "A_vowels_2.mp3",
+            "text": "Around the rugged rocks the ragged rascal ran.",
+            "url": "/static/pronunciation_samples/A_vowels_2.mp3"
+          }
+        ]
+      }
+    },
+    "B": {
+      "info": {
+        "score_range": "80-89",
+        "description": "Good pronunciation with minor inconsistencies",
+        "characteristics": [
+          "Generally clear",
+          "Occasional soft consonants",
+          "Good overall"
+        ]
+      },
+      "samples": {
+        "clarity": [
+          {
+            "file": "B_clarity_0.mp3",
+            "text": "The quick brown fox jumps over the lazy dog.",
+            "url": "/static/pronunciation_samples/B_clarity_0.mp3"
+          },
+          {
+            "file": "B_clarity_1.mp3",
+            "text": "She sells seashells by the seashore.",
+            "url": "/static/pronunciation_samples/B_clarity_1.mp3"
+          },
+          {
+            "file": "B_clarity_2.mp3",
+            "text": "Peter Piper picked a peck of pickled peppers.",
+            "url": "/static/pronunciation_samples/B_clarity_2.mp3"
+          }
+        ],
+        "consonants": [
+          {
+            "file": "B_consonants_0.mp3",
+            "text": "The thirty-three thieves thought they thrilled the throne.",
+            "url": "/static/pronunciation_samples/B_consonants_0.mp3"
+          },
+          {
+            "file": "B_consonants_1.mp3",
+            "text": "Red lorry, yellow lorry, red lorry, yellow lorry.",
+            "url": "/static/pronunciation_samples/B_consonants_1.mp3"
+          },
+          {
+            "file": "B_consonants_2.mp3",
+            "text": "Rubber baby buggy bumpers bounce brightly.",
+            "url": "/static/pronunciation_samples/B_consonants_2.mp3"
+          }
+        ],
+        "vowels": [
+          {
+            "file": "B_vowels_0.mp3",
+            "text": "How now brown cow, allow me to show you how.",
+            "url": "/static/pronunciation_samples/B_vowels_0.mp3"
+          },
+          {
+            "file": "B_vowels_1.mp3",
+            "text": "The rain in Spain stays mainly in the plain.",
+            "url": "/static/pronunciation_samples/B_vowels_1.mp3"
+          },
+          {
+            "file": "B_vowels_2.mp3",
+            "text": "Around the rugged rocks the ragged rascal ran.",
+            "url": "/static/pronunciation_samples/B_vowels_2.mp3"
+          }
+        ]
+      }
+    },
+    "C": {
+      "info": {
+        "score_range": "70-79",
+        "description": "Average pronunciation, some unclear words",
+        "characteristics": [
+          "Some mumbling",
+          "Inconsistent clarity",
+          "Room for improvement"
+        ]
+      },
+      "samples": {
+        "clarity": [
+          {
+            "file": "C_clarity_0.mp3",
+            "text": "The quick brown fox jumps over the lazy dog.",
+            "url": "/static/pronunciation_samples/C_clarity_0.mp3"
+          },
+          {
+            "file": "C_clarity_1.mp3",
+            "text": "She sells seashells by the seashore.",
+            "url": "/static/pronunciation_samples/C_clarity_1.mp3"
+          },
+          {
+            "file": "C_clarity_2.mp3",
+            "text": "Peter Piper picked a peck of pickled peppers.",
+            "url": "/static/pronunciation_samples/C_clarity_2.mp3"
+          }
+        ],
+        "consonants": [
+          {
+            "file": "C_consonants_0.mp3",
+            "text": "The thirty-three thieves thought they thrilled the throne.",
+            "url": "/static/pronunciation_samples/C_consonants_0.mp3"
+          },
+          {
+            "file": "C_consonants_1.mp3",
+            "text": "Red lorry, yellow lorry, red lorry, yellow lorry.",
+            "url": "/static/pronunciation_samples/C_consonants_1.mp3"
+          },
+          {
+            "file": "C_consonants_2.mp3",
+            "text": "Rubber baby buggy bumpers bounce brightly.",
+            "url": "/static/pronunciation_samples/C_consonants_2.mp3"
+          }
+        ],
+        "vowels": [
+          {
+            "file": "C_vowels_0.mp3",
+            "text": "How now brown cow, allow me to show you how.",
+            "url": "/static/pronunciation_samples/C_vowels_0.mp3"
+          },
+          {
+            "file": "C_vowels_1.mp3",
+            "text": "The rain in Spain stays mainly in the plain.",
+            "url": "/static/pronunciation_samples/C_vowels_1.mp3"
+          },
+          {
+            "file": "C_vowels_2.mp3",
+            "text": "Around the rugged rocks the ragged rascal ran.",
+            "url": "/static/pronunciation_samples/C_vowels_2.mp3"
+          }
+        ]
+      }
+    },
+    "D": {
+      "info": {
+        "score_range": "60-69",
+        "description": "Below average, frequent unclear pronunciation",
+        "characteristics": [
+          "Frequent issues",
+          "Rushed or slurred",
+          "Needs practice"
+        ]
+      },
+      "samples": {
+        "clarity": [
+          {
+            "file": "D_clarity_0.mp3",
+            "text": "The quick brown fox jumps over the lazy dog.",
+            "url": "/static/pronunciation_samples/D_clarity_0.mp3"
+          },
+          {
+            "file": "D_clarity_1.mp3",
+            "text": "She sells seashells by the seashore.",
+            "url": "/static/pronunciation_samples/D_clarity_1.mp3"
+          },
+          {
+            "file": "D_clarity_2.mp3",
+            "text": "Peter Piper picked a peck of pickled peppers.",
+            "url": "/static/pronunciation_samples/D_clarity_2.mp3"
+          }
+        ],
+        "consonants": [
+          {
+            "file": "D_consonants_0.mp3",
+            "text": "The thirty-three thieves thought they thrilled the throne.",
+            "url": "/static/pronunciation_samples/D_consonants_0.mp3"
+          },
+          {
+            "file": "D_consonants_1.mp3",
+            "text": "Red lorry, yellow lorry, red lorry, yellow lorry.",
+            "url": "/static/pronunciation_samples/D_consonants_1.mp3"
+          },
+          {
+            "file": "D_consonants_2.mp3",
+            "text": "Rubber baby buggy bumpers bounce brightly.",
+            "url": "/static/pronunciation_samples/D_consonants_2.mp3"
+          }
+        ],
+        "vowels": [
+          {
+            "file": "D_vowels_0.mp3",
+            "text": "How now brown cow, allow me to show you how.",
+            "url": "/static/pronunciation_samples/D_vowels_0.mp3"
+          },
+          {
+            "file": "D_vowels_1.mp3",
+            "text": "The rain in Spain stays mainly in the plain.",
+            "url": "/static/pronunciation_samples/D_vowels_1.mp3"
+          },
+          {
+            "file": "D_vowels_2.mp3",
+            "text": "Around the rugged rocks the ragged rascal ran.",
+            "url": "/static/pronunciation_samples/D_vowels_2.mp3"
+          }
+        ]
+      }
+    },
+    "F": {
+      "info": {
+        "score_range": "0-59",
+        "description": "Poor pronunciation, difficult to understand",
+        "characteristics": [
+          "Very unclear",
+          "Missing sounds",
+          "Significant issues"
+        ]
+      },
+      "samples": {
+        "clarity": [
+          {
+            "file": "F_clarity_0.mp3",
+            "text": "The quick brown fox jumps over the lazy dog.",
+            "url": "/static/pronunciation_samples/F_clarity_0.mp3"
+          },
+          {
+            "file": "F_clarity_1.mp3",
+            "text": "She sells seashells by the seashore.",
+            "url": "/static/pronunciation_samples/F_clarity_1.mp3"
+          },
+          {
+            "file": "F_clarity_2.mp3",
+            "text": "Peter Piper picked a peck of pickled peppers.",
+            "url": "/static/pronunciation_samples/F_clarity_2.mp3"
+          }
+        ],
+        "consonants": [
+          {
+            "file": "F_consonants_0.mp3",
+            "text": "The thirty-three thieves thought they thrilled the throne.",
+            "url": "/static/pronunciation_samples/F_consonants_0.mp3"
+          },
+          {
+            "file": "F_consonants_1.mp3",
+            "text": "Red lorry, yellow lorry, red lorry, yellow lorry.",
+            "url": "/static/pronunciation_samples/F_consonants_1.mp3"
+          },
+          {
+            "file": "F_consonants_2.mp3",
+            "text": "Rubber baby buggy bumpers bounce brightly.",
+            "url": "/static/pronunciation_samples/F_consonants_2.mp3"
+          }
+        ],
+        "vowels": [
+          {
+            "file": "F_vowels_0.mp3",
+            "text": "How now brown cow, allow me to show you how.",
+            "url": "/static/pronunciation_samples/F_vowels_0.mp3"
+          },
+          {
+            "file": "F_vowels_1.mp3",
+            "text": "The rain in Spain stays mainly in the plain.",
+            "url": "/static/pronunciation_samples/F_vowels_1.mp3"
+          },
+          {
+            "file": "F_vowels_2.mp3",
+            "text": "Around the rugged rocks the ragged rascal ran.",
+            "url": "/static/pronunciation_samples/F_vowels_2.mp3"
+          }
+        ]
+      }
+    }
+  },
+  "categories": [
+    "clarity",
+    "consonants",
+    "vowels"
+  ]
+}

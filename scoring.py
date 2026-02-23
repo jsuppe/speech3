@@ -136,6 +136,27 @@ METRIC_DEFS = {
         "label": "Vowel Space Index",
         "unit": "",
     },
+    # Pronunciation metrics (from wav2vec2 analysis)
+    "pronunciation_clarity": {
+        "column": "pronunciation_mean_confidence",
+        "direction": "higher_better",
+        "label": "Pronunciation Clarity",
+        "unit": "%",
+        "scale": 100,  # Convert 0-1 to 0-100
+    },
+    "pronunciation_consistency": {
+        "column": "pronunciation_std_confidence",
+        "direction": "lower_better",
+        "label": "Pronunciation Consistency",
+        "unit": "std",
+    },
+    "pronunciation_accuracy": {
+        "column": "pronunciation_problem_ratio",
+        "direction": "lower_better",
+        "label": "Pronunciation Accuracy",
+        "unit": "% problems",
+        "scale": 100,  # Convert ratio to percentage
+    },
 }
 
 
@@ -163,68 +184,72 @@ SCORING_PROFILES = {
         "repetition_direction": "lower_better",  # for general, less repetition is cleaner
     },
     "oratory": {
-        "description": "Emphasis on rhetorical skill, delivery, and expressiveness",
+        "description": "Rhetorical skill, delivery, and expressiveness — repetition is rewarded",
         "weights": {
-            "wpm": 0.08,
-            "pitch_variation": 0.17,
-            "pitch_range": 0.12,
-            "voice_quality": 0.10,
-            "jitter": 0.05,
-            "vocal_fry": 0.05,
-            "lexical_diversity": 0.12,
-            "syntactic_complexity": 0.08,
-            "repetition": 0.18,
-            "connectedness": 0.0,  # DISABLED: 90% of recordings have 0, metric broken
-            "shimmer": 0.05,
+            # FOCUSED: 6 metrics that matter for persuasive speaking
+            "pitch_variation": 0.22,    # Expressiveness
+            "pitch_range": 0.18,        # Dynamic range
+            "wpm": 0.15,                # Pacing for impact
+            "repetition": 0.20,         # Anaphora is a feature!
+            "voice_quality": 0.15,      # Authority
+            "connectedness": 0.10,      # Logical flow
+            # EXCLUDED: lexical_diversity, syntactic_complexity, grade_level, jitter, shimmer, vocal_fry
         },
         "repetition_direction": "higher_better",  # orators use repetition deliberately
     },
-    "reading_fluency": {
-        "description": "Focus on pace, clarity, and reading quality",
+    "casual": {
+        "description": "Natural conversational speech — relaxed standards for filler and fry",
         "weights": {
-            "wpm": 0.22,
-            "articulation_rate": 0.12,
-            "jitter": 0.10,
-            "shimmer": 0.08,
-            "voice_quality": 0.12,
-            "pitch_variation": 0.10,
-            "vocal_fry": 0.06,
-            "lexical_diversity": 0.08,
-            "grade_level": 0.07,
-            "pitch_range": 0.05,
+            # FOCUSED: 5 metrics for natural conversation
+            "wpm": 0.25,                # Natural pace
+            "pitch_variation": 0.25,    # Engagement
+            "voice_quality": 0.25,      # Clarity
+            "vocal_fry": 0.15,          # Common in casual, lower weight
+            "pitch_range": 0.10,        # Some expression
+            # EXCLUDED: grade_level, syntactic, repetition, connectedness, lexical, jitter, shimmer
+        },
+        "repetition_direction": "lower_better",
+    },
+    "reading_fluency": {
+        "description": "Audiobook and narration quality — clarity and consistent pacing",
+        "weights": {
+            # FOCUSED: 6 metrics for reading/narration
+            "wpm": 0.25,                # Consistent pace
+            "pitch_variation": 0.20,    # Expression/character voices
+            "voice_quality": 0.20,      # Clarity
+            "jitter": 0.15,             # Smooth voice
+            "shimmer": 0.10,            # Consistent volume
+            "pitch_range": 0.10,        # Expressive range
+            # EXCLUDED: lexical, syntactic, repetition, grade_level (not your words)
         },
         "repetition_direction": "lower_better",
     },
     "presentation": {
-        "description": "Professional presentation and delivery quality",
+        "description": "Professional business and educational presenting",
         "weights": {
-            "wpm": 0.12,
-            "pitch_variation": 0.16,
-            "pitch_range": 0.10,
-            "voice_quality": 0.12,
-            "jitter": 0.08,
-            "shimmer": 0.05,
-            "vocal_fry": 0.08,
-            "lexical_diversity": 0.10,
-            "syntactic_complexity": 0.08,
-            "repetition": 0.05,
-            "connectedness": 0.0,  # DISABLED: 90% of recordings have 0, metric broken
-            "grade_level": 0.06,
+            # FOCUSED: 7 metrics for professional delivery
+            "wpm": 0.15,                # Clear pacing
+            "pitch_variation": 0.18,    # Engagement
+            "voice_quality": 0.15,      # Professionalism
+            "grade_level": 0.12,        # Audience-appropriate
+            "connectedness": 0.15,      # Logical structure
+            "lexical_diversity": 0.15,  # Vocabulary
+            "vocal_fry": 0.10,          # Professional sound
+            # EXCLUDED: repetition, syntactic_complexity, extreme pitch_range, jitter, shimmer
         },
         "repetition_direction": "lower_better",
     },
     "clinical": {
-        "description": "Voice health and pathology screening",
+        "description": "Voice health and pathology screening — focuses on acoustic markers",
         "weights": {
-            "jitter": 0.18,
-            "shimmer": 0.15,
-            "voice_quality": 0.20,
-            "vocal_fry": 0.12,
-            "pitch_mean": 0.08,
-            "pitch_variation": 0.07,
-            "wpm": 0.08,
-            "snr": 0.07,
-            "pitch_range": 0.05,
+            # FOCUSED: 6 voice health metrics only
+            "jitter": 0.22,             # Vocal cord stability
+            "shimmer": 0.20,            # Amplitude consistency
+            "voice_quality": 0.25,      # HNR - breathiness/hoarseness
+            "vocal_fry": 0.15,          # Can indicate pathology
+            "wpm": 0.10,                # Motor control
+            "pitch_variation": 0.08,    # Basic expressiveness check
+            # EXCLUDED: all language metrics (lexical, syntactic, grade_level, repetition, connectedness)
         },
         "repetition_direction": "lower_better",
     },
@@ -233,6 +258,30 @@ SCORING_PROFILES = {
         "weights": {},  # No scoring — focus on transcription, diarization, and LLM analysis
         "repetition_direction": "lower_better",
         "skip_scoring": True,  # Flag to skip numeric scoring
+    },
+    "pronunciation": {
+        "description": "Pronunciation clarity and accent training — compare against target accent",
+        "weights": {
+            # PRIMARY: Pronunciation metrics (70%)
+            "pronunciation_clarity": 0.35,      # Mean word confidence
+            "pronunciation_consistency": 0.20,  # Consistent pronunciation
+            "pronunciation_accuracy": 0.15,     # Low problem word ratio
+            # SUPPORTING: Related delivery metrics (30%)
+            "wpm": 0.10,                        # Speaking rate affects clarity
+            "voice_quality": 0.10,              # HNR - clear voice
+            "articulation_rate": 0.10,          # Clear articulation
+        },
+        "repetition_direction": "lower_better",
+        "accent_aware": True,  # Flag: requires accent selection
+        "supported_accents": [
+            "en-US",    # American English (default wav2vec2 model)
+            "en-GB",    # British English
+            "en-AU",    # Australian English
+            "en-IN",    # Indian English
+            "en-ZA",    # South African English
+            # Future: non-English accents with appropriate models
+        ],
+        "default_accent": "en-US",
     },
 }
 
@@ -375,39 +424,68 @@ def _get_distributions(db) -> dict:
     if _distribution_cache and (now - _cache_timestamp) < CACHE_TTL_SEC:
         return _distribution_cache
 
-    columns = set()
+    # Collect columns, separating analyses columns from speeches columns
+    analysis_columns = set()
+    speech_columns = set()  # pronunciation metrics are in speeches table
     for mdef in METRIC_DEFS.values():
-        columns.add(mdef["column"])
-    col_list = sorted(columns)
+        col = mdef["column"]
+        if col.startswith("pronunciation_"):
+            speech_columns.add(col)
+        else:
+            analysis_columns.add(col)
+    
+    analysis_col_list = sorted(analysis_columns)
+    speech_col_list = sorted(speech_columns)
 
-    # Latest analysis per speech
-    col_str = ", ".join(f"a.{c}" for c in col_list)
-    rows = db.conn.execute(f"""
-        SELECT {col_str}
-        FROM analyses a
-        INNER JOIN (
-            SELECT speech_id, MAX(id) as max_id
-            FROM analyses
-            GROUP BY speech_id
-        ) latest ON a.id = latest.max_id
-        WHERE a.wpm IS NOT NULL
-    """).fetchall()
-
+    # Get distributions from analyses table
     distributions = {}
-    for col in col_list:
-        vals = []
-        for row in rows:
-            v = row[col]
-            if v is not None:
-                try:
-                    vals.append(float(v))
-                except (TypeError, ValueError):
-                    pass
-        distributions[col] = sorted(vals)
+    if analysis_col_list:
+        col_str = ", ".join(f"a.{c}" for c in analysis_col_list)
+        rows = db.conn.execute(f"""
+            SELECT {col_str}
+            FROM analyses a
+            INNER JOIN (
+                SELECT speech_id, MAX(id) as max_id
+                FROM analyses
+                GROUP BY speech_id
+            ) latest ON a.id = latest.max_id
+            WHERE a.wpm IS NOT NULL
+        """).fetchall()
+        
+        for col in analysis_col_list:
+            vals = []
+            for row in rows:
+                v = row[col]
+                if v is not None:
+                    try:
+                        vals.append(float(v))
+                    except (TypeError, ValueError):
+                        pass
+            distributions[col] = sorted(vals)
+    
+    # Get distributions from speeches table for pronunciation metrics
+    if speech_col_list:
+        col_str = ", ".join(speech_col_list)
+        pron_rows = db.conn.execute(f"""
+            SELECT {col_str}
+            FROM speeches
+            WHERE pronunciation_mean_confidence IS NOT NULL
+        """).fetchall()
+        
+        for col in speech_col_list:
+            vals = []
+            for row in pron_rows:
+                v = row[col]
+                if v is not None:
+                    try:
+                        vals.append(float(v))
+                    except (TypeError, ValueError):
+                        pass
+            distributions[col] = sorted(vals)
 
     _distribution_cache = distributions
     _cache_timestamp = now
-    logger.info(f"Loaded scoring distributions: {len(rows)} speeches, {len(col_list)} metrics")
+    logger.info(f"Loaded scoring distributions: {len(distributions)} metrics")
     return distributions
 
 
@@ -538,8 +616,12 @@ def generate_summary(
 # Public API
 # ---------------------------------------------------------------------------
 
+# Profiles hidden from user selection (still usable internally)
+HIDDEN_PROFILES = {"general", "clinical"}
+
+
 def get_available_profiles() -> dict:
-    """Return all available scoring profiles with their descriptions."""
+    """Return user-visible scoring profiles with their descriptions."""
     return {
         name: {
             "description": profile["description"],
@@ -547,6 +629,7 @@ def get_available_profiles() -> dict:
             "metric_count": len(profile["weights"]),
         }
         for name, profile in SCORING_PROFILES.items()
+        if name not in HIDDEN_PROFILES
     }
 
 
@@ -582,26 +665,56 @@ def score_speech(
     analysis = db.get_analysis(speech_id)
     if not analysis:
         return None
+    
+    # For pronunciation profile, also fetch pronunciation metrics from speeches table
+    if profile == "pronunciation":
+        pron_row = db.conn.execute("""
+            SELECT pronunciation_mean_confidence, pronunciation_std_confidence,
+                   pronunciation_problem_ratio, pronunciation_words_analyzed
+            FROM speeches WHERE id = ?
+        """, (speech_id,)).fetchone()
+        if pron_row:
+            analysis["pronunciation_mean_confidence"] = pron_row["pronunciation_mean_confidence"]
+            analysis["pronunciation_std_confidence"] = pron_row["pronunciation_std_confidence"]
+            analysis["pronunciation_problem_ratio"] = pron_row["pronunciation_problem_ratio"]
+            analysis["pronunciation_words_analyzed"] = pron_row["pronunciation_words_analyzed"]
 
     # Get distributions
     distributions = _get_distributions(db)
 
-    # Score each metric
+    # Score each metric - iterate ALL metrics, not just those in profile
+    # This allows the app to show greyed-out metrics that aren't scored
     metric_scores = {}
     weighted_sum = 0.0
     total_weight = 0.0
 
-    for metric_name, weight in weights.items():
+    # Core metrics to always show (subset of METRIC_DEFS that users care about)
+    core_metrics = [
+        "wpm", "pitch_variation", "pitch_range", "voice_quality", 
+        "jitter", "shimmer", "vocal_fry", "lexical_diversity",
+        "syntactic_complexity", "grade_level", "repetition", "connectedness"
+    ]
+    
+    # Add pronunciation metrics for pronunciation profile
+    if profile == "pronunciation":
+        core_metrics.extend([
+            "pronunciation_clarity", "pronunciation_consistency", "pronunciation_accuracy"
+        ])
+
+    for metric_name in core_metrics:
         mdef = METRIC_DEFS.get(metric_name)
         if not mdef:
             continue
+
+        # Weight is 0 if metric is not in this profile
+        weight = weights.get(metric_name, 0)
 
         col = mdef["column"]
         value = analysis.get(col)
         dist = distributions.get(col, [])
 
         if value is None or not dist:
-            # Skip metrics with no data
+            # No data available for this metric
             metric_scores[metric_name] = {
                 "label": mdef["label"],
                 "value": None,
@@ -622,10 +735,10 @@ def score_speech(
         if metric_name == "repetition":
             direction = rep_direction
 
-        # Calculate percentile rank
-        pct = _percentile_rank(value, dist)
+        # Calculate raw percentile rank
+        raw_pct = _percentile_rank(value, dist)
 
-        # Calculate score
+        # Calculate score (already direction-aware)
         score = _score_metric(
             value, dist, direction,
             optimal=mdef.get("optimal"),
@@ -635,22 +748,34 @@ def score_speech(
         if score is not None:
             score = round(min(100.0, max(0.0, score)), 1)
             grade = _letter_grade(score)
-            weighted_sum += score * weight
-            total_weight += weight
+            # Only add to weighted sum if this metric is in the profile
+            if weight > 0:
+                weighted_sum += score * weight
+                total_weight += weight
         else:
             grade = "N/A"
+        
+        # Adjust percentile for display: should always mean "better than X%"
+        # For lower_better, being in raw percentile 11.5 means 88.5% have worse (higher) values
+        if direction == "lower_better":
+            display_pct = 100.0 - raw_pct
+        else:
+            display_pct = raw_pct
 
+        # Apply display scale if defined (e.g., 0-1 to 0-100 for percentages)
+        display_value = value * mdef.get("scale", 1)
+        
         metric_scores[metric_name] = {
             "label": mdef["label"],
-            "value": round(value, 3),
+            "value": round(display_value, 3) if display_value >= 1 else round(display_value, 3),
             "unit": mdef["unit"],
             "score": score,
-            "percentile": round(pct, 1),
+            "percentile": round(display_pct, 1),  # Now direction-adjusted for UI
             "grade": grade,
             "grade_color": _grade_color(grade),
             "weight": weight,
             "available": True,
-            "direction": direction,  # Needed for correct percentile interpretation
+            "direction": direction,
         }
 
     # Composite score
@@ -735,6 +860,34 @@ def score_speech(
         duration_sec=duration_sec,
     )
 
+    # Include weights for ALL profiles so app can switch without API calls
+    all_profile_weights = {
+        name: {
+            "description": p["description"],
+            "weights": p["weights"],
+            "repetition_direction": p.get("repetition_direction", "lower_better"),
+        }
+        for name, p in SCORING_PROFILES.items()
+        if not p.get("skip_scoring")  # Exclude "group" profile
+    }
+
+    # Grade thresholds for client-side calculation
+    grade_thresholds = [
+        {"min": 75, "grade": "A+", "color": "#22c55e"},
+        {"min": 71, "grade": "A", "color": "#22c55e"},
+        {"min": 68.5, "grade": "A-", "color": "#22c55e"},
+        {"min": 65, "grade": "B+", "color": "#3b82f6"},
+        {"min": 62, "grade": "B", "color": "#3b82f6"},
+        {"min": 60, "grade": "B-", "color": "#3b82f6"},
+        {"min": 57, "grade": "C+", "color": "#f59e0b"},
+        {"min": 54, "grade": "C", "color": "#f59e0b"},
+        {"min": 52, "grade": "C-", "color": "#f59e0b"},
+        {"min": 48, "grade": "D+", "color": "#f97316"},
+        {"min": 44, "grade": "D", "color": "#f97316"},
+        {"min": 41, "grade": "D-", "color": "#f97316"},
+        {"min": 0, "grade": "F", "color": "#ef4444"},
+    ]
+
     return {
         "speech_id": speech_id,
         "profile": profile,
@@ -749,6 +902,8 @@ def score_speech(
         "metrics_scored": sum(1 for m in metric_scores.values() if m.get("available")),
         "metrics_total": len(weights),
         "summary": summary,
+        "all_profile_weights": all_profile_weights,
+        "grade_thresholds": grade_thresholds,
     }
 
 

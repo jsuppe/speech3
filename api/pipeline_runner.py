@@ -575,6 +575,16 @@ def run_pipeline(
     if advanced_audio is not None:
         result["advanced_audio_analysis"] = advanced_audio
 
+    # Grammar analysis (always run if we have a transcript)
+    if transcript:
+        try:
+            from grammar_analysis import analyze_grammar
+            grammar_result = analyze_grammar(transcript)
+            result["grammar_analysis"] = grammar_result
+            modules_run.append("grammar")
+        except Exception as e:
+            logger.warning(f"Grammar analysis failed: {e}")
+
     return result
 
 
@@ -721,7 +731,7 @@ def persist_result(
                 source_file=filename or os.path.basename(original_audio_path),
                 duration_sec=duration,
                 category=category,
-                products=products or ["SpeechScore"],
+                products=products or ["SpeakFit"],
                 audio_hash=audio_hash,
                 user_id=user_id,
                 profile=profile,
@@ -751,6 +761,38 @@ def persist_result(
         # The result from run_pipeline uses top-level keys that store_analysis expects
         db.store_analysis(speech_id, result, preset=preset)
 
+        # Auto-run phoneme analysis for pronunciation profile or if audio exists
+        if audio_exists and (profile == "pronunciation" or True):  # Always run for now
+            try:
+                from pronunciation import analyze_pronunciation
+                import sqlite3
+                import json
+                from datetime import datetime
+                
+                pron_result = analyze_pronunciation(original_audio_path, transcript_text)
+                if pron_result and pron_result.get("words"):
+                    # Save word analysis to database
+                    word_data = [
+                        {
+                            'word': w.get('word', ''),
+                            'confidence': w.get('confidence', 0),
+                            'start_time': w.get('start_time', 0),
+                            'end_time': w.get('end_time', 0),
+                            'is_problem': w.get('confidence', 1) < 0.7
+                        }
+                        for w in pron_result.get("words", [])
+                    ]
+                    conn = sqlite3.connect(config.DB_PATH)
+                    conn.execute(
+                        "UPDATE speeches SET word_analysis_json = ?, phoneme_analysis_at = ? WHERE id = ?",
+                        (json.dumps(word_data), datetime.now().isoformat(), speech_id)
+                    )
+                    conn.commit()
+                    conn.close()
+                    logger.info(f"Auto-ran phoneme analysis for speech_id={speech_id}, {len(word_data)} words")
+            except Exception as e:
+                logger.warning(f"Auto phoneme analysis failed: {e}")
+
         # Store spectrogram — use provided path or auto-generate
         if spectrogram_path and os.path.exists(spectrogram_path):
             db.store_spectrogram_from_file(speech_id, spectrogram_path)
@@ -762,6 +804,49 @@ def persist_result(
                 logger.info(f"Auto-generated spectrogram for speech_id={speech_id} ({len(png_data)/1024:.0f} KB)")
 
         logger.info(f"Persisted analysis → speech_id={speech_id}, title='{title}'")
+        
+        # Generate AI summary for the profile (async-like, non-blocking)
+        try:
+            from ai_summary import generate_and_save_summary
+            summary = generate_and_save_summary(speech_id, profile, config.DB_PATH)
+            if summary:
+                logger.info(f"Generated AI summary for speech_id={speech_id}, profile={profile}")
+        except Exception as e:
+            logger.warning(f"AI summary generation failed: {e}")
+        
+        # Award XP and check achievements for gamification
+        if user_id:
+            try:
+                from gamification import award_xp, check_achievements
+                conn = sqlite3.connect(config.DB_PATH)
+                
+                # Award base XP for recording
+                bonus_xp = 0
+                overall_score = result.get("overall_score", 0)
+                if overall_score >= 90:
+                    bonus_xp = 50  # Bonus for excellent score
+                elif overall_score >= 80:
+                    bonus_xp = 25  # Bonus for good score
+                
+                xp_result = award_xp(
+                    conn, user_id, 'recording', 
+                    bonus_xp=bonus_xp,
+                    metadata={'speech_id': speech_id, 'profile': profile, 'score': overall_score}
+                )
+                
+                # Check for newly earned achievements
+                new_achievements = check_achievements(conn, user_id)
+                
+                conn.close()
+                
+                if xp_result.get('leveled_up'):
+                    logger.info(f"User {user_id} leveled up to level {xp_result['level']}!")
+                if new_achievements:
+                    logger.info(f"User {user_id} earned {len(new_achievements)} new achievement(s)")
+                    
+            except Exception as e:
+                logger.warning(f"Gamification update failed: {e}")
+        
         return speech_id
 
     except Exception as e:

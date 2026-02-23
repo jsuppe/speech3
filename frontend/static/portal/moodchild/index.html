@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>MoodChild</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      min-height: 100vh;
+      padding-bottom: 100px;
+    }
+    
+    /* Header */
+    .header {
+      background: var(--primary);
+      color: white;
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .settings-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .child-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    
+    .child-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    
+    .child-name {
+      font-size: 18px;
+      font-weight: 500;
+    }
+    
+    .child-dropdown {
+      margin-left: auto;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    
+    /* Quick Add Section */
+    .section {
+      padding: 16px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    
+    .quick-add-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    
+    .quick-btn {
+      background: white;
+      border: none;
+      border-radius: 16px;
+      padding: 16px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .quick-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .quick-btn .icon {
+      font-size: 28px;
+    }
+    
+    .quick-btn .label {
+      font-size: 11px;
+      color: var(--gray-700);
+      font-weight: 500;
+    }
+    
+    .quick-btn.outburst {
+      background: linear-gradient(135deg, #fef2f2, #fee2e2);
+      border: 2px solid #fecaca;
+    }
+    
+    /* Timeline Section */
+    .timeline {
+      background: white;
+      border-radius: 16px;
+      margin: 0 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .timeline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .timeline-date {
+      font-weight: 600;
+    }
+    
+    .timeline-nav {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .timeline-nav button {
+      background: var(--gray-100);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    .event-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .event-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gray-100);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    
+    .event-item:hover {
+      background: var(--gray-50);
+    }
+    
+    .event-item:last-child {
+      border-bottom: none;
+    }
+    
+    .event-icon {
+      font-size: 24px;
+      margin-right: 12px;
+    }
+    
+    .event-details {
+      flex: 1;
+    }
+    
+    .event-type {
+      font-weight: 500;
+      font-size: 15px;
+    }
+    
+    .event-meta {
+      font-size: 13px;
+      color: var(--gray-500);
+    }
+    
+    .event-time {
+      font-size: 13px;
+      color: var(--gray-500);
+    }
+    
+    .event-severity {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      margin-left: 8px;
+    }
+    
+    .severity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .severity-1 { background: #86efac; }
+    .severity-2 { background: #fde047; }
+    .severity-3 { background: #fdba74; }
+    .severity-4 { background: #f87171; }
+    .severity-5 { background: #dc2626; }
+    
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--gray-500);
+    }
+    
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 200;
+    }
+    
+    .modal-overlay.active {
+      display: flex;
+    }
+    
+    .modal {
+      background: white;
+      width: 100%;
+      max-width: 500px;
+      border-radius: 24px 24px 0 0;
+      padding: 24px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    
+    .modal-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .modal-close {
+      background: var(--gray-100);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-700);
+      margin-bottom: 6px;
+    }
+    
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--gray-300);
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.1s;
+    }
+    
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    /* Severity Picker */
+    .severity-picker {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .severity-option {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid var(--gray-200);
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    
+    .severity-option:hover {
+      border-color: var(--gray-300);
+    }
+    
+    .severity-option.selected {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    
+    .severity-option .number {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .severity-option .desc {
+      font-size: 10px;
+      color: var(--gray-500);
+    }
+    
+    /* Mood Picker */
+    .mood-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .mood-option {
+      padding: 8px 14px;
+      border: 2px solid var(--gray-200);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.1s;
+    }
+    
+    .mood-option:hover {
+      border-color: var(--gray-300);
+    }
+    
+    .mood-option.selected {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+    
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+      margin-top: 12px;
+    }
+    
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    
+    .btn-row .btn {
+      flex: 1;
+    }
+    
+    /* Type Picker (for outburst types) */
+    .type-picker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    
+    .type-option {
+      padding: 10px;
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.1s;
+    }
+    
+    .type-option:hover {
+      border-color: var(--gray-300);
+    }
+    
+    .type-option.selected {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    
+    /* Screen Time Specific */
+    .device-picker {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .device-option {
+      padding: 10px 16px;
+      border: 2px solid var(--gray-200);
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.1s;
+    }
+    
+    .device-option:hover {
+      border-color: var(--gray-300);
+    }
+    
+    .device-option.selected {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    
+    .device-option .icon {
+      font-size: 24px;
+    }
+    
+    .device-option .label {
+      font-size: 11px;
+    }
+    
+    /* Duration Input */
+    .duration-input {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .duration-input input {
+      width: 80px;
+      text-align: center;
+    }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: var(--gray-100);
+      border-radius: 12px;
+      padding: 4px;
+      margin: 0 16px 16px;
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--gray-500);
+    }
+    
+    .tab.active {
+      background: white;
+      color: var(--gray-900);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Calendar View */
+    .calendar {
+      background: white;
+      border-radius: 16px;
+      margin: 0 16px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    
+    .calendar-day-header {
+      text-align: center;
+      font-size: 12px;
+      color: var(--gray-500);
+      padding: 8px 0;
+    }
+    
+    .calendar-day {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      font-size: 14px;
+    }
+    
+    .calendar-day:hover {
+      background: var(--gray-100);
+    }
+    
+    .calendar-day.today {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .calendar-day.selected {
+      outline: 2px solid var(--primary);
+    }
+    
+    .calendar-day.other-month {
+      color: var(--gray-300);
+    }
+    
+    .calendar-day .dots {
+      display: flex;
+      gap: 2px;
+      position: absolute;
+      bottom: 4px;
+    }
+    
+    .calendar-day .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+    
+    .calendar-day .dot.outburst {
+      background: var(--danger);
+    }
+    
+    /* Stats Bar */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+    
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 16px;
+      min-width: 100px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: var(--gray-500);
+    }
+    
+    /* Hide/show views */
+    .view { display: none; }
+    .view.active { display: block; }
+    
+    /* Settings Page */
+    .settings-section {
+      background: white;
+      border-radius: 16px;
+      margin: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .settings-section-title {
+      padding: 16px;
+      font-weight: 600;
+      background: var(--gray-50);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .settings-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    
+    .settings-item:last-child {
+      border-bottom: none;
+    }
+    
+    .settings-item-info {
+      flex: 1;
+    }
+    
+    .settings-item-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    .settings-item-desc {
+      font-size: 13px;
+      color: var(--gray-500);
+    }
+    
+    .settings-btn-action {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .settings-btn-danger {
+      background: #fee2e2;
+      color: var(--danger);
+    }
+    
+    .settings-btn-danger:hover {
+      background: #fecaca;
+    }
+    
+    .settings-back {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0;
+    }
+    
+    .data-summary {
+      padding: 16px;
+      background: var(--gray-50);
+      border-radius: 12px;
+      margin: 16px;
+    }
+    
+    .data-summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .data-summary-row:last-child {
+      border-bottom: none;
+    }
+    
+    .confirm-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      padding: 20px;
+    }
+    
+    .confirm-modal.active {
+      display: flex;
+    }
+    
+    .confirm-box {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 320px;
+      text-align: center;
+    }
+    
+    .confirm-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .confirm-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .confirm-desc {
+      color: var(--gray-500);
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    
+    .confirm-buttons {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .confirm-buttons button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .confirm-cancel {
+      background: var(--gray-200);
+      color: var(--gray-700);
+    }
+    
+    .confirm-danger {
+      background: var(--danger);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header" id="mainHeader">
+    <div class="header-row">
+      <h1>🧒 MoodChild</h1>
+      <button class="settings-btn" onclick="showSettings()" data-testid="settings-btn">⚙️</button>
+    </div>
+    <div class="child-selector">
+      <div class="child-avatar">👦</div>
+      <span class="child-name" id="childName">Rhys</span>
+      <button class="child-dropdown" onclick="showChildPicker()">▼</button>
+    </div>
+  </header>
+  
+  <!-- Settings Header (hidden by default) -->
+  <header class="header" id="settingsHeader" style="display: none;">
+    <div class="header-row">
+      <button class="settings-back" onclick="hideSettings()">
+        ← Back
+      </button>
+      <h1>Settings</h1>
+      <div style="width: 60px;"></div>
+    </div>
+  </header>
+  
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card">
+      <div class="stat-value" id="statMeds">0</div>
+      <div class="stat-label">💊 Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statMeals">0</div>
+      <div class="stat-label">🍽️ Meals</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statOutbursts">0</div>
+      <div class="stat-label">🌋 Outbursts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statScreen">0h</div>
+      <div class="stat-label">📺 Screen</div>
+    </div>
+  </div>
+  
+  <!-- Quick Add Section -->
+  <section class="section">
+    <div class="section-title">Quick Add</div>
+    <div class="quick-add-grid">
+      <button class="quick-btn" onclick="quickAdd('medication')" data-testid="quick-medication">
+        <span class="icon">💊</span>
+        <span class="label">Medication</span>
+      </button>
+      <button class="quick-btn" onclick="quickAdd('meal')" data-testid="quick-meal">
+        <span class="icon">🍽️</span>
+        <span class="label">Meal</span>
+      </button>
+      <button class="quick-btn" onclick="quickAdd('sleep')" data-testid="quick-sleep">
+        <span class="icon">😴</span>
+        <span class="label">Sleep</span>
+      </button>
+      <button class="quick-btn" onclick="quickAdd('wake')" data-testid="quick-wake">
+        <span class="icon">⏰</span>
+        <span class="label">Wake</span>
+      </button>
+      <button class="quick-btn" onclick="quickAdd('school')" data-testid="quick-school">
+        <span class="icon">🏫</span>
+        <span class="label">School</span>
+      </button>
+      <button class="quick-btn" onclick="quickAdd('activity')" data-testid="quick-activity">
+        <span class="icon">⚽</span>
+        <span class="label">Activity</span>
+      </button>
+      <button class="quick-btn" onclick="quickAdd('screen_time')" data-testid="quick-screen">
+        <span class="icon">📺</span>
+        <span class="label">Screen</span>
+      </button>
+      <button class="quick-btn outburst" onclick="quickAdd('outburst')" data-testid="quick-outburst">
+        <span class="icon">🌋</span>
+        <span class="label">Outburst</span>
+      </button>
+    </div>
+  </section>
+  
+  <!-- View Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchView('timeline')" data-testid="tab-timeline">Timeline</button>
+    <button class="tab" onclick="switchView('calendar')" data-testid="tab-calendar">Calendar</button>
+  </div>
+  
+  <!-- Timeline View -->
+  <div class="view active" id="timelineView">
+    <div class="timeline">
+      <div class="timeline-header">
+        <button class="timeline-nav" onclick="changeDay(-1)">◀</button>
+        <span class="timeline-date" id="timelineDate">Today</span>
+        <button class="timeline-nav" onclick="changeDay(1)">▶</button>
+      </div>
+      <div class="event-list" id="eventList">
+        <div class="empty-state">
+          <div class="icon">📝</div>
+          <p>No events yet today</p>
+          <p style="font-size: 13px; margin-top: 4px;">Tap a button above to log</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Calendar View -->
+  <div class="view" id="calendarView">
+    <div class="calendar">
+      <div class="timeline-header">
+        <button class="timeline-nav" onclick="changeMonth(-1)">◀</button>
+        <span class="timeline-date" id="calendarMonth">February 2026</span>
+        <button class="timeline-nav" onclick="changeMonth(1)">▶</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- Settings View -->
+  <div class="view" id="settingsView">
+    <!-- Data Summary -->
+    <div class="data-summary">
+      <div class="section-title" style="margin-bottom: 12px;">📊 Your Data</div>
+      <div class="data-summary-row">
+        <span>Total Events</span>
+        <strong id="settingsTotalEvents">0</strong>
+      </div>
+      <div class="data-summary-row">
+        <span>Children</span>
+        <strong id="settingsChildren">0</strong>
+      </div>
+      <div class="data-summary-row">
+        <span>Data Since</span>
+        <strong id="settingsDataSince">—</strong>
+      </div>
+    </div>
+    
+    <!-- Data Management -->
+    <div class="settings-section">
+      <div class="settings-section-title">🗄️ Data Management</div>
+      
+      <div class="settings-item">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Export Data</div>
+          <div class="settings-item-desc">Download all your data as JSON</div>
+        </div>
+        <button class="settings-btn-action" onclick="exportData()" data-testid="export-data">
+          📤 Export
+        </button>
+      </div>
+      
+      <div class="settings-item">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Import Data</div>
+          <div class="settings-item-desc">Restore from a backup file</div>
+        </div>
+        <button class="settings-btn-action" onclick="importData()" data-testid="import-data">
+          📥 Import
+        </button>
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="handleImport(event)">
+      </div>
+    </div>
+    
+    <!-- Danger Zone -->
+    <div class="settings-section">
+      <div class="settings-section-title" style="color: var(--danger);">⚠️ Danger Zone</div>
+      
+      <div class="settings-item">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Clear Local Data</div>
+          <div class="settings-item-desc">Delete all data stored on this device</div>
+        </div>
+        <button class="settings-btn-action settings-btn-danger" onclick="confirmClearLocal()" data-testid="clear-local">
+          🗑️ Clear
+        </button>
+      </div>
+      
+      <div class="settings-item">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Clear Server Data</div>
+          <div class="settings-item-desc">Delete all data from the server (when connected)</div>
+        </div>
+        <button class="settings-btn-action settings-btn-danger" onclick="confirmClearServer()" data-testid="clear-server">
+          🗑️ Clear
+        </button>
+      </div>
+      
+      <div class="settings-item">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Delete All Data</div>
+          <div class="settings-item-desc">Clear both local and server data permanently</div>
+        </div>
+        <button class="settings-btn-action settings-btn-danger" onclick="confirmClearAll()" data-testid="clear-all">
+          💀 Delete All
+        </button>
+      </div>
+    </div>
+    
+    <!-- App Info -->
+    <div class="settings-section">
+      <div class="settings-section-title">ℹ️ About</div>
+      <div class="settings-item">
+        <div class="settings-item-info">
+          <div class="settings-item-title">MoodChild</div>
+          <div class="settings-item-desc">Version 0.1.0 (Prototype)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Confirm Modal -->
+  <div class="confirm-modal" id="confirmModal">
+    <div class="confirm-box">
+      <div class="confirm-icon" id="confirmIcon">⚠️</div>
+      <div class="confirm-title" id="confirmTitle">Are you sure?</div>
+      <div class="confirm-desc" id="confirmDesc">This action cannot be undone.</div>
+      <div class="confirm-buttons">
+        <button class="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+        <button class="confirm-danger" id="confirmAction" onclick="executeConfirm()">Delete</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Event Modal -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModalOverlay(event)">
+    <div class="modal" id="eventModal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Add Event</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <form id="eventForm" onsubmit="saveEvent(event)">
+        <div id="modalContent">
+          <!-- Dynamic content -->
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn" style="background: var(--gray-200); color: var(--gray-700);" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-testid="save-event">Save</button>
+        </div>
+        <button type="button" class="btn btn-danger" id="deleteBtn" style="display: none;" onclick="deleteEvent()">Delete Event</button>
+      </form>
+    </div>
+  </div>
+  
+  <script>
+    // ============================================
+    // DATA STORE
+    // ============================================
+    
+    const STORAGE_KEY = 'moodchild_data';
+    
+    const DEFAULT_DATA = {
+      children: [
+        { id: 'child-1', name: 'Rhys', avatar: '👦' }
+      ],
+      activeChildId: 'child-1',
+      events: [],
+      medications: [
+        { id: 'med-1', childId: 'child-1', name: 'Adderall XR', dosage: '20mg', durationHours: 6.5 }
+      ]
+    };
+    
+    let appData = loadData();
+    let currentDate = new Date();
+    let currentMonth = new Date();
+    let editingEventId = null;
+    
+    function loadData() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('Failed to load data:', e);
+      }
+      return { ...DEFAULT_DATA };
+    }
+    
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+    }
+    
+    function getActiveChild() {
+      return appData.children.find(c => c.id === appData.activeChildId);
+    }
+    
+    function getEventsForDate(date) {
+      const dateStr = formatDateKey(date);
+      return appData.events.filter(e => {
+        return e.childId === appData.activeChildId && 
+               formatDateKey(new Date(e.startedAt)) === dateStr;
+      }).sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    }
+    
+    function formatDateKey(date) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    // ============================================
+    // EVENT ICONS & LABELS
+    // ============================================
+    
+    const EVENT_CONFIG = {
+      medication: { icon: '💊', label: 'Medication' },
+      meal: { icon: '🍽️', label: 'Meal' },
+      sleep: { icon: '😴', label: 'Sleep' },
+      wake: { icon: '⏰', label: 'Wake' },
+      school: { icon: '🏫', label: 'School' },
+      activity: { icon: '⚽', label: 'Activity' },
+      screen_time: { icon: '📺', label: 'Screen Time' },
+      outburst: { icon: '🌋', label: 'Outburst' }
+    };
+    
+    const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+    const OUTBURST_TYPES = ['meltdown', 'tantrum', 'frustration', 'anxiety', 'shutdown', 'aggression'];
+    const MOODS = ['happy', 'calm', 'anxious', 'irritable', 'sad', 'hyper', 'tired', 'angry', 'overwhelmed'];
+    const DEVICES = [
+      { id: 'phone', icon: '📱', label: 'Phone' },
+      { id: 'tablet', icon: '📱', label: 'Tablet' },
+      { id: 'tv', icon: '📺', label: 'TV' },
+      { id: 'computer', icon: '💻', label: 'Computer' },
+      { id: 'game_console', icon: '🎮', label: 'Gaming' }
+    ];
+    
+    // ============================================
+    // UI RENDERING
+    // ============================================
+    
+    function render() {
+      renderHeader();
+      renderStats();
+      renderTimeline();
+      renderCalendar();
+    }
+    
+    function renderHeader() {
+      const child = getActiveChild();
+      document.getElementById('childName').textContent = child.name;
+      document.querySelector('.child-avatar').textContent = child.avatar;
+    }
+    
+    function renderStats() {
+      const today = getEventsForDate(new Date());
+      
+      const meds = today.filter(e => e.type === 'medication').length;
+      const meals = today.filter(e => e.type === 'meal').length;
+      const outbursts = today.filter(e => e.type === 'outburst').length;
+      
+      const screenMinutes = today
+        .filter(e => e.type === 'screen_time')
+        .reduce((sum, e) => sum + (e.details?.durationMinutes || 0), 0);
+      const screenHours = Math.round(screenMinutes / 60 * 10) / 10;
+      
+      document.getElementById('statMeds').textContent = meds;
+      document.getElementById('statMeals').textContent = meals;
+      document.getElementById('statOutbursts').textContent = outbursts;
+      document.getElementById('statScreen').textContent = screenHours + 'h';
+    }
+    
+    function renderTimeline() {
+      const events = getEventsForDate(currentDate);
+      const list = document.getElementById('eventList');
+      
+      // Update date display
+      const isToday = formatDateKey(currentDate) === formatDateKey(new Date());
+      const dateStr = isToday ? 'Today' : currentDate.toLocaleDateString('en-US', { 
+        weekday: 'short', month: 'short', day: 'numeric' 
+      });
+      document.getElementById('timelineDate').textContent = dateStr;
+      
+      if (events.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📝</div>
+            <p>No events ${isToday ? 'yet today' : 'on this day'}</p>
+            <p style="font-size: 13px; margin-top: 4px;">Tap a button above to log</p>
+          </div>
+        `;
+        return;
+      }
+      
+      list.innerHTML = events.map(event => {
+        const config = EVENT_CONFIG[event.type];
+        const time = new Date(event.startedAt).toLocaleTimeString('en-US', { 
+          hour: 'numeric', minute: '2-digit' 
+        });
+        
+        let meta = '';
+        if (event.type === 'medication' && event.details?.medicationName) {
+          meta = event.details.medicationName;
+        } else if (event.type === 'meal' && event.details?.mealType) {
+          meta = event.details.mealType.charAt(0).toUpperCase() + event.details.mealType.slice(1);
+        } else if (event.type === 'screen_time' && event.details?.deviceType) {
+          meta = `${event.details.durationMinutes || 0}min - ${event.details.deviceType}`;
+        } else if (event.type === 'outburst') {
+          const parts = [];
+          if (event.details?.outburstType) parts.push(event.details.outburstType);
+          if (event.details?.moods?.length) parts.push(event.details.moods.join(', '));
+          meta = parts.join(' · ');
+        } else if (event.type === 'activity' && event.details?.activityName) {
+          meta = event.details.activityName;
+        }
+        
+        let severityHtml = '';
+        if (event.type === 'outburst' && event.details?.severity) {
+          severityHtml = `
+            <span class="event-severity">
+              ${Array(event.details.severity).fill('<span class="severity-dot severity-' + event.details.severity + '"></span>').join('')}
+            </span>
+          `;
+        }
+        
+        return `
+          <div class="event-item" onclick="editEvent('${event.id}')" data-testid="event-${event.id}">
+            <span class="event-icon">${config.icon}</span>
+            <div class="event-details">
+              <div class="event-type">${config.label}${severityHtml}</div>
+              ${meta ? `<div class="event-meta">${meta}</div>` : ''}
+            </div>
+            <span class="event-time">${time}</span>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    function renderCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      
+      document.getElementById('calendarMonth').textContent = 
+        currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      
+      // Day headers
+      const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      let html = days.map(d => `<div class="calendar-day-header">${d}</div>`).join('');
+      
+      // First day of month
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const startPad = firstDay.getDay();
+      
+      // Previous month days
+      const prevMonth = new Date(year, month, 0);
+      for (let i = startPad - 1; i >= 0; i--) {
+        html += `<div class="calendar-day other-month">${prevMonth.getDate() - i}</div>`;
+      }
+      
+      // Current month days
+      const today = new Date();
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        const date = new Date(year, month, d);
+        const isToday = formatDateKey(date) === formatDateKey(today);
+        const isSelected = formatDateKey(date) === formatDateKey(currentDate);
+        const events = getEventsForDate(date);
+        
+        let dotsHtml = '';
+        if (events.length > 0) {
+          const hasOutburst = events.some(e => e.type === 'outburst');
+          const dotCount = Math.min(events.length, 3);
+          dotsHtml = `<div class="dots">`;
+          for (let i = 0; i < dotCount; i++) {
+            const cls = hasOutburst && i === 0 ? 'dot outburst' : 'dot';
+            dotsHtml += `<span class="${cls}"></span>`;
+          }
+          dotsHtml += '</div>';
+        }
+        
+        const classes = ['calendar-day'];
+        if (isToday) classes.push('today');
+        if (isSelected) classes.push('selected');
+        
+        html += `
+          <div class="${classes.join(' ')}" onclick="selectDate(${year}, ${month}, ${d})">
+            ${d}
+            ${dotsHtml}
+          </div>
+        `;
+      }
+      
+      // Next month days
+      const endPad = 6 - lastDay.getDay();
+      for (let d = 1; d <= endPad; d++) {
+        html += `<div class="calendar-day other-month">${d}</div>`;
+      }
+      
+      grid.innerHTML = html;
+    }
+    
+    // ============================================
+    // VIEW SWITCHING
+    // ============================================
+    
+    function switchView(view) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add('active');
+      document.getElementById(view + 'View').classList.add('active');
+    }
+    
+    function changeDay(delta) {
+      currentDate.setDate(currentDate.getDate() + delta);
+      renderTimeline();
+    }
+    
+    function changeMonth(delta) {
+      currentMonth.setMonth(currentMonth.getMonth() + delta);
+      renderCalendar();
+    }
+    
+    function selectDate(year, month, day) {
+      currentDate = new Date(year, month, day);
+      renderTimeline();
+      renderCalendar();
+      switchView('timeline');
+    }
+    
+    // ============================================
+    // MODAL HANDLING
+    // ============================================
+    
+    function quickAdd(type) {
+      editingEventId = null;
+      showModal(type);
+    }
+    
+    function editEvent(eventId) {
+      const event = appData.events.find(e => e.id === eventId);
+      if (!event) return;
+      
+      editingEventId = eventId;
+      showModal(event.type, event);
+    }
+    
+    function roundDownToHalfHour(date) {
+      const d = new Date(date);
+      const minutes = d.getMinutes();
+      // Round DOWN to previous :00 or :30
+      const roundedMinutes = Math.floor(minutes / 30) * 30;
+      d.setMinutes(roundedMinutes, 0, 0);
+      return d;
+    }
+    
+    function showModal(type, existingEvent = null) {
+      const config = EVENT_CONFIG[type];
+      document.getElementById('modalTitle').textContent = 
+        (existingEvent ? 'Edit ' : 'Add ') + config.label;
+      
+      let now = existingEvent ? new Date(existingEvent.startedAt) : new Date();
+      // Round down to previous half hour for new events (logging after the fact)
+      if (!existingEvent) {
+        now = roundDownToHalfHour(now);
+      }
+      const timeStr = now.toTimeString().slice(0, 5);
+      
+      let content = `
+        <input type="hidden" id="eventType" value="${type}">
+        <div class="form-group">
+          <label class="form-label">Time</label>
+          <input type="time" class="form-input" id="eventTime" value="${timeStr}" data-testid="event-time">
+        </div>
+      `;
+      
+      // Type-specific fields
+      if (type === 'medication') {
+        const meds = appData.medications.filter(m => m.childId === appData.activeChildId);
+        const selectedMed = existingEvent?.details?.medicationId || (meds[0]?.id || '');
+        content += `
+          <div class="form-group">
+            <label class="form-label">Medication</label>
+            <select class="form-select" id="medicationId" data-testid="medication-select">
+              ${meds.map(m => `<option value="${m.id}" ${m.id === selectedMed ? 'selected' : ''}>${m.name} (${m.dosage})</option>`).join('')}
+              <option value="other">Other...</option>
+            </select>
+          </div>
+        `;
+      }
+      
+      if (type === 'meal') {
+        const selectedType = existingEvent?.details?.mealType || 'lunch';
+        content += `
+          <div class="form-group">
+            <label class="form-label">Meal Type</label>
+            <div class="mood-picker">
+              ${MEAL_TYPES.map(t => `
+                <div class="mood-option ${t === selectedType ? 'selected' : ''}" onclick="selectOption(this, 'mealType')" data-value="${t}">
+                  ${t.charAt(0).toUpperCase() + t.slice(1)}
+                </div>
+              `).join('')}
+            </div>
+            <input type="hidden" id="mealType" value="${selectedType}">
+          </div>
+        `;
+      }
+      
+      if (type === 'screen_time') {
+        const selectedDevice = existingEvent?.details?.deviceType || 'tv';
+        const duration = existingEvent?.details?.durationMinutes || 30;
+        content += `
+          <div class="form-group">
+            <label class="form-label">Device</label>
+            <div class="device-picker">
+              ${DEVICES.map(d => `
+                <div class="device-option ${d.id === selectedDevice ? 'selected' : ''}" onclick="selectOption(this, 'deviceType')" data-value="${d.id}">
+                  <span class="icon">${d.icon}</span>
+                  <span class="label">${d.label}</span>
+                </div>
+              `).join('')}
+            </div>
+            <input type="hidden" id="deviceType" value="${selectedDevice}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Duration (minutes)</label>
+            <input type="number" class="form-input" id="durationMinutes" value="${duration}" min="1" max="480" data-testid="duration-input">
+          </div>
+        `;
+      }
+      
+      if (type === 'outburst') {
+        const severity = existingEvent?.details?.severity || 3;
+        const outburstType = existingEvent?.details?.outburstType || '';
+        // Support both old single mood and new multi-mood format
+        let moods = existingEvent?.details?.moods || [];
+        if (!Array.isArray(moods)) moods = [];
+        if (existingEvent?.details?.mood && !moods.includes(existingEvent.details.mood)) {
+          moods.push(existingEvent.details.mood);
+        }
+        
+        content += `
+          <div class="form-group">
+            <label class="form-label">Severity</label>
+            <div class="severity-picker">
+              ${[1,2,3,4,5].map(n => `
+                <div class="severity-option ${n === severity ? 'selected' : ''}" onclick="selectSeverity(this, ${n})" data-testid="severity-${n}">
+                  <div class="number">${n}</div>
+                  <div class="desc">${['Mild', 'Low', 'Medium', 'High', 'Severe'][n-1]}</div>
+                </div>
+              `).join('')}
+            </div>
+            <input type="hidden" id="severity" value="${severity}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <div class="type-picker">
+              ${OUTBURST_TYPES.map(t => `
+                <div class="type-option ${t === outburstType ? 'selected' : ''}" onclick="selectOption(this, 'outburstType')" data-value="${t}">
+                  ${t.charAt(0).toUpperCase() + t.slice(1)}
+                </div>
+              `).join('')}
+            </div>
+            <input type="hidden" id="outburstType" value="${outburstType}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mood (select all that apply)</label>
+            <div class="mood-picker" id="moodPicker">
+              ${MOODS.map(m => `
+                <div class="mood-option ${moods.includes(m) ? 'selected' : ''}" onclick="toggleMood(this)" data-value="${m}">
+                  ${m.charAt(0).toUpperCase() + m.slice(1)}
+                </div>
+              `).join('')}
+            </div>
+            <input type="hidden" id="moods" value="${moods.join(',')}">
+          </div>
+        `;
+      }
+      
+      if (type === 'activity') {
+        const activityName = existingEvent?.details?.activityName || '';
+        content += `
+          <div class="form-group">
+            <label class="form-label">Activity Name</label>
+            <input type="text" class="form-input" id="activityName" value="${activityName}" placeholder="e.g., Soccer practice" data-testid="activity-name">
+          </div>
+        `;
+      }
+      
+      if (type === 'school') {
+        const isHalfDay = existingEvent?.details?.isHalfDay || false;
+        content += `
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" id="isHalfDay" ${isHalfDay ? 'checked' : ''}> Half day
+            </label>
+          </div>
+        `;
+      }
+      
+      // Notes for all types
+      const notes = existingEvent?.notes || '';
+      content += `
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="eventNotes" placeholder="Any additional details..." data-testid="event-notes">${notes}</textarea>
+        </div>
+      `;
+      
+      document.getElementById('modalContent').innerHTML = content;
+      document.getElementById('deleteBtn').style.display = existingEvent ? 'block' : 'none';
+      document.getElementById('modalOverlay').classList.add('active');
+    }
+    
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+      editingEventId = null;
+    }
+    
+    function closeModalOverlay(e) {
+      if (e.target.id === 'modalOverlay') {
+        closeModal();
+      }
+    }
+    
+    function selectOption(el, fieldId) {
+      el.parentElement.querySelectorAll('.mood-option, .device-option, .type-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById(fieldId).value = el.dataset.value;
+    }
+    
+    function selectSeverity(el, value) {
+      el.parentElement.querySelectorAll('.severity-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('severity').value = value;
+    }
+    
+    function toggleMood(el) {
+      el.classList.toggle('selected');
+      // Update hidden input with all selected moods
+      const selected = Array.from(document.querySelectorAll('#moodPicker .mood-option.selected'))
+        .map(o => o.dataset.value);
+      document.getElementById('moods').value = selected.join(',');
+    }
+    
+    // ============================================
+    // EVENT CRUD
+    // ============================================
+    
+    function saveEvent(e) {
+      e.preventDefault();
+      
+      const type = document.getElementById('eventType').value;
+      const timeStr = document.getElementById('eventTime').value;
+      const notes = document.getElementById('eventNotes').value;
+      
+      // Build timestamp
+      const [hours, minutes] = timeStr.split(':');
+      const timestamp = new Date(currentDate);
+      timestamp.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      
+      // Build details based on type
+      const details = {};
+      
+      if (type === 'medication') {
+        const medId = document.getElementById('medicationId').value;
+        const med = appData.medications.find(m => m.id === medId);
+        details.medicationId = medId;
+        details.medicationName = med?.name || 'Unknown';
+        details.dosage = med?.dosage;
+      }
+      
+      if (type === 'meal') {
+        details.mealType = document.getElementById('mealType').value;
+      }
+      
+      if (type === 'screen_time') {
+        details.deviceType = document.getElementById('deviceType').value;
+        details.durationMinutes = parseInt(document.getElementById('durationMinutes').value) || 30;
+      }
+      
+      if (type === 'outburst') {
+        details.severity = parseInt(document.getElementById('severity').value);
+        details.outburstType = document.getElementById('outburstType').value;
+        const moodsStr = document.getElementById('moods').value;
+        details.moods = moodsStr ? moodsStr.split(',') : [];
+      }
+      
+      if (type === 'activity') {
+        details.activityName = document.getElementById('activityName').value;
+      }
+      
+      if (type === 'school') {
+        details.isHalfDay = document.getElementById('isHalfDay').checked;
+      }
+      
+      if (editingEventId) {
+        // Update existing
+        const event = appData.events.find(e => e.id === editingEventId);
+        if (event) {
+          event.startedAt = timestamp.toISOString();
+          event.notes = notes;
+          event.details = details;
+          event.updatedAt = new Date().toISOString();
+        }
+      } else {
+        // Create new
+        const event = {
+          id: 'evt-' + Date.now(),
+          childId: appData.activeChildId,
+          type: type,
+          startedAt: timestamp.toISOString(),
+          notes: notes,
+          details: details,
+          createdAt: new Date().toISOString()
+        };
+        appData.events.push(event);
+      }
+      
+      saveData();
+      closeModal();
+      render();
+    }
+    
+    function deleteEvent() {
+      if (!editingEventId) return;
+      
+      if (confirm('Delete this event?')) {
+        appData.events = appData.events.filter(e => e.id !== editingEventId);
+        saveData();
+        closeModal();
+        render();
+      }
+    }
+    
+    // ============================================
+    // CHILD MANAGEMENT
+    // ============================================
+    
+    function showChildPicker() {
+      // TODO: Implement child picker modal
+      alert('Child picker coming soon!');
+    }
+    
+    // ============================================
+    // SETTINGS
+    // ============================================
+    
+    let pendingConfirmAction = null;
+    
+    function showSettings() {
+      // Hide main content, show settings
+      document.getElementById('mainHeader').style.display = 'none';
+      document.getElementById('settingsHeader').style.display = 'block';
+      document.getElementById('statsBar').style.display = 'none';
+      document.querySelector('.section').style.display = 'none';
+      document.querySelector('.tabs').style.display = 'none';
+      document.getElementById('timelineView').classList.remove('active');
+      document.getElementById('calendarView').classList.remove('active');
+      document.getElementById('settingsView').classList.add('active');
+      
+      // Update settings stats
+      updateSettingsStats();
+    }
+    
+    function hideSettings() {
+      // Show main content, hide settings
+      document.getElementById('mainHeader').style.display = 'block';
+      document.getElementById('settingsHeader').style.display = 'none';
+      document.getElementById('statsBar').style.display = 'flex';
+      document.querySelector('.section').style.display = 'block';
+      document.querySelector('.tabs').style.display = 'flex';
+      document.getElementById('settingsView').classList.remove('active');
+      document.getElementById('timelineView').classList.add('active');
+    }
+    
+    function updateSettingsStats() {
+      document.getElementById('settingsTotalEvents').textContent = appData.events.length;
+      document.getElementById('settingsChildren').textContent = appData.children.length;
+      
+      if (appData.events.length > 0) {
+        const oldest = appData.events.reduce((min, e) => 
+          new Date(e.createdAt) < new Date(min.createdAt) ? e : min
+        );
+        const date = new Date(oldest.createdAt);
+        document.getElementById('settingsDataSince').textContent = 
+          date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } else {
+        document.getElementById('settingsDataSince').textContent = '—';
+      }
+    }
+    
+    function exportData() {
+      const dataStr = JSON.stringify(appData, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `moodchild-backup-${formatDateKey(new Date())}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    function importData() {
+      document.getElementById('importFile').click();
+    }
+    
+    function handleImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported.events && imported.children) {
+            appData = imported;
+            saveData();
+            updateSettingsStats();
+            alert('Data imported successfully!');
+          } else {
+            alert('Invalid backup file format.');
+          }
+        } catch (err) {
+          alert('Failed to parse backup file.');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = ''; // Reset for re-import
+    }
+    
+    function confirmClearLocal() {
+      showConfirm(
+        '🗑️',
+        'Clear Local Data?',
+        'This will delete all events, children, and settings stored on this device. This cannot be undone.',
+        'Clear Local Data',
+        () => {
+          localStorage.removeItem(STORAGE_KEY);
+          appData = { ...DEFAULT_DATA };
+          saveData();
+          updateSettingsStats();
+          closeConfirm();
+          alert('Local data cleared.');
+        }
+      );
+    }
+    
+    function confirmClearServer() {
+      showConfirm(
+        '☁️',
+        'Clear Server Data?',
+        'This will delete all your data from the server. Other family members will lose access. This cannot be undone.',
+        'Clear Server Data',
+        () => {
+          // TODO: Implement server-side deletion when backend is ready
+          closeConfirm();
+          alert('Server sync not yet available. Data is only stored locally.');
+        }
+      );
+    }
+    
+    function confirmClearAll() {
+      showConfirm(
+        '💀',
+        'Delete ALL Data?',
+        'This will permanently delete all local and server data. Your account will be reset. This action is IRREVERSIBLE.',
+        'Delete Everything',
+        () => {
+          localStorage.removeItem(STORAGE_KEY);
+          appData = { ...DEFAULT_DATA };
+          saveData();
+          // TODO: Also clear server data when backend is ready
+          updateSettingsStats();
+          closeConfirm();
+          alert('All data has been deleted.');
+        }
+      );
+    }
+    
+    function showConfirm(icon, title, desc, actionText, action) {
+      document.getElementById('confirmIcon').textContent = icon;
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmDesc').textContent = desc;
+      document.getElementById('confirmAction').textContent = actionText;
+      pendingConfirmAction = action;
+      document.getElementById('confirmModal').classList.add('active');
+    }
+    
+    function closeConfirm() {
+      document.getElementById('confirmModal').classList.remove('active');
+      pendingConfirmAction = null;
+    }
+    
+    function executeConfirm() {
+      if (pendingConfirmAction) {
+        pendingConfirmAction();
+      }
+    }
+    
+    // ============================================
+    // INIT
+    // ============================================
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      render();
+    });
+    
+    // Expose for testing
+    window.MoodChild = {
+      getData: () => appData,
+      setData: (data) => { appData = data; saveData(); render(); },
+      clearData: () => { localStorage.removeItem(STORAGE_KEY); appData = { ...DEFAULT_DATA }; render(); }
+    };
+  </script>
+</body>
+</html>

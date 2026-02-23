@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% block title %}Methodology — SpeakFit{% endblock %}
+
+{% block content %}
+<div class="fade-in max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold text-white mb-2">Scoring Methodology</h1>
+    <p class="text-gray-400 mb-8">How SpeakFit analyzes and grades speeches.</p>
+
+    <!-- Table of Contents -->
+    <nav class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-8">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Contents</h2>
+        <ol class="space-y-1 text-sm">
+            <li><a href="#pipeline" class="text-indigo-400 hover:text-indigo-300">1. Analysis Pipeline</a></li>
+            <li><a href="#metrics" class="text-indigo-400 hover:text-indigo-300">2. Metrics Reference</a></li>
+            <li><a href="#scoring" class="text-indigo-400 hover:text-indigo-300">3. How Scores Are Calculated</a></li>
+            <li><a href="#profiles" class="text-indigo-400 hover:text-indigo-300">4. Scoring Profiles</a></li>
+            <li><a href="#grades" class="text-indigo-400 hover:text-indigo-300">5. Grade Scale</a></li>
+            <li><a href="#limitations" class="text-indigo-400 hover:text-indigo-300">6. Limitations &amp; Caveats</a></li>
+            {% if is_admin %}
+            <li><a href="#internals" class="text-indigo-400 hover:text-indigo-300">7. Pipeline Internals <span class="text-xs text-indigo-500">(Admin)</span></a></li>
+            {% endif %}
+        </ol>
+    </nav>
+
+    <!-- 1. Pipeline -->
+    <section id="pipeline" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">1.</span> Analysis Pipeline
+        </h2>
+        <p class="text-gray-300 mb-4">Each uploaded audio file passes through a 10-module analysis pipeline:</p>
+        <div class="grid sm:grid-cols-2 gap-3">
+            {% set modules = [
+                ("🎤", "Audio Quality Gate", "Estimates Signal-to-Noise Ratio (SNR) and assigns a quality level (HIGH / MEDIUM / LOW / UNUSABLE). Low-quality audio may produce unreliable metrics."),
+                ("📝", "Whisper STT", "OpenAI's Whisper large-v3 model transcribes speech to text with word-level timestamps. Runs locally on GPU (~25x realtime)."),
+                ("📊", "Core Text Analysis", "Lexical diversity (type-token ratio), syntactic complexity (parse tree depth), fluency score, discourse connectedness."),
+                ("📖", "Advanced Text", "Readability scores (Flesch-Kincaid, Flesch Reading Ease), discourse structure, named entities, question density, perspective analysis."),
+                ("🔁", "Rhetorical Analysis", "Detects anaphora, epistrophe, repeated phrases. Computes repetition score and rhythm regularity."),
+                ("😊", "Sentiment Analysis", "3-class sentiment (positive/negative/neutral) using a RoBERTa model fine-tuned on social media text. Includes per-segment emotional arc."),
+                ("🔉", "Core Audio Analysis", "Fundamental frequency (pitch), intensity, voice quality (jitter, shimmer, HNR), pause patterns, speaking rate (WPM)."),
+                ("🎵", "Advanced Audio", "Formant analysis (vowel space), pitch contour, uptalk detection, speaking rate variability, vocal fry ratio, emphasis patterns."),
+                ("📈", "Spectrogram", "Generates waveform, mel-spectrogram, and loudness visualizations via songsee."),
+                ("⚡", "Scoring Engine", "Compares metrics against the database distribution. Assigns percentile-based scores with profile-specific weights."),
+            ] %}
+            {% for icon, name, desc in modules %}
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <span>{{ icon }}</span>
+                    <span class="font-medium text-white text-sm">{{ name }}</span>
+                </div>
+                <p class="text-xs text-gray-400 leading-relaxed">{{ desc }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- 2. Metrics -->
+    <section id="metrics" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">2.</span> Metrics Reference
+        </h2>
+        <p class="text-gray-300 mb-4">These are the core metrics extracted from each speech and used in scoring:</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-800">
+                        <th class="text-left py-2 px-3 text-gray-400 font-medium">Metric</th>
+                        <th class="text-left py-2 px-3 text-gray-400 font-medium">Unit</th>
+                        <th class="text-left py-2 px-3 text-gray-400 font-medium">Direction</th>
+                        <th class="text-left py-2 px-3 text-gray-400 font-medium">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, m in metric_defs.items() %}
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-900/50">
+                        <td class="py-2.5 px-3 text-white font-medium">{{ m.label }}</td>
+                        <td class="py-2.5 px-3 text-gray-400">{{ m.unit or '—' }}</td>
+                        <td class="py-2.5 px-3">
+                            {% if m.direction == 'higher_better' %}
+                                <span class="text-green-400 text-xs">↑ higher = better</span>
+                            {% elif m.direction == 'lower_better' %}
+                                <span class="text-blue-400 text-xs">↓ lower = better</span>
+                            {% elif m.direction == 'optimal' %}
+                                <span class="text-amber-400 text-xs">⊙ optimal = {{ m.optimal }}</span>
+                            {% else %}
+                                <span class="text-gray-500 text-xs">↕ context-dependent</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 text-gray-400 text-xs leading-relaxed">{{ metric_info.get(m.label, metric_info.get(key, '')) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- 3. Scoring -->
+    <section id="scoring" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">3.</span> How Scores Are Calculated
+        </h2>
+
+        <div class="space-y-4 text-gray-300 text-sm leading-relaxed">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <h3 class="text-white font-medium mb-2">Step 1: Percentile Ranking</h3>
+                <p>Each metric is compared against the distribution of <strong class="text-white">all {{ total_speeches }} speeches</strong> in the database. A speech's <em>percentile rank</em> tells you what percentage of speeches it exceeds for that metric.</p>
+                <p class="mt-2 text-gray-400">Example: If a speech has 140 WPM and 70% of speeches are slower, its WPM percentile is 70.</p>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <h3 class="text-white font-medium mb-2">Step 2: Direction Adjustment</h3>
+                <p>The percentile is converted to a score based on whether higher or lower values are desirable:</p>
+                <ul class="mt-2 space-y-1 text-gray-400">
+                    <li><span class="text-green-400">↑ Higher = better</span> (e.g., HNR, pitch variation): percentile rank <em>is</em> the score</li>
+                    <li><span class="text-blue-400">↓ Lower = better</span> (e.g., jitter, vocal fry): score = 100 − percentile</li>
+                    <li><span class="text-amber-400">⊙ Optimal target</span> (e.g., WPM=150): score follows a bell curve around the target — farther away = lower score</li>
+                </ul>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <h3 class="text-white font-medium mb-2">Step 3: Weighted Composite</h3>
+                <p>Individual metric scores are combined using <strong class="text-white">profile-specific weights</strong>. Each scoring profile emphasizes different metrics (see below). The composite score is the weighted sum.</p>
+            </div>
+
+            <div class="bg-gray-900 border border-amber-500/30 rounded-lg p-5">
+                <h3 class="text-amber-400 font-medium mb-2">⚠️ Known Limitation</h3>
+                <p>The current scoring is <strong class="text-white">percentile-based</strong>, meaning scores reflect where a speech ranks <em>within this database</em>, not an absolute quality standard. With {{ total_speeches }} speeches of widely varying types (historical recordings, clinical samples, children's readings, trained orators), the percentiles can be misleading.</p>
+                <p class="mt-2">For example, a speech at the 50th percentile gets a score of 50 (grade F), even though "average" in this database might represent perfectly good speech. We're working on absolute reference ranges to address this.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Profiles -->
+    <section id="profiles" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">4.</span> Scoring Profiles
+        </h2>
+        <p class="text-gray-300 mb-4 text-sm">Each profile weights metrics differently to assess speeches for different purposes:</p>
+
+        {% for name, profile in profiles.items() %}
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-white font-semibold capitalize">{{ name }}</h3>
+                <span class="text-xs text-gray-500">Repetition: {{ profile.repetition_direction | replace('_', ' ') }}</span>
+            </div>
+            <p class="text-sm text-gray-400 mb-3">{{ profile.description }}</p>
+            <div class="flex flex-wrap gap-2">
+                {% for metric_key, weight in profile.weights | dictsort(by='value', reverse=true) %}
+                {% set mdef = metric_defs.get(metric_key, {}) %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs
+                    {% if weight >= 0.15 %}bg-indigo-500/20 text-indigo-300 border border-indigo-500/30
+                    {% elif weight >= 0.10 %}bg-blue-500/15 text-blue-300 border border-blue-500/20
+                    {% elif weight >= 0.07 %}bg-gray-700/50 text-gray-300 border border-gray-600/30
+                    {% else %}bg-gray-800/50 text-gray-500 border border-gray-700/30{% endif %}">
+                    {{ mdef.get('label', metric_key) }}
+                    <span class="font-mono font-bold">{{ "%.0f" | format(weight * 100) }}%</span>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+
+    <!-- 5. Grade Scale -->
+    <section id="grades" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">5.</span> Grade Scale
+        </h2>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <div class="grid grid-cols-5 sm:grid-cols-10 gap-2 text-center">
+                {% set grades = [
+                    ("A+", "97–100", "#22c55e"), ("A", "93–96", "#22c55e"), ("A-", "90–92", "#22c55e"),
+                    ("B+", "87–89", "#3b82f6"), ("B", "83–86", "#3b82f6"), ("B-", "80–82", "#3b82f6"),
+                    ("C+", "77–79", "#f59e0b"), ("C", "73–76", "#f59e0b"), ("C-", "70–72", "#f59e0b"),
+                    ("D+", "67–69", "#f97316"), ("D", "63–66", "#f97316"), ("D-", "60–62", "#f97316"),
+                    ("F", "0–59", "#ef4444"),
+                ] %}
+                {% for letter, range, color in grades %}
+                <div class="py-2">
+                    <div class="text-lg font-black" style="color: {{ color }}">{{ letter }}</div>
+                    <div class="text-[10px] text-gray-500 mt-0.5">{{ range }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <p class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
+                Grade cutoffs follow standard academic thresholds. Because current scoring is percentile-based against {{ total_speeches }} diverse speeches, most scores cluster in the 40–70 range.
+            </p>
+        </div>
+    </section>
+
+    <!-- 6. Limitations -->
+    <section id="limitations" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">6.</span> Limitations &amp; Caveats
+        </h2>
+        <div class="space-y-3 text-sm text-gray-300">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <h3 class="text-white font-medium mb-1">📊 Small Database</h3>
+                <p class="text-gray-400">With {{ total_speeches }} speeches, percentile distributions are not statistically robust. Adding or removing a few speeches can shift scores significantly.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <h3 class="text-white font-medium mb-1">🎙️ Recording Quality Bias</h3>
+                <p class="text-gray-400">Historical recordings (pre-digital) inherently score lower on audio metrics (HNR, SNR, jitter) due to recording technology, not speaker quality. A 1963 MLK speech will always have worse HNR than a 2020 podcast.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <h3 class="text-white font-medium mb-1">🍎🍊 Heterogeneous Comparisons</h3>
+                <p class="text-gray-400">The database includes clinical speech samples, children's readings, casual conversation, and professional oratory. Comparing a dysarthric speaker against a TED talk conflates very different speech goals.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <h3 class="text-white font-medium mb-1">🔁 Repetition Paradox</h3>
+                <p class="text-gray-400">Deliberate rhetorical repetition (MLK's "I have a dream") lowers lexical diversity scores. The system can't distinguish intentional craft from limited vocabulary without additional context.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <h3 class="text-white font-medium mb-1">🔮 Future: Absolute Reference Ranges</h3>
+                <p class="text-gray-400">We plan to replace percentile-based scoring with absolute reference ranges grounded in speech science literature. This will produce stable, meaningful grades independent of database composition.</p>
+            </div>
+        </div>
+    </section>
+
+    {% if is_admin %}
+    <!-- 7. Pipeline Internals (Admin Only) -->
+    <section id="internals" class="mb-10 mt-12 border-t-2 border-indigo-500/30 pt-8">
+        <div class="flex items-center gap-3 mb-6">
+            <span class="bg-indigo-500/20 text-indigo-400 text-xs font-medium px-2 py-1 rounded">ADMIN ONLY</span>
+            <h2 class="text-xl font-semibold text-white flex items-center gap-2">
+                <span class="text-indigo-400">7.</span> Pipeline Internals
+            </h2>
+        </div>
+        
+        <!-- Pipeline Diagram -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+            <h3 class="text-lg font-semibold text-white mb-4">Architecture Diagram</h3>
+            <div class="bg-white rounded-lg p-4 overflow-x-auto">
+                <img src="/static/images/pipeline.png" alt="SpeakFit Pipeline Diagram" class="max-w-full h-auto">
+            </div>
+        </div>
+
+        <!-- Technical Details Grid -->
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+            
+            <!-- Transcription -->
+            <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h3 class="text-lg font-semibold text-blue-400 mb-3">🎙️ Transcription</h3>
+                <p class="text-gray-300 text-sm mb-4">Speech-to-text using OpenAI Whisper large-v3 with CUDA acceleration.</p>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">Model</td>
+                        <td class="py-2 text-white">large-v3 (1.5B params)</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">Device</td>
+                        <td class="py-2 text-white">CUDA (float16)</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">Features</td>
+                        <td class="py-2 text-white">Word timestamps, VAD filter, language detection</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-400">Library</td>
+                        <td class="py-2 text-white">faster-whisper</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Quality Gate -->
+            <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h3 class="text-lg font-semibold text-amber-400 mb-3">📊 Quality Gate</h3>
+                <p class="text-gray-300 text-sm mb-4">Audio quality assessment based on Signal-to-Noise Ratio (SNR).</p>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">HIGH</td>
+                        <td class="py-2 text-green-400">&gt; 15 dB SNR</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">MEDIUM</td>
+                        <td class="py-2 text-yellow-400">8-15 dB SNR</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">LOW</td>
+                        <td class="py-2 text-orange-400">3-8 dB SNR</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-400">UNUSABLE</td>
+                        <td class="py-2 text-red-400">&lt; 3 dB SNR</td>
+                    </tr>
+                </table>
+                <p class="text-gray-500 text-xs mt-3">Modes: block (reject), warn (annotate), skip (no check)</p>
+            </div>
+
+            <!-- Audio Analysis -->
+            <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h3 class="text-lg font-semibold text-cyan-400 mb-3">🔊 Audio Analysis (Praat)</h3>
+                <p class="text-gray-300 text-sm mb-4">Acoustic analysis using parselmouth signal processing.</p>
+                <h4 class="text-white text-sm font-medium mb-2">Core Metrics</h4>
+                <ul class="text-gray-400 text-sm space-y-1 mb-4">
+                    <li>• <span class="text-white">Pitch (F0)</span> — Mean, std, range in Hz</li>
+                    <li>• <span class="text-white">Intensity</span> — Volume dynamics in dB</li>
+                    <li>• <span class="text-white">Jitter/Shimmer/HNR</span> — Voice quality</li>
+                    <li>• <span class="text-white">Pauses</span> — Count, duration, avg length</li>
+                    <li>• <span class="text-white">Speaking Rate</span> — Words per minute</li>
+                </ul>
+                <h4 class="text-white text-sm font-medium mb-2">Advanced Metrics</h4>
+                <ul class="text-gray-400 text-sm space-y-1">
+                    <li>• <span class="text-white">Formants (F1-F3)</span> — Vowel quality</li>
+                    <li>• <span class="text-white">Pitch Contour / Uptalk</span> — Intonation</li>
+                    <li>• <span class="text-white">Vocal Fry</span> — Creaky voice ratio</li>
+                    <li>• <span class="text-white">Rate Variability</span> — Pace changes</li>
+                </ul>
+            </div>
+
+            <!-- Speaker Analysis -->
+            <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h3 class="text-lg font-semibold text-indigo-400 mb-3">👥 Speaker Fingerprinting</h3>
+                <p class="text-gray-300 text-sm mb-4">Voice identification using Resemblyzer embeddings.</p>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">Diarization</td>
+                        <td class="py-2 text-white">Segment-level speaker assignment</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">Embeddings</td>
+                        <td class="py-2 text-white">256-dim voice fingerprint</td>
+                    </tr>
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-gray-400">Clustering</td>
+                        <td class="py-2 text-white">Agglomerative (auto-detect)</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-400">Matching</td>
+                        <td class="py-2 text-white">Cosine similarity ≥80%</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- API Module Reference -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+            <h3 class="text-lg font-semibold text-white mb-4">API Module Selection</h3>
+            <p class="text-gray-400 text-sm mb-4">Control which modules run via <code class="text-blue-400">modules</code> or <code class="text-blue-400">preset</code> parameter.</p>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="text-white text-sm font-medium mb-2">Available Modules</h4>
+                    <table class="w-full text-sm">
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">transcription</td>
+                            <td class="py-1 text-gray-400">Whisper STT (always runs)</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">quality</td>
+                            <td class="py-1 text-gray-400">Audio quality gate</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">diarization</td>
+                            <td class="py-1 text-gray-400">Speaker separation</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">text</td>
+                            <td class="py-1 text-gray-400">Core text analysis</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">advanced_text</td>
+                            <td class="py-1 text-gray-400">Readability, discourse</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">rhetorical</td>
+                            <td class="py-1 text-gray-400">Repetition, rhythm</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">sentiment</td>
+                            <td class="py-1 text-gray-400">Emotion analysis</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-blue-400 font-mono">audio</td>
+                            <td class="py-1 text-gray-400">Core audio (Praat)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1 text-blue-400 font-mono">advanced_audio</td>
+                            <td class="py-1 text-gray-400">Formants, fry, emphasis</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div>
+                    <h4 class="text-white text-sm font-medium mb-2">Presets</h4>
+                    <table class="w-full text-sm">
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-green-400 font-mono">quick</td>
+                            <td class="py-1 text-gray-400">transcription, quality</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-green-400 font-mono">text_only</td>
+                            <td class="py-1 text-gray-400">All text modules</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-green-400 font-mono">audio_only</td>
+                            <td class="py-1 text-gray-400">All audio modules</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-green-400 font-mono">full</td>
+                            <td class="py-1 text-gray-400">Everything</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-1 text-green-400 font-mono">clinical</td>
+                            <td class="py-1 text-gray-400">Voice quality focus</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1 text-green-400 font-mono">coaching</td>
+                            <td class="py-1 text-gray-400">Balanced for feedback</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h3 class="text-lg font-semibold text-white mb-4">Technology Stack</h3>
+            <div class="grid md:grid-cols-3 gap-4 text-sm">
+                <div>
+                    <h4 class="text-gray-400 font-medium mb-2">Speech Processing</h4>
+                    <ul class="text-white space-y-1">
+                        <li>faster-whisper (large-v3)</li>
+                        <li>parselmouth (Praat)</li>
+                        <li>resemblyzer</li>
+                        <li>FFmpeg</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-gray-400 font-medium mb-2">NLP</h4>
+                    <ul class="text-white space-y-1">
+                        <li>spaCy (en_core_web_sm)</li>
+                        <li>sentence-transformers</li>
+                        <li>transformers (RoBERTa)</li>
+                        <li>NLTK</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-gray-400 font-medium mb-2">Infrastructure</h4>
+                    <ul class="text-white space-y-1">
+                        <li>FastAPI</li>
+                        <li>SQLite (WAL mode)</li>
+                        <li>CUDA (RTX 3090)</li>
+                        <li>PyTorch 2.x</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- DB Stats footer -->
+    <div class="text-xs text-gray-600 border-t border-gray-800 pt-4 mt-8">
+        Database: {{ total_speeches }} speeches • {{ total_analyses }} analyses • Scoring engine refreshes distributions every 5 minutes
+    </div>
+</div>
+{% endblock %}

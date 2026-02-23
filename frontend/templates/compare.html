@@ -3,13 +3,13 @@
 
 {% block content %}
 <div class="fade-in">
-    <h1 class="text-2xl font-bold text-white mb-2">Compare Speeches</h1>
-    <p class="text-sm text-gray-400 mb-6">Select speeches to compare side-by-side with scoring.</p>
+    <h1 class="text-2xl font-bold text-white mb-2">Compare Recordings</h1>
+    <p class="text-sm text-gray-400 mb-6">Select recordings to compare side-by-side with scoring.</p>
 
     <!-- Speech Selector -->
     <form method="get" class="flex flex-wrap gap-3 mb-8 items-end">
         <div>
-            <label class="block text-sm text-gray-400 mb-1">Select Speeches</label>
+            <label class="block text-sm text-gray-400 mb-1">Select Recordings</label>
             <select name="ids" id="speechSelect" multiple size="4"
                     class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none w-96">
                 {% for s in speeches %}
@@ -42,7 +42,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 {% if item.score %}{% if loop.index0 == 0 %}border-l-4 border-l-indigo-500{% endif %}{% endif %}">
             <div class="flex items-start justify-between">
                 <div>
-                    <a href="/speeches/{{ item.speech.id }}" class="text-white font-semibold hover:text-indigo-300 transition-colors">
+                    <a href="/recordings/{{ item.speech.id }}" class="text-white font-semibold hover:text-indigo-300 transition-colors">
                         {{ item.speech.title[:40] }}
                     </a>
                     <div class="text-sm text-gray-400 mt-0.5">{{ item.speech.speaker or '—' }}</div>
@@ -165,7 +165,7 @@
         {% endfor %}
     </div>
     {% elif current_ids %}
-    <p class="text-gray-400">No matching speeches found.</p>
+    <p class="text-gray-400">No matching recordings found.</p>
     {% endif %}
 </div>
 {% endblock %}

@@ -69,7 +69,7 @@
                     {% for speech in speeches %}
                     <tr class="hover:bg-gray-800/50 transition-colors">
                         <td class="px-6 py-4">
-                            <a href="/speeches/{{ speech.id }}" class="text-white font-medium hover:text-indigo-400 transition-colors">
+                            <a href="/recordings/{{ speech.id }}" class="text-white font-medium hover:text-indigo-400 transition-colors">
                                 {{ speech.title or 'Untitled' }}
                             </a>
                         </td>
@@ -98,7 +98,7 @@
                         </td>
                         <td class="px-6 py-4 text-gray-400 text-sm">{{ speech.created_at[:10] if speech.created_at else '-' }}</td>
                         <td class="px-6 py-4">
-                            <a href="/speeches/{{ speech.id }}" class="text-indigo-400 hover:text-indigo-300 text-sm">
+                            <a href="/recordings/{{ speech.id }}" class="text-indigo-400 hover:text-indigo-300 text-sm">
                                 View →
                             </a>
                         </td>

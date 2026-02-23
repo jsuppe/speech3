@@ -195,7 +195,7 @@
                 </thead>
                 <tbody>
                     {% for r in recent_recordings %}
-                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/speeches/{{ r.id }}'">
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/recordings/{{ r.id }}'">
                         <td class="py-3 pr-4 text-white">{{ r.title[:50] }}{% if r.title|length > 50 %}...{% endif %}</td>
                         <td class="py-3 pr-4 text-gray-400">{{ r.user_name or 'Unknown' }}</td>
                         <td class="py-3 pr-4 text-right">

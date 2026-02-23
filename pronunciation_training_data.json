@@ -1,0 +1,708 @@
+[
+  {
+    "recording_id": "1",
+    "audio_path": "test_speeches/mlk_dream_climax.mp3",
+    "duration_seconds": 256.18,
+    "total_words": 521,
+    "problem_word_count": 24,
+    "problem_word_ratio": 0.046065259117082535,
+    "mean_word_confidence": 0.9558888671494262,
+    "std_word_confidence": 0.150986982077483,
+    "min_word_confidence": 0.0003104209899902344,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.9990234375,
+    "pct_words_below_50": 0.0345489443378119,
+    "pct_words_below_60": 0.046065259117082535,
+    "pct_words_below_70": 0.053742802303262956,
+    "pct_words_below_80": 0.06525911708253358,
+    "pct_words_below_90": 0.08637236084452975,
+    "mean_pronunciation_score": 0.9558888671494262,
+    "std_pronunciation_score": 0.150986982077483,
+    "min_pronunciation_score": 0.0003104209899902344,
+    "words_per_minute": 122.0235771723007,
+    "mean_word_duration_ms": 404.6449136276393,
+    "std_word_duration_ms": 307.68892518487326,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 48.3,
+    "human_label": null,
+    "title": "I Have a Dream (climax)",
+    "oratory_score": 48.3,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 83.9,
+        "grade": "A+",
+        "grade_color": "#22c55e"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 45.0,
+        "grade": "D",
+        "grade_color": "#f97316"
+      },
+      "language": {
+        "label": "Language & Content",
+        "score": 20.7,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 68.4,
+        "grade": "B+",
+        "grade_color": "#3b82f6"
+      }
+    }
+  },
+  {
+    "recording_id": "2",
+    "audio_path": "test_speeches/mlk_mountaintop_climax.mp3",
+    "duration_seconds": 286.26,
+    "total_words": 551,
+    "problem_word_count": 38,
+    "problem_word_ratio": 0.06896551724137931,
+    "mean_word_confidence": 0.9248692525276904,
+    "std_word_confidence": 0.19642254082645333,
+    "min_word_confidence": 1.6391277313232422e-05,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99609375,
+    "pct_words_below_50": 0.05263157894736842,
+    "pct_words_below_60": 0.06896551724137931,
+    "pct_words_below_70": 0.08166969147005444,
+    "pct_words_below_80": 0.10526315789473684,
+    "pct_words_below_90": 0.14156079854809436,
+    "mean_pronunciation_score": 0.9248692525276904,
+    "std_pronunciation_score": 0.19642254082645333,
+    "min_pronunciation_score": 1.6391277313232422e-05,
+    "words_per_minute": 115.48941521693565,
+    "mean_word_duration_ms": 382.6497277676947,
+    "std_word_duration_ms": 358.0014382086387,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 27.8,
+    "human_label": null,
+    "title": "I've Been to the Mountaintop (climax)",
+    "oratory_score": 27.8,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 33.9,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "3",
+    "audio_path": "test_speeches/cuomo_1984_opening.mp3",
+    "duration_seconds": 177.86,
+    "total_words": 373,
+    "problem_word_count": 9,
+    "problem_word_ratio": 0.024128686327077747,
+    "mean_word_confidence": 0.9663348909570663,
+    "std_word_confidence": 0.12968650882465918,
+    "min_word_confidence": 0.00559234619140625,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.9990234375,
+    "pct_words_below_50": 0.01876675603217158,
+    "pct_words_below_60": 0.024128686327077747,
+    "pct_words_below_70": 0.032171581769437,
+    "pct_words_below_80": 0.05361930294906166,
+    "pct_words_below_90": 0.07238605898123325,
+    "mean_pronunciation_score": 0.9663348909570663,
+    "std_pronunciation_score": 0.12968650882465918,
+    "min_pronunciation_score": 0.00559234619140625,
+    "words_per_minute": 125.82930394692454,
+    "mean_word_duration_ms": 352.4932975871312,
+    "std_word_duration_ms": 227.5913111585393,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 18.9,
+    "human_label": null,
+    "title": "1984 DNC Keynote Address (opening)",
+    "oratory_score": 18.9,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 23.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "6",
+    "audio_path": "test_speeches/jfk_inaugural_clip.mp3",
+    "duration_seconds": 179.98,
+    "total_words": 308,
+    "problem_word_count": 13,
+    "problem_word_ratio": 0.04220779220779221,
+    "mean_word_confidence": 0.9462956651980743,
+    "std_word_confidence": 0.16356052063124543,
+    "min_word_confidence": 0.00040602684020996094,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99853515625,
+    "pct_words_below_50": 0.03571428571428571,
+    "pct_words_below_60": 0.04220779220779221,
+    "pct_words_below_70": 0.05519480519480519,
+    "pct_words_below_80": 0.07467532467532467,
+    "pct_words_below_90": 0.11688311688311688,
+    "mean_pronunciation_score": 0.9462956651980743,
+    "std_pronunciation_score": 0.16356052063124543,
+    "min_pronunciation_score": 0.00040602684020996094,
+    "words_per_minute": 102.67807534170464,
+    "mean_word_duration_ms": 481.94805194805184,
+    "std_word_duration_ms": 410.65844802921526,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 49.3,
+    "human_label": null,
+    "title": "Inaugural Address (opening)",
+    "oratory_score": 49.3,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 66.8,
+        "grade": "B+",
+        "grade_color": "#3b82f6"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 45.5,
+        "grade": "D",
+        "grade_color": "#f97316"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 81.9,
+        "grade": "A+",
+        "grade_color": "#22c55e"
+      }
+    }
+  },
+  {
+    "recording_id": "7",
+    "audio_path": "test_speeches/fdr_war_declaration_clip.mp3",
+    "duration_seconds": 179.98,
+    "total_words": 232,
+    "problem_word_count": 20,
+    "problem_word_ratio": 0.08620689655172414,
+    "mean_word_confidence": 0.9151079292441237,
+    "std_word_confidence": 0.24622388209027202,
+    "min_word_confidence": 5.900859832763672e-06,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99951171875,
+    "pct_words_below_50": 0.08189655172413793,
+    "pct_words_below_60": 0.08620689655172414,
+    "pct_words_below_70": 0.09482758620689655,
+    "pct_words_below_80": 0.09913793103448276,
+    "pct_words_below_90": 0.1206896551724138,
+    "mean_pronunciation_score": 0.9151079292441237,
+    "std_pronunciation_score": 0.24622388209027202,
+    "min_pronunciation_score": 5.900859832763672e-06,
+    "words_per_minute": 77.34192688076453,
+    "mean_word_duration_ms": 558.9655172413791,
+    "std_word_duration_ms": 403.153259363083,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 13.2,
+    "human_label": null,
+    "title": "Declaration of War Against Japan (opening)",
+    "oratory_score": 13.2,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 16.1,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "8",
+    "audio_path": "test_speeches/churchill_pm_clip.mp3",
+    "duration_seconds": 178.9,
+    "total_words": 422,
+    "problem_word_count": 94,
+    "problem_word_ratio": 0.22274881516587677,
+    "mean_word_confidence": 0.7798990008625751,
+    "std_word_confidence": 0.37935399832362104,
+    "min_word_confidence": 4.589557647705078e-06,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99658203125,
+    "pct_words_below_50": 0.2156398104265403,
+    "pct_words_below_60": 0.22274881516587677,
+    "pct_words_below_70": 0.22748815165876776,
+    "pct_words_below_80": 0.24644549763033174,
+    "pct_words_below_90": 0.2796208530805687,
+    "mean_pronunciation_score": 0.7798990008625751,
+    "std_pronunciation_score": 0.37935399832362104,
+    "min_pronunciation_score": 4.589557647705078e-06,
+    "words_per_minute": 141.53158188932366,
+    "mean_word_duration_ms": 362.8436018957345,
+    "std_word_duration_ms": 418.466472742769,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 21.4,
+    "human_label": null,
+    "title": "First Radio Address as Prime Minister (opening)",
+    "oratory_score": 21.4,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 26.1,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "10",
+    "audio_path": "test_speeches/stokely_black_power_clip.mp3",
+    "duration_seconds": 75.38,
+    "total_words": 191,
+    "problem_word_count": 8,
+    "problem_word_ratio": 0.041884816753926704,
+    "mean_word_confidence": 0.9440713053598454,
+    "std_word_confidence": 0.1527651910417793,
+    "min_word_confidence": 0.003662109375,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99609375,
+    "pct_words_below_50": 0.041884816753926704,
+    "pct_words_below_60": 0.041884816753926704,
+    "pct_words_below_70": 0.06806282722513089,
+    "pct_words_below_80": 0.08900523560209424,
+    "pct_words_below_90": 0.11518324607329843,
+    "mean_pronunciation_score": 0.9440713053598454,
+    "std_pronunciation_score": 0.1527651910417793,
+    "min_pronunciation_score": 0.003662109375,
+    "words_per_minute": 152.02971610506768,
+    "mean_word_duration_ms": 347.53926701570686,
+    "std_word_duration_ms": 315.7268971579573,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 20.5,
+    "human_label": null,
+    "title": "On Black Power",
+    "oratory_score": 20.5,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 25.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "11",
+    "audio_path": "test_speeches/nixon_checkers_clip.mp3",
+    "duration_seconds": 179.98,
+    "total_words": 478,
+    "problem_word_count": 36,
+    "problem_word_ratio": 0.07531380753138076,
+    "mean_word_confidence": 0.9333481798818754,
+    "std_word_confidence": 0.20710489656042322,
+    "min_word_confidence": 7.957220077514648e-05,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.999267578125,
+    "pct_words_below_50": 0.058577405857740586,
+    "pct_words_below_60": 0.07531380753138076,
+    "pct_words_below_70": 0.08368200836820083,
+    "pct_words_below_80": 0.0899581589958159,
+    "pct_words_below_90": 0.10460251046025104,
+    "mean_pronunciation_score": 0.9333481798818754,
+    "std_pronunciation_score": 0.20710489656042322,
+    "min_pronunciation_score": 7.957220077514648e-05,
+    "words_per_minute": 159.3510390043338,
+    "mean_word_duration_ms": 323.93305439330544,
+    "std_word_duration_ms": 226.12899389091737,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 24.3,
+    "human_label": null,
+    "title": "Checkers Speech (opening)",
+    "oratory_score": 24.3,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 29.6,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "12",
+    "audio_path": "test_speeches/reagan_inaugural_clip.mp3",
+    "duration_seconds": 145.24,
+    "total_words": 300,
+    "problem_word_count": 14,
+    "problem_word_ratio": 0.04666666666666667,
+    "mean_word_confidence": 0.9419431735740769,
+    "std_word_confidence": 0.1951277853371188,
+    "min_word_confidence": 0.0008063316345214844,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.998046875,
+    "pct_words_below_50": 0.043333333333333335,
+    "pct_words_below_60": 0.04666666666666667,
+    "pct_words_below_70": 0.06333333333333334,
+    "pct_words_below_80": 0.07333333333333333,
+    "pct_words_below_90": 0.08666666666666667,
+    "mean_pronunciation_score": 0.9419431735740769,
+    "std_pronunciation_score": 0.1951277853371188,
+    "min_pronunciation_score": 0.0008063316345214844,
+    "words_per_minute": 123.93280088129991,
+    "mean_word_duration_ms": 385.3999999999997,
+    "std_word_duration_ms": 238.4131707771204,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 22.2,
+    "human_label": null,
+    "title": "Inaugural Address",
+    "oratory_score": 22.2,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 27.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 0.0,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "13",
+    "audio_path": "test_speeches/reagan_berlin_wall_clip.mp3",
+    "duration_seconds": 115.8,
+    "total_words": 303,
+    "problem_word_count": 12,
+    "problem_word_ratio": 0.039603960396039604,
+    "mean_word_confidence": 0.9614311444877398,
+    "std_word_confidence": 0.14066094521916356,
+    "min_word_confidence": 0.0030059814453125,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.9990234375,
+    "pct_words_below_50": 0.0297029702970297,
+    "pct_words_below_60": 0.039603960396039604,
+    "pct_words_below_70": 0.052805280528052806,
+    "pct_words_below_80": 0.056105610561056105,
+    "pct_words_below_90": 0.07260726072607261,
+    "mean_pronunciation_score": 0.9614311444877398,
+    "std_pronunciation_score": 0.14066094521916356,
+    "min_pronunciation_score": 0.0030059814453125,
+    "words_per_minute": 156.99481865284974,
+    "mean_word_duration_ms": 326.0066006600661,
+    "std_word_duration_ms": 168.25122645602352,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 27.4,
+    "human_label": null,
+    "title": "Address on the Berlin Wall",
+    "oratory_score": 27.4,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 62.3,
+        "grade": "B",
+        "grade_color": "#3b82f6"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 19.7,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 27.9,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  },
+  {
+    "recording_id": "14",
+    "audio_path": "test_speeches/steve_jobs_clip.mp3",
+    "duration_seconds": 179.02,
+    "total_words": 422,
+    "problem_word_count": 12,
+    "problem_word_ratio": 0.02843601895734597,
+    "mean_word_confidence": 0.9726006024256701,
+    "std_word_confidence": 0.12640067021855178,
+    "min_word_confidence": 0.01361846923828125,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99951171875,
+    "pct_words_below_50": 0.018957345971563982,
+    "pct_words_below_60": 0.02843601895734597,
+    "pct_words_below_70": 0.035545023696682464,
+    "pct_words_below_80": 0.04265402843601896,
+    "pct_words_below_90": 0.04265402843601896,
+    "mean_pronunciation_score": 0.9726006024256701,
+    "std_pronunciation_score": 0.12640067021855178,
+    "min_pronunciation_score": 0.01361846923828125,
+    "words_per_minute": 141.43671098201315,
+    "mean_word_duration_ms": 282.32227488151636,
+    "std_word_duration_ms": 164.34073500369476,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 41.6,
+    "human_label": null,
+    "title": "Stanford Commencement (opening)",
+    "oratory_score": 41.6,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 75.3,
+        "grade": "A+",
+        "grade_color": "#22c55e"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 34.2,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 44.9,
+        "grade": "D",
+        "grade_color": "#f97316"
+      }
+    }
+  },
+  {
+    "recording_id": "15",
+    "audio_path": "test_speeches/steve_jobs_mid_clip.mp3",
+    "duration_seconds": 179.98,
+    "total_words": 480,
+    "problem_word_count": 30,
+    "problem_word_ratio": 0.0625,
+    "mean_word_confidence": 0.9350104758308995,
+    "std_word_confidence": 0.2008617627269605,
+    "min_word_confidence": 0.00013172626495361328,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99951171875,
+    "pct_words_below_50": 0.058333333333333334,
+    "pct_words_below_60": 0.0625,
+    "pct_words_below_70": 0.07291666666666667,
+    "pct_words_below_80": 0.09375,
+    "pct_words_below_90": 0.1125,
+    "mean_pronunciation_score": 0.9350104758308995,
+    "std_pronunciation_score": 0.2008617627269605,
+    "min_pronunciation_score": 0.00013172626495361328,
+    "words_per_minute": 160.01777975330592,
+    "mean_word_duration_ms": 275.04166666666674,
+    "std_word_duration_ms": 170.27795393773712,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 37.6,
+    "human_label": null,
+    "title": "Stanford Commencement (connecting the dots)",
+    "oratory_score": 37.6,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 73.0,
+        "grade": "A",
+        "grade_color": "#22c55e"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 29.9,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 43.7,
+        "grade": "D-",
+        "grade_color": "#f97316"
+      }
+    }
+  },
+  {
+    "recording_id": "18",
+    "audio_path": "test_speeches/carl_sagan_commencement_clip.mp3",
+    "duration_seconds": 179.96,
+    "total_words": 317,
+    "problem_word_count": 17,
+    "problem_word_ratio": 0.05362776025236593,
+    "mean_word_confidence": 0.9444695924860194,
+    "std_word_confidence": 0.18055184550130296,
+    "min_word_confidence": 6.300210952758789e-05,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.99853515625,
+    "pct_words_below_50": 0.0473186119873817,
+    "pct_words_below_60": 0.05362776025236593,
+    "pct_words_below_70": 0.056782334384858045,
+    "pct_words_below_80": 0.06624605678233439,
+    "pct_words_below_90": 0.0946372239747634,
+    "mean_pronunciation_score": 0.9444695924860194,
+    "std_pronunciation_score": 0.18055184550130296,
+    "min_pronunciation_score": 6.300210952758789e-05,
+    "words_per_minute": 105.69015336741498,
+    "mean_word_duration_ms": 424.6687697160883,
+    "std_word_duration_ms": 307.68234172524075,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 29.9,
+    "human_label": null,
+    "title": "Commencement Address (1990)",
+    "oratory_score": 29.9,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 58.7,
+        "grade": "C+",
+        "grade_color": "#f59e0b"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 23.6,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 53.0,
+        "grade": "C-",
+        "grade_color": "#f59e0b"
+      }
+    }
+  },
+  {
+    "recording_id": "20",
+    "audio_path": "test_speeches/bahnsen_debate_clip.mp3",
+    "duration_seconds": 172.66,
+    "total_words": 565,
+    "problem_word_count": 12,
+    "problem_word_ratio": 0.021238938053097345,
+    "mean_word_confidence": 0.9676130986846654,
+    "std_word_confidence": 0.11051628181874212,
+    "min_word_confidence": 0.0235443115234375,
+    "max_word_confidence": 1.0,
+    "median_word_confidence": 0.9990234375,
+    "pct_words_below_50": 0.01415929203539823,
+    "pct_words_below_60": 0.021238938053097345,
+    "pct_words_below_70": 0.033628318584070796,
+    "pct_words_below_80": 0.04601769911504425,
+    "pct_words_below_90": 0.07964601769911504,
+    "mean_pronunciation_score": 0.9676130986846654,
+    "std_pronunciation_score": 0.11051628181874212,
+    "min_pronunciation_score": 0.0235443115234375,
+    "words_per_minute": 196.33962701262598,
+    "mean_word_duration_ms": 265.4867256637169,
+    "std_word_duration_ms": 206.01997991621332,
+    "total_issues": 0,
+    "unique_issue_types": 0,
+    "human_score": 28.6,
+    "human_label": null,
+    "title": "The Great Debate: Does God Exist? (Opening Argument)",
+    "oratory_score": 28.6,
+    "category_scores": {
+      "delivery": {
+        "label": "Delivery & Pace",
+        "score": 48.4,
+        "grade": "D+",
+        "grade_color": "#f97316"
+      },
+      "voice": {
+        "label": "Voice Quality",
+        "score": 24.3,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      },
+      "expression": {
+        "label": "Expressiveness",
+        "score": 34.1,
+        "grade": "F",
+        "grade_color": "#ef4444"
+      }
+    }
+  }
+]

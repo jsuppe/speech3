@@ -6,71 +6,71 @@
       "unit": "WPM",
       "grades": {
         "A": {
-          "value": 131.0,
-          "speaker": "Martin Luther King Jr.",
-          "title": "I Have a Dream (climax)",
-          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
+          "value": 126.0,
+          "speaker": "LibriVox Volunteer",
+          "title": "The Aesop for Children \u2014 Fables 1-4",
+          "audio_url": "/static/exemplars/aesop_children_fables_clip.mp3"
         },
         "B": {
-          "value": 121.0,
-          "speaker": "Martin Luther King Jr.",
-          "title": "I've Been to the Mountaintop (climax)",
-          "audio_url": "/static/exemplars/mlk_mountaintop_climax.mp3"
+          "value": 103.2,
+          "speaker": "Carl Sagan",
+          "title": "Commencement Address (1990)",
+          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
         },
         "C": {
-          "value": 107.4,
+          "value": 95.0,
           "speaker": "John F. Kennedy",
           "title": "Inaugural Address (opening)",
           "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
         },
         "D": {
-          "value": 75.7,
-          "speaker": "Franklin D. Roosevelt",
-          "title": "Declaration of War Against Japan (opening)",
-          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+          "value": 212.9,
+          "speaker": "April Sadowski",
+          "title": "Alice in Wonderland Ch1 - April Sadowski",
+          "audio_url": "/static/exemplars/alice_wonderland_clip.mp3"
         },
         "F": {
-          "value": 37.3,
-          "speaker": "Anonymous patient",
-          "title": "Dysarthric Speech - Before Therapy",
-          "audio_url": "/static/exemplars/dysarthric_original.wav"
+          "value": 79.0,
+          "speaker": "King George VI",
+          "title": "King George VI Empire Day Address 1940",
+          "audio_url": "/static/exemplars/king_george_vi_clip.mp3"
         }
       }
     },
     "pitch_variation": {
       "label": "Pitch Variation",
       "direction": "higher_better",
-      "unit": "Hz",
+      "unit": "Hz std",
       "grades": {
         "A": {
-          "value": 112.1,
-          "speaker": "Franklin D. Roosevelt",
-          "title": "Declaration of War Against Japan (opening)",
-          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
-        },
-        "B": {
           "value": 58.7,
           "speaker": "John F. Kennedy",
           "title": "Inaugural Address (opening)",
           "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
         },
+        "B": {
+          "value": 49.8,
+          "speaker": "LibriVox Volunteer",
+          "title": "Grimms Fairy Tales - The Golden Bird",
+          "audio_url": "/static/exemplars/grimm_golden_bird_clip.mp3"
+        },
         "C": {
-          "value": 52.1,
-          "speaker": "Ian Woolf",
-          "title": "Mild Aphasia \u2014 First-Person Account",
-          "audio_url": "/static/exemplars/mild_aphasia_clip.mp3"
+          "value": 43.0,
+          "speaker": "Carl Sagan",
+          "title": "Commencement Address (1990)",
+          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
         },
         "D": {
-          "value": 31.9,
-          "speaker": "Ronald Reagan",
-          "title": "Address on the Berlin Wall",
-          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
+          "value": 39.7,
+          "speaker": "Steve Jobs",
+          "title": "Stanford Commencement (opening)",
+          "audio_url": "/static/exemplars/steve_jobs_clip.mp3"
         },
         "F": {
-          "value": 22.3,
-          "speaker": "Winston Churchill",
-          "title": "First Radio Address as Prime Minister (opening)",
-          "audio_url": "/static/exemplars/churchill_pm_clip.mp3"
+          "value": 31.1,
+          "speaker": "King George VI",
+          "title": "King George VI Empire Day Address 1940",
+          "audio_url": "/static/exemplars/king_george_vi_clip.mp3"
         }
       }
     },
@@ -79,29 +79,35 @@
       "direction": "higher_better",
       "unit": "dB",
       "grades": {
-        "B": {
-          "value": 13.6,
+        "A": {
+          "value": 13.3,
           "speaker": "April Sadowski",
           "title": "Alice in Wonderland Ch1 - April Sadowski",
           "audio_url": "/static/exemplars/alice_wonderland_clip.mp3"
         },
+        "B": {
+          "value": 12.7,
+          "speaker": "King George VI",
+          "title": "King George VI Empire Day Address 1940",
+          "audio_url": "/static/exemplars/king_george_vi_clip.mp3"
+        },
         "C": {
-          "value": 11.3,
+          "value": 11.9,
           "speaker": "LibriVox Volunteer",
-          "title": "A Primary Reader - Children's Stories",
-          "audio_url": "/static/exemplars/children_reading_clip.mp3"
+          "title": "The Aesop for Children \u2014 Fables 1-4",
+          "audio_url": "/static/exemplars/aesop_children_fables_clip.mp3"
         },
         "D": {
-          "value": 9.9,
-          "speaker": "John F. Kennedy",
-          "title": "Inaugural Address (opening)",
-          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+          "value": 11.0,
+          "speaker": "Carl Sagan",
+          "title": "Commencement Address (1990)",
+          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
         },
         "F": {
-          "value": 5.8,
-          "speaker": "Franklin D. Roosevelt",
-          "title": "Declaration of War Against Japan (opening)",
-          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+          "value": 9.3,
+          "speaker": "LibriVox Volunteer",
+          "title": "Grimms Fairy Tales - The Golden Bird",
+          "audio_url": "/static/exemplars/grimm_golden_bird_clip.mp3"
         }
       }
     },
@@ -111,34 +117,34 @@
       "unit": "%",
       "grades": {
         "A": {
-          "value": 1.11,
-          "speaker": "John F. Kennedy",
-          "title": "Inaugural Address (opening)",
-          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+          "value": 1.76,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I Have a Dream (climax)",
+          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
         },
         "B": {
-          "value": 2.26,
-          "speaker": "Winston Churchill",
-          "title": "First Radio Address as Prime Minister (opening)",
-          "audio_url": "/static/exemplars/churchill_pm_clip.mp3"
+          "value": 2.05,
+          "speaker": "J. Pearson (autistic speaker)",
+          "title": "Shades of the Spectrum - Autism Podcast",
+          "audio_url": "/static/exemplars/autism_spectrum_clip.mp3"
         },
         "C": {
-          "value": 2.34,
-          "speaker": "Stokely Carmichael",
-          "title": "On Black Power",
-          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
+          "value": 2.23,
+          "speaker": "King George VI",
+          "title": "King George VI Empire Day Address 1940",
+          "audio_url": "/static/exemplars/king_george_vi_clip.mp3"
         },
         "D": {
-          "value": 2.82,
+          "value": 2.27,
+          "speaker": "LibriVox Volunteer",
+          "title": "A Primary Reader - Children's Stories",
+          "audio_url": "/static/exemplars/children_reading_clip.mp3"
+        },
+        "F": {
+          "value": 2.9,
           "speaker": "Ronald Reagan",
           "title": "Address on the Berlin Wall",
           "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
-        },
-        "F": {
-          "value": 4.37,
-          "speaker": "Franklin D. Roosevelt",
-          "title": "Declaration of War Against Japan (opening)",
-          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
         }
       }
     },
@@ -147,6 +153,18 @@
       "direction": "lower_better",
       "unit": "%",
       "grades": {
+        "A": {
+          "value": 9.64,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I Have a Dream (climax)",
+          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
+        },
+        "B": {
+          "value": 10.18,
+          "speaker": "Adlai Stevenson",
+          "title": "Cuban Missile Confrontation at UN",
+          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+        },
         "C": {
           "value": 10.66,
           "speaker": "John F. Kennedy",
@@ -154,16 +172,16 @@
           "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
         },
         "D": {
-          "value": 12.32,
-          "speaker": "Stokely Carmichael",
-          "title": "On Black Power",
-          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
+          "value": 11.26,
+          "speaker": "Ronald Reagan",
+          "title": "Address on the Berlin Wall",
+          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
         },
         "F": {
-          "value": 15.12,
-          "speaker": "Franklin D. Roosevelt",
-          "title": "Declaration of War Against Japan (opening)",
-          "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
+          "value": 11.62,
+          "speaker": "Steve Jobs",
+          "title": "Stanford Commencement (opening)",
+          "audio_url": "/static/exemplars/steve_jobs_clip.mp3"
         }
       }
     },
@@ -175,32 +193,32 @@
         "A": {
           "value": 0.0,
           "speaker": "Franklin D. Roosevelt",
-          "title": "Declaration of War Against Japan (opening)",
+          "title": "Declaration of War Against Japan",
           "audio_url": "/static/exemplars/fdr_war_declaration_clip.mp3"
         },
         "B": {
-          "value": 0.01,
-          "speaker": "Winston Churchill",
-          "title": "First Radio Address as Prime Minister (opening)",
-          "audio_url": "/static/exemplars/churchill_pm_clip.mp3"
+          "value": 0.002,
+          "speaker": "Martin Luther King Jr.",
+          "title": "I Have a Dream (climax)",
+          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
         },
         "C": {
-          "value": 0.04,
-          "speaker": "Ronald Reagan",
-          "title": "Inaugural Address",
-          "audio_url": "/static/exemplars/reagan_inaugural_clip.mp3"
+          "value": 0.006,
+          "speaker": "Steve Jobs",
+          "title": "Stanford Commencement (opening)",
+          "audio_url": "/static/exemplars/steve_jobs_clip.mp3"
         },
         "D": {
-          "value": 0.07,
-          "speaker": "Carl Sagan",
-          "title": "Commencement Address (1990)",
-          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
+          "value": 0.012,
+          "speaker": "Stokely Carmichael",
+          "title": "On Black Power",
+          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
         },
         "F": {
-          "value": 0.3,
-          "speaker": "John F. Kennedy",
-          "title": "Inaugural Address (opening)",
-          "audio_url": "/static/exemplars/jfk_inaugural_clip.mp3"
+          "value": 0.06,
+          "speaker": "King George VI",
+          "title": "King George VI Empire Day Address 1940",
+          "audio_url": "/static/exemplars/king_george_vi_clip.mp3"
         }
       }
     },
@@ -215,17 +233,11 @@
           "title": "Dysarthric Speech - Before Therapy",
           "audio_url": "/static/exemplars/dysarthric_original.wav"
         },
-        "C": {
-          "value": 0.84,
-          "speaker": "Lou Gehrig",
-          "title": "Farewell to Baseball",
-          "audio_url": "/static/exemplars/gehrig_farewell_clip.mp3"
-        },
         "F": {
-          "value": 0.3,
-          "speaker": "Martin Luther King Jr.",
-          "title": "I Have a Dream (climax)",
-          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
+          "value": 0.54,
+          "speaker": "Ronald Reagan",
+          "title": "Address on the Berlin Wall",
+          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
         }
       }
     },
@@ -235,34 +247,28 @@
       "unit": "dB",
       "grades": {
         "A": {
-          "value": 51.5,
+          "value": 44.9,
           "speaker": "LibriVox Volunteer",
-          "title": "The Aesop for Children \u2014 Fables 1-4",
-          "audio_url": "/static/exemplars/aesop_children_fables_clip.mp3"
-        },
-        "B": {
-          "value": 40.2,
-          "speaker": "Larry Gifford, Soania Mathur, Tim Hague (all have PD)",
-          "title": "PD Avengers - Parkinson's Disease Speakers",
-          "audio_url": "/static/exemplars/parkinsons_pd_avengers_clip.mp3"
+          "title": "Grimms Fairy Tales - The Golden Bird",
+          "audio_url": "/static/exemplars/grimm_golden_bird_clip.mp3"
         },
         "C": {
-          "value": 36.7,
-          "speaker": "Lou Gehrig",
-          "title": "Farewell to Baseball",
-          "audio_url": "/static/exemplars/gehrig_farewell_clip.mp3"
+          "value": 32.5,
+          "speaker": "Steve Jobs",
+          "title": "Stanford Commencement (opening)",
+          "audio_url": "/static/exemplars/steve_jobs_clip.mp3"
         },
         "D": {
-          "value": 26.1,
-          "speaker": "Carl Sagan",
-          "title": "Commencement Address (1990)",
-          "audio_url": "/static/exemplars/carl_sagan_commencement_clip.mp3"
+          "value": 31.3,
+          "speaker": "J. Pearson (autistic speaker)",
+          "title": "Shades of the Spectrum - Autism Podcast",
+          "audio_url": "/static/exemplars/autism_spectrum_clip.mp3"
         },
         "F": {
-          "value": 20.2,
-          "speaker": "Greg Bahnsen",
-          "title": "The Great Debate: Does God Exist? (Opening Argumen",
-          "audio_url": "/static/exemplars/bahnsen_debate_clip.mp3"
+          "value": 23.8,
+          "speaker": "Ronald Reagan",
+          "title": "Address on the Berlin Wall",
+          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
         }
       }
     },
@@ -272,34 +278,28 @@
       "unit": "Hz",
       "grades": {
         "A": {
-          "value": 423.0,
-          "speaker": "Martin Luther King Jr.",
-          "title": "I Have a Dream (climax)",
-          "audio_url": "/static/exemplars/mlk_dream_climax.mp3"
-        },
-        "B": {
-          "value": 415.3,
-          "speaker": "Lou Gehrig",
-          "title": "Farewell to Baseball",
-          "audio_url": "/static/exemplars/gehrig_farewell_clip.mp3"
+          "value": 417.4,
+          "speaker": "Steve Jobs",
+          "title": "Stanford Commencement (opening)",
+          "audio_url": "/static/exemplars/steve_jobs_clip.mp3"
         },
         "C": {
-          "value": 389.7,
-          "speaker": "Stokely Carmichael",
-          "title": "On Black Power",
-          "audio_url": "/static/exemplars/stokely_black_power_clip.mp3"
+          "value": 373.6,
+          "speaker": "Ronald Reagan",
+          "title": "Address on the Berlin Wall",
+          "audio_url": "/static/exemplars/reagan_berlin_wall_clip.mp3"
         },
         "D": {
-          "value": 352.0,
-          "speaker": "Mario Cuomo",
-          "title": "1984 DNC Keynote Address (opening)",
-          "audio_url": "/static/exemplars/cuomo_1984_opening.mp3"
+          "value": 325.1,
+          "speaker": "HPR contributor",
+          "title": "HPR - Speech Impediments Discussion",
+          "audio_url": "/static/exemplars/hpr_speech_impediments_clip.mp3"
         },
         "F": {
-          "value": 170.3,
-          "speaker": "Ronald Reagan",
-          "title": "Inaugural Address",
-          "audio_url": "/static/exemplars/reagan_inaugural_clip.mp3"
+          "value": 273.3,
+          "speaker": "King George VI",
+          "title": "King George VI Empire Day Address 1940",
+          "audio_url": "/static/exemplars/king_george_vi_clip.mp3"
         }
       }
     }

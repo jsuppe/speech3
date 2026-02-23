@@ -4,6 +4,37 @@ All notable changes to the SpeechScore platform (API, Web Dashboard, Mobile App)
 
 ## [Unreleased]
 
+### 2026-02-21
+
+#### Mobile App (Flutter) - Patch 28: Gamification System
+- **Added** Streak & XP tracking on home screen
+- **Added** Achievement badges system (20 achievements across 6 categories)
+- **Added** Level progression (1-20 with XP thresholds)
+- **Added** Daily XP goals (50 XP/day)
+- **Added** Achievement popup notifications when badges are earned
+- **Added** Achievements screen (tap streak card to view all)
+- **Added** Notification service for coach messages and achievements
+
+#### API (SpeakFit)
+- **Added** Gamification endpoints (`/v1/gamification/*`)
+  - `GET /status` — streak, XP, level, recent achievements
+  - `GET /achievements` — all badges with progress
+  - `POST /check` — check for newly earned achievements
+  - `GET /achievements/unnotified` — for push notifications
+  - `POST /achievements/mark-notified` — mark as shown
+  - `GET /leaderboard` — weekly/monthly XP rankings
+  - `GET /levels` — level threshold info
+- **Added** Database tables: `user_streaks`, `achievements`, `user_achievements`, `activity_log`
+- **Added** XP awards on recording (25 XP + bonus for high scores)
+- **Added** XP awards on coach chat (5 XP)
+- **Added** Achievement checks after activities
+- **Added** Pronunciation Grade Samples — 54 TTS-generated audio samples
+  - 6 grade levels (A+, A, B, C, D, F) demonstrating pronunciation quality
+  - 3 categories: clarity, consonants, vowels
+  - API endpoint: `GET /v1/speeches/pronunciation/samples`
+  - Static files: `/static/pronunciation_samples/*.mp3`
+  - Generator script: `tools/generate_pronunciation_samples.py`
+
 ### 2026-02-18 (Parity Check)
 
 #### Web Dashboard (speechscore.dev)

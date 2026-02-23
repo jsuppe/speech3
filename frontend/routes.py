@@ -525,13 +525,32 @@ async def dashboard(request: Request):
 
 
 @router.get("/speeches", response_class=HTMLResponse)
-async def speech_list(
+async def speech_list_redirect(
     request: Request,
     category: str = Query(None),
     product: str = Query(None),
     q: str = Query(None),
 ):
-    """Browse all speeches with filters."""
+    """Redirect old /speeches URL to /recordings."""
+    params = []
+    if category:
+        params.append(f"category={category}")
+    if product:
+        params.append(f"product={product}")
+    if q:
+        params.append(f"q={q}")
+    url = "/recordings" + ("?" + "&".join(params) if params else "")
+    return RedirectResponse(url=url, status_code=301)
+
+
+@router.get("/recordings", response_class=HTMLResponse)
+async def recording_list(
+    request: Request,
+    category: str = Query(None),
+    product: str = Query(None),
+    q: str = Query(None),
+):
+    """Browse all recordings with filters."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/", status_code=302)
@@ -580,12 +599,25 @@ async def speech_list(
 
 
 @router.get("/speeches/{speech_id}", response_class=HTMLResponse)
-async def speech_detail(
+async def speech_detail_redirect(
     request: Request,
     speech_id: int,
     profile: str = Query("general"),
 ):
-    """Detailed view of a single speech analysis."""
+    """Redirect old /speeches/{id} URL to /recordings/{id}."""
+    url = f"/recordings/{speech_id}"
+    if profile != "general":
+        url += f"?profile={profile}"
+    return RedirectResponse(url=url, status_code=301)
+
+
+@router.get("/recordings/{speech_id}", response_class=HTMLResponse)
+async def recording_detail(
+    request: Request,
+    speech_id: int,
+    profile: str = Query("general"),
+):
+    """Detailed view of a single recording analysis."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/", status_code=302)
@@ -625,6 +657,7 @@ async def speech_detail(
 
 
 @router.get("/speeches/{speech_id}/spectrogram.png")
+@router.get("/recordings/{speech_id}/spectrogram.png")
 async def frontend_spectrogram(speech_id: int):
     """Serve spectrogram image for frontend (no auth required)."""
     from fastapi.responses import Response
@@ -646,6 +679,7 @@ async def frontend_spectrogram(speech_id: int):
 
 
 @router.get("/speeches/{speech_id}/audio.opus")
+@router.get("/recordings/{speech_id}/audio.opus")
 async def frontend_audio(speech_id: int):
     """Serve audio for frontend player (no auth required)."""
     from fastapi.responses import Response

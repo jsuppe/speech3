@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAGI Team Picnic 🎮</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            overflow: hidden;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            padding: 15px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+        #info h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .avatar-label {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="info">
+        <h1>🎮 MAGI Team Picnic</h1>
+        <p>💎 Gemma · 🗿 Melchior · 🦆 Caspar</p>
+        <p style="margin-top: 10px; opacity: 0.7">Drag to rotate · Scroll to zoom</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(8, 6, 12);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1, 0);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const sunLight = new THREE.DirectionalLight(0xffffcc, 1);
+        sunLight.position.set(10, 20, 10);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 50;
+        sunLight.shadow.camera.left = -20;
+        sunLight.shadow.camera.right = 20;
+        sunLight.shadow.camera.top = 20;
+        sunLight.shadow.camera.bottom = -20;
+        scene.add(sunLight);
+        
+        // Helper function to create blocky avatar
+        function createBlockyAvatar(config) {
+            const group = new THREE.Group();
+            
+            // Body
+            const bodyGeo = new THREE.BoxGeometry(1, 1.2, 0.6);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: config.bodyColor });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1.1;
+            body.castShadow = true;
+            group.add(body);
+            
+            // Head
+            const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const headMat = new THREE.MeshStandardMaterial({ color: config.headColor });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.1;
+            head.castShadow = true;
+            group.add(head);
+            
+            // Eyes
+            const eyeGeo = new THREE.BoxGeometry(0.15, 0.15, 0.1);
+            const eyeMat = new THREE.MeshStandardMaterial({ color: config.eyeColor || 0xffffff });
+            const pupilMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            [-0.2, 0.2].forEach(x => {
+                const eye = new THREE.Mesh(eyeGeo, eyeMat);
+                eye.position.set(x, 2.15, 0.4);
+                group.add(eye);
+                
+                const pupil = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.08, 0.05),
+                    pupilMat
+                );
+                pupil.position.set(x, 2.15, 0.45);
+                group.add(pupil);
+            });
+            
+            // Arms
+            const armGeo = new THREE.BoxGeometry(0.25, 0.8, 0.25);
+            const armMat = new THREE.MeshStandardMaterial({ color: config.armColor || config.bodyColor });
+            
+            const leftArm = new THREE.Mesh(armGeo, armMat);
+            leftArm.position.set(-0.7, 1.1, 0);
+            leftArm.rotation.z = config.leftArmRotation || 0;
+            leftArm.castShadow = true;
+            group.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeo, armMat);
+            rightArm.position.set(0.7, 1.1, 0);
+            rightArm.rotation.z = config.rightArmRotation || 0;
+            rightArm.castShadow = true;
+            group.add(rightArm);
+            
+            // Legs
+            const legGeo = new THREE.BoxGeometry(0.3, 0.7, 0.3);
+            const legMat = new THREE.MeshStandardMaterial({ color: config.legColor || 0x333333 });
+            
+            const leftLeg = new THREE.Mesh(legGeo, legMat);
+            leftLeg.position.set(-0.25, 0.35, 0);
+            leftLeg.castShadow = true;
+            group.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeo, legMat);
+            rightLeg.position.set(0.25, 0.35, 0);
+            rightLeg.castShadow = true;
+            group.add(rightLeg);
+            
+            // Special features
+            if (config.special) {
+                config.special(group);
+            }
+            
+            return group;
+        }
+        
+        // Gemma - Purple/Crystal themed 💎
+        const gemma = createBlockyAvatar({
+            bodyColor: 0x9b59b6,  // Purple
+            headColor: 0xd4a5ff,  // Light purple/lavender
+            armColor: 0x9b59b6,
+            legColor: 0x5b2c6f,
+            leftArmRotation: -0.3,
+            rightArmRotation: 0.5,
+            special: (group) => {
+                // Crystal crown
+                const crystalGeo = new THREE.ConeGeometry(0.15, 0.4, 4);
+                const crystalMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xe8daef,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                [-0.2, 0, 0.2].forEach((x, i) => {
+                    const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                    crystal.position.set(x, 2.6 + (i === 1 ? 0.1 : 0), 0);
+                    crystal.rotation.x = Math.PI;
+                    group.add(crystal);
+                });
+            }
+        });
+        gemma.position.set(-2.5, 0, 0);
+        gemma.rotation.y = 0.3;
+        scene.add(gemma);
+        
+        // Melchior - Stone/Moai themed 🗿
+        const melchior = createBlockyAvatar({
+            bodyColor: 0x5d6d7e,  // Blue-gray
+            headColor: 0x7f8c8d,  // Stone gray
+            armColor: 0x5d6d7e,
+            legColor: 0x2c3e50,
+            leftArmRotation: 0.2,
+            rightArmRotation: -0.4,
+            special: (group) => {
+                // Moai-like brow
+                const browGeo = new THREE.BoxGeometry(0.7, 0.15, 0.2);
+                const browMat = new THREE.MeshStandardMaterial({ color: 0x566573 });
+                const brow = new THREE.Mesh(browGeo, browMat);
+                brow.position.set(0, 2.35, 0.35);
+                group.add(brow);
+                
+                // Stoic expression line
+                const mouthGeo = new THREE.BoxGeometry(0.3, 0.05, 0.1);
+                const mouthMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+                const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+                mouth.position.set(0, 1.9, 0.4);
+                group.add(mouth);
+            }
+        });
+        melchior.position.set(0, 0, -1);
+        melchior.rotation.y = 0;
+        scene.add(melchior);
+        
+        // Caspar - Duck/Yellow themed 🦆
+        const caspar = createBlockyAvatar({
+            bodyColor: 0xf39c12,  // Orange-yellow
+            headColor: 0xf1c40f,  // Yellow
+            armColor: 0xf39c12,
+            legColor: 0xe67e22,
+            eyeColor: 0xffffff,
+            leftArmRotation: -0.5,
+            rightArmRotation: 0.2,
+            special: (group) => {
+                // Duck bill
+                const billGeo = new THREE.BoxGeometry(0.4, 0.15, 0.3);
+                const billMat = new THREE.MeshStandardMaterial({ color: 0xe67e22 });
+                const bill = new THREE.Mesh(billGeo, billMat);
+                bill.position.set(0, 1.95, 0.55);
+                group.add(bill);
+                
+                // Small duck wings detail on back
+                const wingGeo = new THREE.BoxGeometry(0.1, 0.4, 0.3);
+                const wingMat = new THREE.MeshStandardMaterial({ color: 0xd68910 });
+                [-0.55, 0.55].forEach(x => {
+                    const wing = new THREE.Mesh(wingGeo, wingMat);
+                    wing.position.set(x, 1.2, -0.2);
+                    wing.rotation.z = x > 0 ? -0.2 : 0.2;
+                    group.add(wing);
+                });
+            }
+        });
+        caspar.position.set(2.5, 0, 0.5);
+        caspar.rotation.y = -0.4;
+        scene.add(caspar);
+        
+        // Ground - Grass
+        const groundGeo = new THREE.PlaneGeometry(30, 30);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x7cba5f });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // Picnic blanket
+        const blanketGeo = new THREE.BoxGeometry(5, 0.05, 4);
+        const blanketMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
+        const blanket = new THREE.Mesh(blanketGeo, blanketMat);
+        blanket.position.set(0, 0.025, 0);
+        blanket.receiveShadow = true;
+        scene.add(blanket);
+        
+        // Checkered pattern on blanket
+        const checkGeo = new THREE.BoxGeometry(0.8, 0.06, 0.8);
+        const checkMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        for (let x = -2; x <= 2; x += 1.6) {
+            for (let z = -1.5; z <= 1.5; z += 1.6) {
+                if ((Math.round(x + z) % 2) === 0) {
+                    const check = new THREE.Mesh(checkGeo, checkMat);
+                    check.position.set(x, 0.03, z);
+                    scene.add(check);
+                }
+            }
+        }
+        
+        // Picnic basket
+        const basketGeo = new THREE.BoxGeometry(0.8, 0.6, 0.6);
+        const basketMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const basket = new THREE.Mesh(basketGeo, basketMat);
+        basket.position.set(1.5, 0.3, -1);
+        basket.castShadow = true;
+        scene.add(basket);
+        
+        // Board game between them
+        const boardGeo = new THREE.BoxGeometry(1.2, 0.08, 1.2);
+        const boardMat = new THREE.MeshStandardMaterial({ color: 0xdeb887 });
+        const board = new THREE.Mesh(boardGeo, boardMat);
+        board.position.set(0, 0.1, 0.5);
+        scene.add(board);
+        
+        // Game pieces
+        const pieceColors = [0x9b59b6, 0x7f8c8d, 0xf1c40f]; // Gemma, Melchior, Caspar colors
+        const pieceGeo = new THREE.CylinderGeometry(0.1, 0.12, 0.2, 8);
+        pieceColors.forEach((color, i) => {
+            const pieceMat = new THREE.MeshStandardMaterial({ color });
+            const piece = new THREE.Mesh(pieceGeo, pieceMat);
+            piece.position.set(-0.3 + i * 0.3, 0.24, 0.3 + Math.random() * 0.4);
+            piece.castShadow = true;
+            scene.add(piece);
+        });
+        
+        // Dice
+        const diceGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+        const diceMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const dice = new THREE.Mesh(diceGeo, diceMat);
+        dice.position.set(0.2, 0.18, 0.8);
+        dice.rotation.set(0.3, 0.5, 0.2);
+        scene.add(dice);
+        
+        // Trees in background
+        function createTree(x, z) {
+            const treeGroup = new THREE.Group();
+            
+            // Trunk
+            const trunkGeo = new THREE.BoxGeometry(0.4, 1.5, 0.4);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 0.75;
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+            
+            // Foliage (stacked boxes for blocky look)
+            const foliageColors = [0x228B22, 0x2e8b2e, 0x32cd32];
+            const foliageMat = new THREE.MeshStandardMaterial({ color: foliageColors[Math.floor(Math.random() * 3)] });
+            
+            const sizes = [1.8, 1.4, 1.0];
+            sizes.forEach((size, i) => {
+                const foliageGeo = new THREE.BoxGeometry(size, 0.8, size);
+                const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+                foliage.position.y = 1.8 + i * 0.7;
+                foliage.castShadow = true;
+                treeGroup.add(foliage);
+            });
+            
+            treeGroup.position.set(x, 0, z);
+            return treeGroup;
+        }
+        
+        // Add trees
+        [[-8, -5], [-6, -8], [8, -6], [7, -9], [-9, 3], [9, 2]].forEach(([x, z]) => {
+            scene.add(createTree(x, z));
+        });
+        
+        // Sun
+        const sunGeo = new THREE.SphereGeometry(1.5, 16, 16);
+        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+        const sun = new THREE.Mesh(sunGeo, sunMat);
+        sun.position.set(15, 15, -10);
+        scene.add(sun);
+        
+        // Clouds
+        function createCloud(x, y, z) {
+            const cloudGroup = new THREE.Group();
+            const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            
+            const positions = [[0, 0, 0], [0.6, 0.1, 0], [-0.5, 0.1, 0.2], [0.2, 0.3, 0]];
+            positions.forEach(([cx, cy, cz]) => {
+                const cloudGeo = new THREE.SphereGeometry(0.5 + Math.random() * 0.3, 8, 8);
+                const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+                cloud.position.set(cx, cy, cz);
+                cloudGroup.add(cloud);
+            });
+            
+            cloudGroup.position.set(x, y, z);
+            return cloudGroup;
+        }
+        
+        [[-5, 10, -8], [3, 11, -10], [8, 9, -7]].forEach(([x, y, z]) => {
+            scene.add(createCloud(x, y, z));
+        });
+        
+        // Animation
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.02;
+            
+            // Gentle bobbing for characters
+            gemma.position.y = Math.sin(time * 2) * 0.05;
+            melchior.position.y = Math.sin(time * 2 + 1) * 0.03;
+            caspar.position.y = Math.sin(time * 2 + 2) * 0.05;
+            
+            // Subtle head movements
+            gemma.children[1].rotation.y = Math.sin(time) * 0.1;
+            caspar.children[1].rotation.y = Math.sin(time + 1) * 0.15;
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

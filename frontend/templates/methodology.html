@@ -4,7 +4,7 @@
 {% block content %}
 <div class="fade-in max-w-4xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-2">Scoring Methodology</h1>
-    <p class="text-gray-400 mb-8">How SpeakFit analyzes and grades speeches.</p>
+    <p class="text-gray-400 mb-8">How SpeakFit analyzes and grades recordings.</p>
 
     <!-- Table of Contents -->
     <nav class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-8">
@@ -31,7 +31,7 @@
         <div class="grid sm:grid-cols-2 gap-3">
             {% set modules = [
                 ("🎤", "Audio Quality Gate", "Estimates Signal-to-Noise Ratio (SNR) and assigns a quality level (HIGH / MEDIUM / LOW / UNUSABLE). Low-quality audio may produce unreliable metrics."),
-                ("📝", "Whisper STT", "OpenAI's Whisper large-v3 model transcribes speech to text with word-level timestamps. Runs locally on GPU (~25x realtime)."),
+                ("📝", "Whisper STT", "OpenAI's Whisper large-v3 model transcribes audio to text with word-level timestamps. Runs locally on GPU (~25x realtime)."),
                 ("📊", "Core Text Analysis", "Lexical diversity (type-token ratio), syntactic complexity (parse tree depth), fluency score, discourse connectedness."),
                 ("📖", "Advanced Text", "Readability scores (Flesch-Kincaid, Flesch Reading Ease), discourse structure, named entities, question density, perspective analysis."),
                 ("🔁", "Rhetorical Analysis", "Detects anaphora, epistrophe, repeated phrases. Computes repetition score and rhythm regularity."),
@@ -58,7 +58,7 @@
         <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <span class="text-indigo-400">2.</span> Metrics Reference
         </h2>
-        <p class="text-gray-300 mb-4">These are the core metrics extracted from each speech and used in scoring:</p>
+        <p class="text-gray-300 mb-4">These are the core metrics extracted from each recording and used in scoring:</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
@@ -102,8 +102,8 @@
         <div class="space-y-4 text-gray-300 text-sm leading-relaxed">
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
                 <h3 class="text-white font-medium mb-2">Step 1: Percentile Ranking</h3>
-                <p>Each metric is compared against the distribution of <strong class="text-white">all {{ total_speeches }} speeches</strong> in the database. A speech's <em>percentile rank</em> tells you what percentage of speeches it exceeds for that metric.</p>
-                <p class="mt-2 text-gray-400">Example: If a speech has 140 WPM and 70% of speeches are slower, its WPM percentile is 70.</p>
+                <p>Each metric is compared against the distribution of <strong class="text-white">all {{ total_speeches }} recordings</strong> in the database. A recording's <em>percentile rank</em> tells you what percentage of recordings it exceeds for that metric.</p>
+                <p class="mt-2 text-gray-400">Example: If a recording has 140 WPM and 70% of recordings are slower, its WPM percentile is 70.</p>
             </div>
 
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
@@ -123,8 +123,8 @@
 
             <div class="bg-gray-900 border border-amber-500/30 rounded-lg p-5">
                 <h3 class="text-amber-400 font-medium mb-2">⚠️ Known Limitation</h3>
-                <p>The current scoring is <strong class="text-white">percentile-based</strong>, meaning scores reflect where a speech ranks <em>within this database</em>, not an absolute quality standard. With {{ total_speeches }} speeches of widely varying types (historical recordings, clinical samples, children's readings, trained orators), the percentiles can be misleading.</p>
-                <p class="mt-2">For example, a speech at the 50th percentile gets a score of 50 (grade F), even though "average" in this database might represent perfectly good speech. We're working on absolute reference ranges to address this.</p>
+                <p>The current scoring is <strong class="text-white">percentile-based</strong>, meaning scores reflect where a recording ranks <em>within this database</em>, not an absolute quality standard. With {{ total_speeches }} recordings of widely varying types (historical recordings, clinical samples, children's readings, trained orators), the percentiles can be misleading.</p>
+                <p class="mt-2">For example, a recording at the 50th percentile gets a score of 50 (grade F), even though "average" in this database might represent perfectly good recording. We're working on absolute reference ranges to address this.</p>
             </div>
         </div>
     </section>
@@ -134,7 +134,7 @@
         <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <span class="text-indigo-400">4.</span> Scoring Profiles
         </h2>
-        <p class="text-gray-300 mb-4 text-sm">Each profile weights metrics differently to assess speeches for different purposes:</p>
+        <p class="text-gray-300 mb-4 text-sm">Each profile weights metrics differently to assess recordings for different purposes:</p>
 
         {% for name, profile in profiles.items() %}
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-4">
@@ -182,7 +182,7 @@
                 {% endfor %}
             </div>
             <p class="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
-                Grade cutoffs follow standard academic thresholds. Because current scoring is percentile-based against {{ total_speeches }} diverse speeches, most scores cluster in the 40–70 range.
+                Grade cutoffs follow standard academic thresholds. Because current scoring is percentile-based against {{ total_speeches }} diverse recordings, most scores cluster in the 40–70 range.
             </p>
         </div>
     </section>
@@ -195,7 +195,7 @@
         <div class="space-y-3 text-sm text-gray-300">
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
                 <h3 class="text-white font-medium mb-1">📊 Small Database</h3>
-                <p class="text-gray-400">With {{ total_speeches }} speeches, percentile distributions are not statistically robust. Adding or removing a few speeches can shift scores significantly.</p>
+                <p class="text-gray-400">With {{ total_speeches }} recordings, percentile distributions are not statistically robust. Adding or removing a few recordings can shift scores significantly.</p>
             </div>
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
                 <h3 class="text-white font-medium mb-1">🎙️ Recording Quality Bias</h3>
@@ -203,7 +203,7 @@
             </div>
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
                 <h3 class="text-white font-medium mb-1">🍎🍊 Heterogeneous Comparisons</h3>
-                <p class="text-gray-400">The database includes clinical speech samples, children's readings, casual conversation, and professional oratory. Comparing a dysarthric speaker against a TED talk conflates very different speech goals.</p>
+                <p class="text-gray-400">The database includes clinical samples, children's readings, casual conversation, and professional oratory. Comparing a dysarthric speaker against a TED talk conflates very different speech goals.</p>
             </div>
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
                 <h3 class="text-white font-medium mb-1">🔁 Repetition Paradox</h3>
@@ -450,7 +450,7 @@
 
     <!-- DB Stats footer -->
     <div class="text-xs text-gray-600 border-t border-gray-800 pt-4 mt-8">
-        Database: {{ total_speeches }} speeches • {{ total_analyses }} analyses • Scoring engine refreshes distributions every 5 minutes
+        Database: {{ total_speeches }} recordings • {{ total_analyses }} analyses • Scoring engine refreshes distributions every 5 minutes
     </div>
 </div>
 {% endblock %}

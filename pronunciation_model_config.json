@@ -1,0 +1,16 @@
+{
+  "features": [
+    "mean_word_confidence",
+    "std_word_confidence",
+    "problem_word_ratio",
+    "pct_words_below_50",
+    "pct_words_below_60",
+    "pct_words_below_70",
+    "pct_words_below_80",
+    "pct_words_below_90",
+    "words_per_minute",
+    "mean_word_duration_ms"
+  ],
+  "model_type": "RandomForestRegressor",
+  "description": "Predicts oratory-style score from pronunciation features"
+}

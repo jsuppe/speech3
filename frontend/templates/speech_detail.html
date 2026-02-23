@@ -67,7 +67,7 @@
             <h2 class="text-lg font-semibold text-white">SpeakFit Score</h2>
             <div class="flex items-center gap-2">
                 <label class="text-sm text-gray-400">Profile:</label>
-                <select id="profileSelect" onchange="window.location.href='/speeches/{{ speech.id }}?profile=' + this.value"
+                <select id="profileSelect" onchange="window.location.href='/recordings/{{ speech.id }}?profile=' + this.value"
                     class="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:border-indigo-500 focus:outline-none">
                     {% for p in available_profiles %}
                     <option value="{{ p }}" {% if p == current_profile %}selected{% endif %}>{{ p|title }}</option>
@@ -214,7 +214,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Spectrogram</h2>
             {% if has_spectrogram %}
-            <img src="/speeches/{{ speech.id }}/spectrogram.png"
+            <img src="/recordings/{{ speech.id }}/spectrogram.png"
                  alt="Spectrogram" class="w-full rounded-lg" loading="lazy">
             {% else %}
             <div class="flex items-center justify-center h-48 text-gray-500">No spectrogram available</div>
@@ -229,7 +229,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Audio</h2>
             <audio controls class="w-full" preload="none">
-                <source src="/speeches/{{ speech.id }}/audio.opus" type="audio/opus">
+                <source src="/recordings/{{ speech.id }}/audio.opus" type="audio/opus">
                 Your browser does not support the audio element.
             </audio>
             <div class="text-xs text-gray-500 mt-2">
@@ -261,13 +261,13 @@
 
     <!-- Actions -->
     <div class="flex gap-3">
-        <a href="/speeches/{{ speech.id }}/audio.opus" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
+        <a href="/recordings/{{ speech.id }}/audio.opus" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors" download>
             Download Audio
         </a>
         <a href="/compare?ids={{ speech.id }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">
             Compare
         </a>
-        <a href="/v1/speeches/{{ speech.id }}/benchmark" target="_blank" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">
+        <a href="/v1/recordings/{{ speech.id }}/benchmark" target="_blank" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-white rounded-lg transition-colors">
             Benchmark JSON
         </a>
     </div>
@@ -318,7 +318,7 @@ async function saveTitle() {
     saving.classList.remove('hidden');
     
     try {
-        const response = await fetch(`/api/speeches/${speechId}`, {
+        const response = await fetch(`/api/recordings/${speechId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: newTitle })
@@ -377,7 +377,7 @@ async function saveSpeaker() {
     saving.classList.remove('hidden');
     
     try {
-        const response = await fetch(`/api/speeches/${speechId}`, {
+        const response = await fetch(`/api/recordings/${speechId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ speaker: newSpeaker })

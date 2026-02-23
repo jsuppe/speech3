@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Speeches — SpeakFit{% endblock %}
+{% block title %}Recordings — SpeakFit{% endblock %}
 
 {% block content %}
 <div class="fade-in">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-white">Speech Library</h1>
-            <p class="text-sm text-gray-400 mt-1">{{ total }} speeches</p>
+            <h1 class="text-2xl font-bold text-white">Recording Library</h1>
+            <p class="text-sm text-gray-400 mt-1">{{ total }} recordings</p>
         </div>
         <a href="/upload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
             + Upload New
@@ -31,14 +31,14 @@
         </select>
         <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors">Filter</button>
         {% if current_q or current_category or current_product %}
-        <a href="/speeches" class="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors">Clear</a>
+        <a href="/recordings" class="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors">Clear</a>
         {% endif %}
     </form>
 
     <!-- Speech Grid -->
     <div class="grid gap-3">
         {% for s in speeches %}
-        <a href="/speeches/{{ s.id }}" class="block bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-600 transition-colors group">
+        <a href="/recordings/{{ s.id }}" class="block bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-600 transition-colors group">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
