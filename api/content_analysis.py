@@ -119,6 +119,7 @@ class ContentAnalysisResult:
     overall_message: str
     segment_feedback: List[SegmentFeedback]  # NEW: Per-segment content feedback
     content_segments: List[ContentSegment]
+    unified_timeline: List[Dict]  # NEW: Merged timeline with all data
     alignment_score: int  # 0-100
     alignment_summary: str
     content_feedback: List[str]
@@ -135,6 +136,7 @@ class ContentAnalysisResult:
             "overall_message": self.overall_message,
             "segment_feedback": [sf.to_dict() for sf in self.segment_feedback],
             "content_segments": [cs.to_dict() for cs in self.content_segments],
+            "unified_timeline": self.unified_timeline,
             "alignment_score": self.alignment_score,
             "alignment_summary": self.alignment_summary,
             "content_feedback": self.content_feedback,
@@ -222,6 +224,9 @@ class ContentAnalyzer:
         content_feedback = self._generate_content_feedback(content_analysis, transcript, intent)
         tone_recommendations = self._generate_tone_recommendations(content_segments, intent)
         
+        # Step 8: Build unified timeline (merge segment data)
+        unified_timeline = self._build_unified_timeline(content_segments, segment_feedback)
+        
         return ContentAnalysisResult(
             main_topic=content_analysis.get("main_topic", "General presentation"),
             presentation_type=content_analysis.get("type", "speech"),
@@ -231,6 +236,7 @@ class ContentAnalyzer:
             overall_message=content_analysis.get("message", ""),
             segment_feedback=segment_feedback,
             content_segments=content_segments,
+            unified_timeline=unified_timeline,
             alignment_score=alignment_score,
             alignment_summary=alignment_summary,
             content_feedback=content_feedback,
@@ -922,6 +928,69 @@ Respond in JSON only:
             recommendations.append(f"{len(partials)} sections could better match your {intent.primary_intent} intent")
         
         return recommendations
+
+    def _build_unified_timeline(
+        self, 
+        content_segments: List[ContentSegment], 
+        segment_feedback: List[SegmentFeedback]
+    ) -> List[Dict]:
+        """
+        Build a unified timeline merging content_segments with segment_feedback.
+        Uses content_segments as the base (finer granularity) and enriches with
+        feedback data from overlapping segment_feedback entries.
+        """
+        timeline = []
+        
+        for cs in content_segments:
+            # Find overlapping segment_feedback
+            overlapping_fb = None
+            best_overlap = 0
+            
+            for fb in segment_feedback:
+                overlap_start = max(cs.start_time, fb.start_time)
+                overlap_end = min(cs.end_time, fb.end_time)
+                overlap = max(0, overlap_end - overlap_start)
+                
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    overlapping_fb = fb
+            
+            # Build unified entry
+            entry = {
+                # Timing
+                "start_time": cs.start_time,
+                "end_time": cs.end_time,
+                "duration": cs.end_time - cs.start_time,
+                
+                # Text
+                "text": cs.text,
+                
+                # Content analysis
+                "content_type": cs.content_type,
+                "topic": cs.topic,
+                
+                # Tone analysis
+                "detected_tone": cs.detected_emotion,
+                "expected_tone": cs.expected_tone,
+                "alignment": cs.alignment,
+                "tone_feedback": cs.feedback,
+                
+                # Intent analysis (from segment_feedback if available)
+                "supports_intent": overlapping_fb.supports_intent if overlapping_fb else None,
+                "effectiveness": overlapping_fb.effectiveness if overlapping_fb else None,
+                "ideal_tone": overlapping_fb.ideal_tone if overlapping_fb else None,
+                "tone_match": overlapping_fb.tone_match if overlapping_fb else None,
+                
+                # Detailed feedback
+                "meaning": overlapping_fb.meaning if overlapping_fb else None,
+                "purpose": overlapping_fb.purpose if overlapping_fb else None,
+                "suggestions": overlapping_fb.suggestions if overlapping_fb else [],
+                "analysis": overlapping_fb.analysis if overlapping_fb else None,
+            }
+            
+            timeline.append(entry)
+        
+        return timeline
 
 
 # Singleton
