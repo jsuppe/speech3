@@ -587,7 +587,7 @@ class OratoryAnalyzer:
     def analyze(
         self, 
         audio_path: str,
-        segment_duration: float = 5.0,
+        segment_duration: float = 0.5,
         word_timestamps: Optional[List[Dict]] = None
     ) -> OratoryAnalysisResult:
         """
