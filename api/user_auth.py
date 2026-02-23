@@ -408,6 +408,33 @@ async def user_required(
     return user
 
 
+# Admin whitelist - emails allowed to access admin endpoints
+ADMIN_EMAILS = ["jon.suppe@gmail.com"]
+
+
+async def get_admin_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+) -> Dict[str, Any]:
+    """
+    Require admin user. Raises 401/403 if not authenticated or not admin.
+    """
+    user = await get_current_user(request, credentials)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "UNAUTHORIZED", "message": "Login required."}
+        )
+    
+    if user.get("email") not in ADMIN_EMAILS:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "FORBIDDEN", "message": "Admin access required."}
+        )
+    
+    return user
+
+
 async def flexible_auth(
     request: Request,
     response: Response,

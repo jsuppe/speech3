@@ -55,7 +55,7 @@ async def analyze_presentation_readiness(
     
     # Get analysis
     analysis = db.execute(
-        "SELECT * FROM analyses WHERE speech_id = ?",
+        "SELECT * FROM analyses WHERE speech_id = ? ORDER BY id DESC LIMIT 1",
         (speech_id,)
     ).fetchone()
     
@@ -68,9 +68,12 @@ async def analyze_presentation_readiness(
     if analysis['result']:
         try:
             result_json = json.loads(analysis['result'])
-            advanced_audio = result_json.get('advanced_audio')
-        except:
-            pass
+            advanced_audio = result_json.get('advanced_audio_analysis') or result_json.get('advanced_audio')
+            logger.info(f"Loaded advanced_audio, keys: {list(advanced_audio.keys()) if advanced_audio else 'None'}")
+            if advanced_audio and 'emphasis_patterns' in advanced_audio:
+                logger.info(f"emphasis_patterns: {advanced_audio['emphasis_patterns']}")
+        except Exception as e:
+            logger.error(f"Failed to parse result JSON: {e}")
     
     # Parse segments
     segments = []
@@ -119,13 +122,26 @@ async def get_presentation_readiness(
 @router.post("/{speech_id}/content-analysis")
 async def analyze_content(
     speech_id: int,
+    force_refresh: bool = False,
     user = Depends(flexible_auth)
 ):
     """
     Analyze speech content and tone alignment.
     Uses LLM to understand what's being said and compares to how it's delivered.
+    Results are cached for fast subsequent loads.
     """
     db = get_db()
+    
+    # Check cache first (unless force refresh)
+    if not force_refresh:
+        cached = db.execute(
+            "SELECT analysis_data FROM content_analysis_cache WHERE speech_id = ?",
+            (speech_id,)
+        ).fetchone()
+        
+        if cached:
+            logger.info(f"Returning cached content analysis for speech {speech_id}")
+            return json.loads(cached['analysis_data'])
     
     # Get speech info
     speech = db.execute(
@@ -208,4 +224,16 @@ async def analyze_content(
         emotion_data=emotion_data
     )
     
-    return result.to_dict()
+    # Cache the result
+    result_dict = result.to_dict()
+    try:
+        db.execute(
+            "INSERT OR REPLACE INTO content_analysis_cache (speech_id, analysis_data) VALUES (?, ?)",
+            (speech_id, json.dumps(result_dict))
+        )
+        db.commit()
+        logger.info(f"Cached content analysis for speech {speech_id}")
+    except Exception as e:
+        logger.warning(f"Failed to cache content analysis: {e}")
+    
+    return result_dict

@@ -52,6 +52,13 @@ def analyze_pitch(snd, floor=75, ceiling=500):
         if f > 0:
             contour.append({"time": round(float(t), 3), "hz": round(float(f), 1)})
 
+    # Calculate pitch variation as a 0-100 score
+    # Based on coefficient of variation (std/mean) scaled to useful range
+    cv = float(np.std(voiced) / np.mean(voiced)) if np.mean(voiced) > 0 else 0
+    # CV of 0.15-0.25 is typical for expressive speech
+    # Scale: 0 CV = 0 score, 0.3 CV = 100 score
+    pitch_variation_score = min(100, int(cv / 0.003))
+    
     return {
         "mean_hz": round(float(np.mean(voiced)), 1),
         "median_hz": round(float(np.median(voiced)), 1),
@@ -60,6 +67,8 @@ def analyze_pitch(snd, floor=75, ceiling=500):
         "max_hz": round(float(np.max(voiced)), 1),
         "range_hz": round(float(np.max(voiced) - np.min(voiced)), 1),
         "voiced_fraction": round(float(len(voiced) / len(pitch_values)), 3),
+        "pitch_contour": contour,  # For visualization
+        "pitch_variation_score": pitch_variation_score,
     }
 
 

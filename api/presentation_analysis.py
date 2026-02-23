@@ -386,19 +386,30 @@ class PresentationAnalyzer:
             ), dips
         
         # Check for energy variation in segments
-        if advanced_audio and 'emphasis_detection' in advanced_audio:
-            emphasis = advanced_audio['emphasis_detection']
-            emphasis_ratio = emphasis.get('emphasized_ratio', 0.1)
+        if advanced_audio and 'emphasis_patterns' in advanced_audio:
+            emphasis = advanced_audio['emphasis_patterns']
             
-            if emphasis_ratio >= 0.15:
+            # Calculate emphasis ratio from available data
+            emphasis_count = emphasis.get('emphasis_count', 0)
+            emphasis_dist = emphasis.get('emphasis_distribution', '')
+            emphasis_segments = emphasis.get('emphasis_segments', [])
+            
+            # Use distribution description if available
+            if 'distributed' in emphasis_dist.lower() or 'throughout' in emphasis_dist.lower():
                 status = "pass"
-                detail = "Good energy variation - keeps audience engaged"
-            elif emphasis_ratio >= 0.08:
+                detail = "Good energy variation - emphasis throughout the speech"
+            elif emphasis_count >= 3 or len(emphasis_segments) >= 3:
+                # Check average emphasis score
+                avg_score = sum(s.get('emphasis_score', 0) for s in emphasis_segments) / max(1, len(emphasis_segments))
+                if avg_score >= 0.7:
+                    status = "pass"
+                    detail = f"Strong emphasis moments (avg {avg_score:.0%} emphasis)"
+                else:
+                    status = "warning"
+                    detail = "Could use more emphasis on key points"
+            else:
                 status = "warning"
                 detail = "Could use more emphasis on key points"
-            else:
-                status = "fail"
-                detail = "Monotone - add more vocal emphasis"
             
             # Find low-energy sections
             segments_data = emphasis.get('emphasis_segments', [])
@@ -413,10 +424,17 @@ class PresentationAnalyzer:
                             break
                     dips.append((start, end))
             
+            # Calculate meaningful value
+            if emphasis_segments:
+                avg_score = sum(s.get('emphasis_score', 0) for s in emphasis_segments) / len(emphasis_segments)
+                value = f"{avg_score:.0%} avg emphasis"
+            else:
+                value = f"{emphasis_count} emphasis moments"
+            
             return ReadinessMetric(
                 name="Energy",
                 status=status,
-                value=f"{int(emphasis_ratio * 100)}% emphasized",
+                value=value,
                 detail=detail,
                 icon="bolt"
             ), dips
@@ -533,8 +551,8 @@ class PresentationAnalyzer:
                 ))
         
         # Rushed sections (from segment analysis)
-        if advanced_audio and 'emphasis_detection' in advanced_audio:
-            seg_data = advanced_audio['emphasis_detection'].get('emphasis_segments', [])
+        if advanced_audio and 'emphasis_patterns' in advanced_audio:
+            seg_data = advanced_audio['emphasis_patterns'].get('emphasis_segments', [])
             for seg in seg_data:
                 rate = seg.get('speaking_rate', 0)
                 if rate > 4.5:  # Very fast

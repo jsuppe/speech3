@@ -164,6 +164,107 @@ class PronunciationAnalyzer:
         
         return min(1.0, score), issues
     
+    def refine_word_boundaries(self, audio_path: str, start: float, end: float, 
+                                search_window: float = 0.15) -> Tuple[float, float]:
+        """
+        Refine word boundaries using energy-based onset/offset detection.
+        
+        Whisper timestamps can be imprecise, especially for short words.
+        This method looks at audio energy to find the actual word boundaries.
+        
+        Args:
+            audio_path: Path to audio file
+            start: Whisper-provided start time
+            end: Whisper-provided end time
+            search_window: How far to search before/after (seconds)
+        
+        Returns:
+            Refined (start, end) tuple
+        """
+        try:
+            waveform, sr = torchaudio.load(audio_path)
+            
+            # Convert to mono
+            if waveform.shape[0] > 1:
+                waveform = waveform.mean(dim=0)
+            else:
+                waveform = waveform.squeeze()
+            
+            # Resample to 16kHz if needed
+            if sr != 16000:
+                resampler = torchaudio.transforms.Resample(sr, 16000)
+                waveform = resampler(waveform.unsqueeze(0)).squeeze()
+                sr = 16000
+            
+            # Define search regions
+            search_start = max(0, start - search_window)
+            search_end = min(len(waveform) / sr, end + search_window)
+            
+            # Extract search region
+            start_sample = int(search_start * sr)
+            end_sample = int(search_end * sr)
+            segment = waveform[start_sample:end_sample].numpy()
+            
+            if len(segment) < 100:
+                return start, end
+            
+            # Calculate energy using RMS in small windows
+            window_size = int(0.01 * sr)  # 10ms windows
+            hop_size = int(0.005 * sr)    # 5ms hop
+            
+            energies = []
+            for i in range(0, len(segment) - window_size, hop_size):
+                window = segment[i:i + window_size]
+                rms = np.sqrt(np.mean(window ** 2))
+                energies.append(rms)
+            
+            if not energies:
+                return start, end
+            
+            energies = np.array(energies)
+            
+            # Normalize and find threshold
+            energy_max = energies.max()
+            if energy_max < 1e-6:
+                return start, end
+            
+            energies_norm = energies / energy_max
+            threshold = 0.15  # 15% of max energy
+            
+            # Find onset (first point above threshold)
+            onset_idx = 0
+            for i, e in enumerate(energies_norm):
+                if e > threshold:
+                    onset_idx = max(0, i - 2)  # Small lookback
+                    break
+            
+            # Find offset (last point above threshold)
+            offset_idx = len(energies_norm) - 1
+            for i in range(len(energies_norm) - 1, -1, -1):
+                if energies_norm[i] > threshold:
+                    offset_idx = min(len(energies_norm) - 1, i + 2)  # Small lookforward
+                    break
+            
+            # Convert back to time
+            refined_start = search_start + (onset_idx * hop_size / sr)
+            refined_end = search_start + (offset_idx * hop_size / sr)
+            
+            # Sanity checks - don't deviate too far from Whisper
+            if abs(refined_start - start) > search_window:
+                refined_start = start
+            if abs(refined_end - end) > search_window:
+                refined_end = end
+            
+            # Ensure minimum duration
+            if refined_end - refined_start < 0.05:
+                return start, end
+            
+            return refined_start, refined_end
+            
+        except Exception as e:
+            print(f"Boundary refinement failed: {e}")
+            return start, end
+    
     def analyze(self, audio_path: str, reference_text: Optional[str] = None) -> PronunciationAnalysis:
         """Analyze pronunciation of audio file"""
         print(f"Analyzing {audio_path}...")
@@ -178,12 +279,17 @@ class PronunciationAnalyzer:
                 if not word or len(word) < 2:
                     continue
                 
+                # Refine word boundaries using energy detection
+                refined_start, refined_end = self.refine_word_boundaries(
+                    audio_path, word_info.start, word_info.end
+                )
+                
                 # Get expected phonemes
                 expected = self.get_expected_phonemes(word)
                 
-                # Extract and analyze audio segment
+                # Extract and analyze audio segment using refined boundaries
                 try:
-                    audio_seg = self.extract_audio_segment(audio_path, word_info.start, word_info.end)
+                    audio_seg = self.extract_audio_segment(audio_path, refined_start, refined_end)
                     detected, wav2vec_conf = self.recognize_segment(audio_seg)
                 except Exception as e:
                     detected = ""
@@ -194,8 +300,8 @@ class PronunciationAnalyzer:
                 
                 words.append(WordPronunciation(
                     word=word,
-                    start=word_info.start,
-                    end=word_info.end,
+                    start=refined_start,  # Use refined timestamps
+                    end=refined_end,
                     whisper_confidence=word_info.probability,
                     expected_phonemes=expected,
                     detected_chars=detected,

@@ -266,6 +266,14 @@ try:
 except ImportError as e:
     logger.warning(f"Presentation endpoints not available: {e}")
 
+# Register survey routes
+try:
+    from .survey_endpoints import router as survey_router  # noqa: E402
+    app.include_router(survey_router)
+    logger.info("Survey routes registered.")
+except ImportError as e:
+    logger.warning(f"Survey endpoints not available: {e}")
+
 # Register frontend routes
 try:
     from frontend.routes import router as frontend_router

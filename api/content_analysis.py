@@ -787,6 +787,12 @@ Respond in JSON only:
         if any(w in text_lower for w in ["thank", "grateful", "appreciate"]):
             return "thanks", "warm"
         
+        # Inspirational/motivational content
+        if any(w in text_lower for w in ["dream", "freedom", "justice", "believe", "hope", "rise", "together", "change", "fight", "stand"]):
+            return "motivation", "inspiring"
+        if any(w in text_lower for w in ["let us", "we must", "we will", "we can", "we shall", "i have a dream"]):
+            return "call_to_action", "passionate"
+        
         return "general", "neutral"
     
     def _check_alignment(self, expected_tone: str, detected_emotion: str, text: str) -> Tuple[str, str]:
@@ -796,19 +802,25 @@ Respond in JSON only:
         detected_tone = self.EMOTION_TONE_MAP.get(detected_emotion, "neutral")
         
         # Define compatible tones
+        # Note: "angry" in speech emotion models = passionate/intense (not literal anger)
         compatible = {
             "somber": ["sad", "neutral", "somber"],
-            "energetic": ["happy", "energetic", "animated"],
-            "serious": ["neutral", "intense", "measured"],
-            "optimistic": ["happy", "energetic", "positive"],
-            "neutral": ["neutral", "measured", "calm"],
+            "energetic": ["happy", "energetic", "animated", "angry", "intense"],  # passionate delivery is energetic
+            "serious": ["neutral", "intense", "measured", "angry"],
+            "optimistic": ["happy", "energetic", "positive", "animated"],
+            "neutral": ["neutral", "measured", "calm", "happy"],  # happy can work with neutral content
             "warm": ["happy", "calm", "neutral"],
-            "urgent": ["intense", "anxious", "energetic"],
+            "urgent": ["intense", "anxious", "energetic", "angry"],  # passionate delivery fits urgency
+            "inspiring": ["happy", "energetic", "angry", "intense", "animated"],  # MLK-style passion
+            "passionate": ["angry", "intense", "energetic", "happy"],  # intense delivery
         }
         
         expected_compatible = compatible.get(expected_tone, ["neutral"])
         
         if detected_emotion in expected_compatible or detected_tone == expected_tone:
+            # Better feedback for passionate delivery
+            if detected_emotion == "angry" and expected_tone in ["inspiring", "passionate", "energetic", "urgent"]:
+                return "match", f"Passionate, intense delivery - perfect for {expected_tone} content"
             return "match", f"Good tone for {expected_tone} content"
         
         # Check for major mismatches
