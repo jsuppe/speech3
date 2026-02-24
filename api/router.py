@@ -227,7 +227,9 @@ async def analyze(
     language: Optional[str] = Form(None, description="Language code for Whisper (e.g. 'en', 'es'). Default: auto-detect."),
     speaker: Optional[str] = Form(None, description="Speaker name (used for diarization when single speaker detected)"),
     title: Optional[str] = Form(None, description="Title for the speech"),
-    profile: Optional[str] = Form("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical"),
+    profile: Optional[str] = Form("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical, voice_health"),
+    exercise_type: Optional[str] = Form(None, description="Exercise type for voice_health profile (e.g. 'sustained_ah', 'humming', 'projection')"),
+    target_duration: Optional[float] = Form(None, description="Target duration in seconds for sustained exercises"),
     auth: dict = Depends(flexible_auth),
 ):
     """
@@ -238,6 +240,8 @@ async def analyze(
 
     Use `modules` or `preset` to select which analysis modules run.
     If both are provided, `preset` takes precedence.
+    
+    For voice_health profile, pass exercise_type and target_duration for enhanced feedback.
     """
     key_data = auth.get("key_data")
     key_id = key_data["key_id"] if key_data else "user"
@@ -359,6 +363,9 @@ async def analyze(
                 preset=resolved_preset,
                 modules_requested=modules_requested,
                 known_speaker=speaker,
+                voice_health_mode=(profile == "voice_health"),
+                exercise_type=exercise_type,
+                target_duration=target_duration,
             )
         except pipeline_runner.QualityGateError as e:
             return _error(422, "QUALITY_GATE_BLOCKED", str(e))
@@ -2195,14 +2202,17 @@ Your approach:
 5. CELEBRATE milestones and achievements enthusiastically!
 
 Things you should proactively do:
-- Ask about the user's speaking goals if you don't know them
-- Check in on progress toward goals
-- Suggest specific exercises based on their weak areas
+- Reference their onboarding survey (if available) - tailor advice to their primary goal, skill level, and focus areas
+- Check in on progress toward their stated goals
+- Suggest specific exercises based on their focus areas (pacing, clarity, filler words, confidence, etc.)
 - Ask for feedback on the app features
 - Celebrate improvements you notice in their metrics
 - Acknowledge streaks and achievements ("Great job on your 7-day streak!")
 - Challenge users to beat their personal bests
 - Mention daily XP goals if they're close
+- For pronunciation-focused users, emphasize clarity and articulation exercises
+- For presentation-focused users, emphasize structure and engagement
+- For confidence-focused users, be extra encouraging and positive
 
 Gamification awareness:
 - Users earn XP for recordings (25 XP) and coach chats (5 XP)
@@ -2328,6 +2338,39 @@ def _build_user_context(db, user_id: int) -> str:
             conn.close()
         except Exception as e:
             logger.warning(f"Failed to get gamification context: {e}")
+        
+        # Get user's survey responses (personalization data)
+        try:
+            cursor = db.conn.execute("""
+                SELECT primary_goal, skill_level, focus_areas, context, time_commitment, native_language
+                FROM user_surveys
+                WHERE user_id = ?
+            """, (user_id,))
+            survey = cursor.fetchone()
+            
+            if survey:
+                context_parts.append("\n📋 USER PROFILE (from onboarding survey):")
+                context_parts.append(f"  Primary goal: {survey[0].replace('_', ' ')}")
+                context_parts.append(f"  Skill level: {survey[1]}")
+                
+                # Parse focus areas JSON
+                try:
+                    import json
+                    focus_areas = json.loads(survey[2])
+                    if focus_areas:
+                        context_parts.append(f"  Focus areas: {', '.join(a.replace('_', ' ') for a in focus_areas)}")
+                except:
+                    pass
+                
+                context_parts.append(f"  Context: {survey[3].replace('_', ' ')}")
+                context_parts.append(f"  Time commitment: {survey[4]}")
+                
+                if survey[5]:
+                    context_parts.append(f"  Native language: {survey[5]}")
+                
+                context_parts.append("(Tailor your advice to their goals and focus areas!)")
+        except Exception as e:
+            logger.warning(f"Failed to get survey context: {e}")
         
     except Exception as e:
         logger.warning(f"Failed to build user context: {e}")
@@ -2668,6 +2711,102 @@ Be concise, helpful, and reference specific parts of the meeting when relevant."
         return _error(502, "AI_ERROR", "Failed to get response from coach AI")
     except Exception as e:
         logger.error(f"Meeting coach error: {e}")
+        return _error(500, "INTERNAL_ERROR", str(e))
+
+
+# ---------------------------------------------------------------------------
+# Kids Mode - Word Help (AI-Powered Pronunciation Guidance)
+# ---------------------------------------------------------------------------
+
+KIDS_WORD_HELP_PROMPT = """You are a friendly reading helper for children ages 4-8. 
+A child is reading aloud and tapped on a word they need help with.
+
+Your job:
+1. Explain how to say the word in a fun, simple way
+2. Break it into easy sound chunks if helpful
+3. Give a short tip they can remember
+4. Keep your response SHORT (2-3 sentences max)
+5. Use encouraging, kid-friendly language
+6. If relevant, mention a rhyme or similar word they might know
+
+DO NOT:
+- Use technical linguistic terms
+- Give long explanations
+- Be condescending
+- Use complicated words in your explanation
+
+Examples of good responses:
+- "This word is 'through' - say it like 'threw' the ball! The 'ough' makes an 'oo' sound."
+- "Say 'beau-ti-ful' - three parts! BYOO-tih-full. Like saying 'beautiful butterfly'!"
+- "This is 'knight' - the K is silent! Say it like 'night' when it's dark outside."
+"""
+
+
+@router.post("/kids/word-help", tags=["Kids"])
+async def kids_word_help(
+    word: str = Body(..., description="The word the child tapped on"),
+    sentence: str = Body(..., description="The full sentence containing the word"),
+    book_title: Optional[str] = Body(None, description="Title of the book being read"),
+    difficulty: Optional[str] = Body(None, description="Book difficulty level"),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get kid-friendly pronunciation help for a word.
+    Uses Ollama to generate contextual, age-appropriate guidance.
+    """
+    
+    # Build the prompt
+    context_parts = [f"Word: {word}", f"Sentence: {sentence}"]
+    if book_title:
+        context_parts.append(f"Book: {book_title} ({difficulty or 'unknown'} level)")
+    
+    prompt = f"""{KIDS_WORD_HELP_PROMPT}
+
+{chr(10).join(context_parts)}
+
+How should the child say "{word}"? (Keep it short and fun!)"""
+
+    # Call Ollama
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                OLLAMA_URL,
+                json={
+                    "model": "llama3.1:8b",
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "num_predict": 150,  # Keep responses short
+                    }
+                }
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Ollama error: {response.status_code} - {response.text}")
+                return _error(502, "AI_ERROR", "Failed to get help from reading assistant")
+            
+            result = response.json()
+            help_text = result.get("response", "").strip()
+            
+            if not help_text:
+                # Fallback for empty response
+                help_text = f"Let's sound it out: {word}. Try saying each part slowly!"
+            
+            return {
+                "word": word,
+                "tip": help_text,
+                "sentence": sentence,
+            }
+            
+    except httpx.TimeoutException:
+        logger.error("Ollama timeout for kids word help")
+        return _error(504, "TIMEOUT", "Reading helper took too long")
+    except httpx.RequestError as e:
+        logger.error(f"Ollama error: {e}")
+        return _error(502, "AI_ERROR", "Failed to get help from reading assistant")
+    except Exception as e:
+        logger.error(f"Kids word help error: {e}")
         return _error(500, "INTERNAL_ERROR", str(e))
 
 
