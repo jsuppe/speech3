@@ -2570,6 +2570,62 @@ async def get_coach_history(
     }
 
 
+@router.post("/coach/live-feedback", tags=["Coach"])
+async def get_live_coach_feedback(
+    data: dict,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get real-time coaching feedback during a live presentation.
+    Sends the full transcript to Ollama for quick 1-sentence advice.
+    """
+    import requests
+    
+    transcript = data.get("transcript", "").strip()
+    if not transcript or len(transcript) < 20:
+        return {"feedback": ""}
+    
+    prompt = f"""You are a presentation coach whispering in the speaker's ear during a LIVE presentation. 
+Based on their speech so far, give ONE brief tip (under 15 words). Be encouraging but direct.
+Focus on: pacing, filler words, clarity, confidence, or structure.
+If everything sounds good, give brief encouragement.
+
+Their speech so far:
+"{transcript[-2000:]}"
+
+Your one-sentence coaching tip:"""
+    
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3:latest",
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 50,
+                }
+            },
+            timeout=5,
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            feedback = result.get("response", "").strip()
+            # Clean up any quotes or extra formatting
+            feedback = feedback.strip('"\'').strip()
+            # Limit length
+            if len(feedback) > 100:
+                feedback = feedback[:100].rsplit(' ', 1)[0] + '...'
+            return {"feedback": feedback}
+        else:
+            return {"feedback": ""}
+    except Exception as e:
+        logger.warning(f"Live coach feedback error: {e}")
+        return {"feedback": ""}
+
+
 @router.get("/coach/unread", tags=["Coach"])
 async def get_coach_unread(
     auth: dict = Depends(flexible_auth),
