@@ -314,6 +314,14 @@ try:
 except ImportError as e:
     logger.warning(f"Reader endpoints not available: {e}")
 
+# Register metrics history routes
+try:
+    from .metrics_endpoints import router as metrics_router  # noqa: E402
+    app.include_router(metrics_router, prefix="/v1/metrics", tags=["metrics"])
+    logger.info("Metrics history routes registered.")
+except ImportError as e:
+    logger.warning(f"Metrics endpoints not available: {e}")
+
 # Register TTS routes (ElevenLabs)
 try:
     from .tts_endpoints import router as tts_router  # noqa: E402
