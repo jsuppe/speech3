@@ -641,6 +641,22 @@ async def methodology_page(request: Request):
     })
 
 
+@router.get("/interview", response_class=HTMLResponse)
+async def interview_page(request: Request):
+    """AI Interview Practice page."""
+    return templates.TemplateResponse("interview.html", {
+        "request": request,
+    })
+
+
+@router.get("/present", response_class=HTMLResponse)
+async def present_page(request: Request):
+    """Present Mode landing page."""
+    return templates.TemplateResponse("present.html", {
+        "request": request,
+    })
+
+
 @router.get("/compare", response_class=HTMLResponse)
 async def compare_page(
     request: Request,
@@ -718,22 +734,82 @@ async def admin_dashboard(request: Request):
     total_users = db.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     total_recordings = db.conn.execute("SELECT COUNT(*) FROM speeches WHERE user_id IS NOT NULL").fetchone()[0]
     
-    # Active users (7 and 30 days)
+    # Time ranges
     now = datetime.utcnow()
-    week_ago = (now - timedelta(days=7)).isoformat()
-    month_ago = (now - timedelta(days=30)).isoformat()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    week_ago = (now - timedelta(days=7)).isoformat()
     week_start = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    month_ago = (now - timedelta(days=30)).isoformat()
+    two_months_ago = (now - timedelta(days=60)).isoformat()
     
+    # DAU - Daily Active Users (users who made recordings today)
+    dau = db.conn.execute("""
+        SELECT COUNT(DISTINCT user_id) FROM speeches 
+        WHERE user_id IS NOT NULL AND created_at >= ?
+    """, (today_start,)).fetchone()[0]
+    
+    # DAU yesterday (for trend)
+    dau_yesterday = db.conn.execute("""
+        SELECT COUNT(DISTINCT user_id) FROM speeches 
+        WHERE user_id IS NOT NULL AND created_at >= ? AND created_at < ?
+    """, (yesterday_start, today_start)).fetchone()[0]
+    
+    # Active users (7 and 30 days)
     active_7d = db.conn.execute("""
         SELECT COUNT(DISTINCT user_id) FROM speeches 
         WHERE user_id IS NOT NULL AND created_at >= ?
     """, (week_ago,)).fetchone()[0]
     
-    active_30d = db.conn.execute("""
+    # MAU - Monthly Active Users
+    mau = db.conn.execute("""
         SELECT COUNT(DISTINCT user_id) FROM speeches 
         WHERE user_id IS NOT NULL AND created_at >= ?
     """, (month_ago,)).fetchone()[0]
+    
+    # Previous month MAU (for MoM growth)
+    mau_prev_month = db.conn.execute("""
+        SELECT COUNT(DISTINCT user_id) FROM speeches 
+        WHERE user_id IS NOT NULL AND created_at >= ? AND created_at < ?
+    """, (two_months_ago, month_ago)).fetchone()[0]
+    
+    # Month-over-Month growth
+    mom_growth = ((mau - mau_prev_month) / mau_prev_month * 100) if mau_prev_month > 0 else 0
+    
+    # Subscription stats by tier
+    tier_counts = db.conn.execute("""
+        SELECT COALESCE(tier, 'free') as tier, COUNT(*) as count
+        FROM users
+        GROUP BY tier
+        ORDER BY count DESC
+    """).fetchall()
+    tier_stats = {row[0]: row[1] for row in tier_counts}
+    paid_users = sum(v for k, v in tier_stats.items() if k not in ('free', 'none', None))
+    
+    # New paid subscriptions (today, this week, this month)
+    paid_today = db.conn.execute("""
+        SELECT COUNT(*) FROM users 
+        WHERE tier NOT IN ('free', 'none') AND tier IS NOT NULL AND created_at >= ?
+    """, (today_start,)).fetchone()[0]
+    
+    paid_week = db.conn.execute("""
+        SELECT COUNT(*) FROM users 
+        WHERE tier NOT IN ('free', 'none') AND tier IS NOT NULL AND created_at >= ?
+    """, (week_start,)).fetchone()[0]
+    
+    paid_month = db.conn.execute("""
+        SELECT COUNT(*) FROM users 
+        WHERE tier NOT IN ('free', 'none') AND tier IS NOT NULL AND created_at >= ?
+    """, (month_ago,)).fetchone()[0]
+    
+    # DAU trend (last 14 days)
+    dau_trend = db.conn.execute("""
+        SELECT DATE(created_at) as date, COUNT(DISTINCT user_id) as dau
+        FROM speeches
+        WHERE user_id IS NOT NULL AND created_at >= ?
+        GROUP BY DATE(created_at)
+        ORDER BY date
+    """, ((now - timedelta(days=14)).isoformat(),)).fetchall()
     
     # Recordings today and this week
     recordings_today = db.conn.execute("""
@@ -890,6 +966,7 @@ async def admin_dashboard(request: Request):
     chart_data = json.dumps({
         "recordings_by_day": [{"date": r[0], "count": r[1]} for r in recordings_by_day],
         "users_by_day": [{"date": r[0], "count": r[1]} for r in users_by_day],
+        "dau_trend": [{"date": r[0], "dau": r[1]} for r in dau_trend],
         "score_distribution": score_dist,
         "categories": [{"category": c[0], "count": c[1]} for c in categories],
         "survey_goals": [{"goal": g[0], "count": g[1]} for g in survey_goals],
@@ -913,8 +990,18 @@ async def admin_dashboard(request: Request):
         "stats": {
             "total_users": total_users,
             "total_recordings": total_recordings,
+            "dau": dau,
+            "dau_yesterday": dau_yesterday,
+            "mau": mau,
+            "mau_prev_month": mau_prev_month,
+            "mom_growth": mom_growth,
             "active_7d": active_7d,
-            "active_30d": active_30d,
+            "active_30d": mau,  # Same as MAU
+            "paid_users": paid_users,
+            "paid_today": paid_today,
+            "paid_week": paid_week,
+            "paid_month": paid_month,
+            "tier_stats": tier_stats,
             "recordings_today": recordings_today,
             "recordings_week": recordings_week,
             "storage_mb": storage_mb,

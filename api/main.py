@@ -330,6 +330,14 @@ try:
 except ImportError as e:
     logger.warning(f"Transcribe endpoint not available: {e}")
 
+# Register AI Interview endpoints
+try:
+    from .interview_endpoints import router as interview_router  # noqa: E402
+    app.include_router(interview_router, prefix="/v1", tags=["interview"])
+    logger.info("AI Interview endpoints registered.")
+except ImportError as e:
+    logger.warning(f"Interview endpoints not available: {e}")
+
 # Register TTS routes (ElevenLabs)
 try:
     from .tts_endpoints import router as tts_router  # noqa: E402

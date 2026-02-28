@@ -9,27 +9,83 @@
         <p class="text-sm text-gray-400 mt-1">Platform analytics and user statistics</p>
     </div>
 
-    <!-- Top Stats Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <!-- Key Metrics: DAU, MAU, MoM Growth -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="metric-card bg-gradient-to-br from-blue-900/40 to-blue-800/20 rounded-xl border border-blue-700/50 p-5">
+            <div class="flex items-center justify-between">
+                <div class="text-3xl font-bold text-blue-400">{{ stats.dau }}</div>
+                {% if stats.dau_yesterday > 0 %}
+                    {% set dau_change = ((stats.dau - stats.dau_yesterday) / stats.dau_yesterday * 100) %}
+                    <span class="text-sm px-2 py-1 rounded-full {% if dau_change >= 0 %}bg-green-900/50 text-green-400{% else %}bg-red-900/50 text-red-400{% endif %}">
+                        {% if dau_change >= 0 %}+{% endif %}{{ "%.0f"|format(dau_change) }}%
+                    </span>
+                {% endif %}
+            </div>
+            <div class="text-sm text-gray-400 mt-1">📅 Daily Active Users</div>
+            <div class="text-xs text-gray-500 mt-1">vs {{ stats.dau_yesterday }} yesterday</div>
+        </div>
+        <div class="metric-card bg-gradient-to-br from-indigo-900/40 to-indigo-800/20 rounded-xl border border-indigo-700/50 p-5">
+            <div class="text-3xl font-bold text-indigo-400">{{ stats.mau }}</div>
+            <div class="text-sm text-gray-400 mt-1">📆 Monthly Active Users</div>
+            <div class="text-xs text-gray-500 mt-1">Last 30 days</div>
+        </div>
+        <div class="metric-card bg-gradient-to-br from-purple-900/40 to-purple-800/20 rounded-xl border border-purple-700/50 p-5">
+            <div class="flex items-center">
+                <div class="text-3xl font-bold {% if stats.mom_growth >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                    {% if stats.mom_growth >= 0 %}+{% endif %}{{ "%.1f"|format(stats.mom_growth) }}%
+                </div>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">📈 Month-over-Month</div>
+            <div class="text-xs text-gray-500 mt-1">{{ stats.mau_prev_month }} → {{ stats.mau }}</div>
+        </div>
+        <div class="metric-card bg-gradient-to-br from-green-900/40 to-green-800/20 rounded-xl border border-green-700/50 p-5">
+            <div class="text-3xl font-bold text-green-400">{{ stats.paid_users }}</div>
+            <div class="text-sm text-gray-400 mt-1">💰 Paid Users</div>
+            <div class="text-xs text-gray-500 mt-1">
+                {% for tier, count in stats.tier_stats.items() if tier not in ['free', 'none', None] %}
+                    {{ tier }}: {{ count }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Subscription Growth -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-white">{{ stats.total_users }}</div>
-            <div class="text-sm text-gray-400 mt-1">Total Users</div>
+            <div class="text-2xl font-bold text-white">{{ stats.paid_today }}</div>
+            <div class="text-sm text-gray-400 mt-1">New Paid Today</div>
         </div>
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-white">{{ stats.total_recordings }}</div>
-            <div class="text-sm text-gray-400 mt-1">Total Recordings</div>
+            <div class="text-2xl font-bold text-white">{{ stats.paid_week }}</div>
+            <div class="text-sm text-gray-400 mt-1">New Paid This Week</div>
         </div>
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-green-400">{{ stats.active_7d }}</div>
-            <div class="text-sm text-gray-400 mt-1">Active (7 days)</div>
-        </div>
-        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-indigo-400">{{ stats.active_30d }}</div>
-            <div class="text-sm text-gray-400 mt-1">Active (30 days)</div>
+            <div class="text-2xl font-bold text-white">{{ stats.paid_month }}</div>
+            <div class="text-sm text-gray-400 mt-1">New Paid This Month</div>
         </div>
     </div>
 
     <!-- Secondary Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-white">{{ stats.total_users }}</div>
+            <div class="text-sm text-gray-400 mt-1">Total Users</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-white">{{ stats.total_recordings }}</div>
+            <div class="text-sm text-gray-400 mt-1">Total Recordings</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-green-400">{{ stats.active_7d }}</div>
+            <div class="text-sm text-gray-400 mt-1">Active (7 days)</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-amber-400">{{ "%.1f"|format(stats.storage_mb) }} MB</div>
+            <div class="text-sm text-gray-400 mt-1">Storage Used</div>
+        </div>
+    </div>
+
+    <!-- Activity Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
             <div class="text-2xl font-bold text-white">{{ stats.recordings_today }}</div>
@@ -40,13 +96,19 @@
             <div class="text-sm text-gray-400 mt-1">This Week</div>
         </div>
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-2xl font-bold text-amber-400">{{ "%.1f"|format(stats.storage_mb) }} MB</div>
-            <div class="text-sm text-gray-400 mt-1">Storage Used</div>
-        </div>
-        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
             <div class="text-2xl font-bold text-white">{{ "%.1f"|format(stats.avg_score) if stats.avg_score else 'N/A' }}</div>
             <div class="text-sm text-gray-400 mt-1">Avg Score</div>
         </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-white">{{ stats.survey_total }}</div>
+            <div class="text-sm text-gray-400 mt-1">Survey Responses</div>
+        </div>
+    </div>
+
+    <!-- DAU Trend Chart -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <h2 class="text-lg font-semibold text-white mb-4">📅 Daily Active Users (14 days)</h2>
+        <canvas id="dauChart" height="120"></canvas>
     </div>
 
     <!-- Charts Row -->
@@ -290,6 +352,32 @@ const chartData = {{ chart_data | safe }};
 
 Chart.defaults.color = '#9ca3af';
 Chart.defaults.borderColor = '#1f2937';
+
+// DAU Trend
+if (chartData.dau_trend && chartData.dau_trend.length > 0) {
+    new Chart(document.getElementById('dauChart'), {
+        type: 'line',
+        data: {
+            labels: chartData.dau_trend.map(d => d.date.slice(5)), // MM-DD format
+            datasets: [{
+                label: 'DAU',
+                data: chartData.dau_trend.map(d => d.dau),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                pointBackgroundColor: '#3b82f6',
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        }
+    });
+}
 
 // Recordings over time
 new Chart(document.getElementById('recordingsChart'), {

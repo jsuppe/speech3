@@ -2570,6 +2570,63 @@ async def get_coach_history(
     }
 
 
+@router.post("/coach/upload-document", tags=["Coach"])
+async def upload_coach_document(
+    document: UploadFile = File(...),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Upload a presentation document (PPT, DOCX, PDF, XLSX) for Live Coach context.
+    Returns extracted text that should be included in subsequent feedback requests.
+    """
+    import tempfile
+    import os
+    from .document_parser import extract_text_from_document, summarize_for_context
+    
+    # Check file extension
+    filename = document.filename or "document"
+    ext = os.path.splitext(filename.lower())[1]
+    allowed_extensions = ['.pptx', '.ppt', '.docx', '.doc', '.pdf', '.xlsx', '.xls', '.txt']
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {ext}. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        content = await document.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+    
+    try:
+        # Extract text
+        extracted_text = extract_text_from_document(tmp_path, filename)
+        
+        if not extracted_text:
+            return {
+                "success": False,
+                "error": "Could not extract text from document",
+                "filename": filename,
+            }
+        
+        # Summarize for LLM context (limit size)
+        context_text = summarize_for_context(extracted_text, max_chars=8000)
+        
+        return {
+            "success": True,
+            "filename": filename,
+            "char_count": len(extracted_text),
+            "context_text": context_text,
+        }
+        
+    finally:
+        # Clean up temp file
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
 @router.post("/coach/live-feedback", tags=["Coach"])
 async def get_live_coach_feedback(
     data: dict,
@@ -2577,23 +2634,101 @@ async def get_live_coach_feedback(
 ):
     """
     Get real-time coaching feedback during a live presentation.
-    Sends the full transcript to Ollama for quick 1-sentence advice.
+    
+    Modes:
+    - 'cue': Returns short 1-2 word cues for glanceable feedback
+    - 'detailed': Returns longer TTS-friendly feedback (for pause & coach)
     """
     import requests
     
     transcript = data.get("transcript", "").strip()
-    if not transcript or len(transcript) < 20:
-        return {"feedback": ""}
+    mode = data.get("mode", "cue")  # 'cue' or 'detailed'
+    wpm = data.get("wpm", 0)
+    filler_count = data.get("filler_count", 0)
+    confidence_score = data.get("confidence_score", 50)
+    document_context = data.get("document_context", "")  # Uploaded presentation content
     
-    prompt = f"""You are a presentation coach whispering in the speaker's ear during a LIVE presentation. 
-Based on their speech so far, give ONE brief tip (under 15 words). Be encouraging but direct.
-Focus on: pacing, filler words, clarity, confidence, or structure.
-If everything sounds good, give brief encouragement.
+    if not transcript or len(transcript) < 20:
+        return {"feedback": "", "cue": "", "cue_type": "neutral"}
+    
+    # Short cues for glanceable feedback
+    CUES = {
+        "pace_slow": {"cue": "Speed Up!", "emoji": "🐢", "type": "warning"},
+        "pace_fast": {"cue": "Slow Down!", "emoji": "🏃", "type": "warning"},
+        "pace_good": {"cue": "Good Pace!", "emoji": "✓", "type": "positive"},
+        "volume_up": {"cue": "Louder!", "emoji": "📢", "type": "warning"},
+        "volume_down": {"cue": "Softer!", "emoji": "🤫", "type": "warning"},
+        "energy_up": {"cue": "More Energy!", "emoji": "⚡", "type": "warning"},
+        "energy_down": {"cue": "Tone Down!", "emoji": "😌", "type": "warning"},
+        "confidence": {"cue": "Stronger!", "emoji": "💪", "type": "warning"},
+        "own_it": {"cue": "Own It!", "emoji": "🎯", "type": "warning"},
+        "breathe": {"cue": "Breathe!", "emoji": "🌬️", "type": "warning"},
+        "pause": {"cue": "Pause!", "emoji": "⏸️", "type": "warning"},
+        "fillers": {"cue": "Watch Fillers!", "emoji": "⚠️", "type": "alert"},
+        "clean": {"cue": "Clean Speech!", "emoji": "✨", "type": "positive"},
+        "enunciate": {"cue": "Enunciate!", "emoji": "🗣️", "type": "warning"},
+        "project": {"cue": "Project!", "emoji": "🔊", "type": "warning"},
+        "nailed_it": {"cue": "Nailed It!", "emoji": "🔥", "type": "positive"},
+        "perfect": {"cue": "Perfect!", "emoji": "⭐", "type": "positive"},
+        "keep_going": {"cue": "Keep Going!", "emoji": "👍", "type": "positive"},
+        "great": {"cue": "Sounds Great!", "emoji": "🎉", "type": "positive"},
+    }
+    
+    if mode == "cue":
+        # Determine the most relevant cue based on metrics
+        cue_key = "keep_going"  # default
+        
+        if wpm > 0:
+            if wpm > 180:
+                cue_key = "pace_fast"
+            elif wpm < 100:
+                cue_key = "pace_slow"
+            elif 130 <= wpm <= 160:
+                if filler_count == 0 and confidence_score >= 70:
+                    cue_key = "great"
+        
+        if filler_count > 3:
+            cue_key = "fillers"
+        elif filler_count == 0 and wpm > 0:
+            cue_key = "clean"
+        
+        if confidence_score < 35:
+            cue_key = "confidence"
+        elif confidence_score < 50:
+            cue_key = "own_it"
+        
+        cue_data = CUES.get(cue_key, CUES["keep_going"])
+        return {
+            "feedback": "",
+            "cue": cue_data["cue"],
+            "cue_emoji": cue_data["emoji"],
+            "cue_type": cue_data["type"],
+        }
+    
+    # Detailed mode - use LLM for longer feedback
+    doc_section = ""
+    if document_context:
+        doc_section = f"""
+PRESENTATION MATERIALS (what they're supposed to be covering):
+{document_context[:4000]}
 
-Their speech so far:
-"{transcript[-2000:]}"
+"""
+    
+    prompt = f"""You are a presentation coach giving feedback during a PAUSED session.
+The presenter pressed "Coach Me" for detailed advice on their recent speaking.
+{doc_section}
+Context:
+- Current pace: {wpm} WPM (ideal: 130-160)
+- Filler words used: {filler_count}
+- Confidence score: {confidence_score}/100
 
-Your one-sentence coaching tip:"""
+Recent transcript (last part of their speech):
+"{transcript[-1500:]}"
+
+Give 2-3 sentences of specific, actionable feedback on their most recent topic/segment.
+Be encouraging but direct. Focus on what they can improve RIGHT NOW when they resume.
+{"If relevant, mention how well they're covering the presentation materials." if document_context else ""}
+Start with what they did well, then give one clear improvement."""
     
     try:
         response = requests.post(
@@ -2604,26 +2739,147 @@ Your one-sentence coaching tip:"""
                 "stream": False,
                 "options": {
                     "temperature": 0.7,
-                    "num_predict": 50,
+                    "num_predict": 150,
                 }
             },
-            timeout=5,
+            timeout=10,
         )
         
         if response.status_code == 200:
             result = response.json()
             feedback = result.get("response", "").strip()
-            # Clean up any quotes or extra formatting
+            # Clean up
             feedback = feedback.strip('"\'').strip()
-            # Limit length
-            if len(feedback) > 100:
-                feedback = feedback[:100].rsplit(' ', 1)[0] + '...'
-            return {"feedback": feedback}
+            # Limit length for TTS
+            if len(feedback) > 300:
+                feedback = feedback[:300].rsplit('.', 1)[0] + '.'
+            return {"feedback": feedback, "cue": "", "cue_type": "detailed"}
         else:
-            return {"feedback": ""}
+            return {"feedback": "You're doing well. Focus on your pacing and take a breath before continuing.", "cue": "", "cue_type": "detailed"}
     except Exception as e:
         logger.warning(f"Live coach feedback error: {e}")
-        return {"feedback": ""}
+        return {"feedback": "Take a breath. You've got this.", "cue": "", "cue_type": "detailed"}
+
+
+@router.post("/coach/session-summary/{speech_id}", tags=["Coach"])
+async def get_session_coaching_summary(
+    speech_id: int,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Generate comprehensive coaching feedback at the end of a Live Coach session.
+    Uses full transcript + audio analysis for detailed advice.
+    """
+    import requests
+    
+    db = get_db()
+    
+    # Get the speech and its analysis
+    speech_row = db.conn.execute("""
+        SELECT s.*, a.* FROM speeches s
+        LEFT JOIN analyses a ON a.speech_id = s.id
+        WHERE s.id = ?
+    """, (speech_id,)).fetchone()
+    
+    if not speech_row:
+        raise HTTPException(status_code=404, detail="Speech not found")
+    
+    speech = dict(speech_row)
+    
+    # Build analysis context
+    analysis_context = []
+    
+    if speech.get('wpm'):
+        wpm = speech['wpm']
+        pace_note = "good pace" if 130 <= wpm <= 160 else ("too fast" if wpm > 160 else "too slow")
+        analysis_context.append(f"Speaking pace: {wpm} WPM ({pace_note})")
+    
+    if speech.get('pitch_mean_hz'):
+        analysis_context.append(f"Average pitch: {speech['pitch_mean_hz']:.0f} Hz")
+        if speech.get('pitch_std_hz'):
+            analysis_context.append(f"Pitch variation: {speech['pitch_std_hz']:.1f} Hz std")
+    
+    if speech.get('jitter_pct'):
+        jitter = speech['jitter_pct']
+        jitter_note = "steady voice" if jitter < 1.0 else ("some instability" if jitter < 2.0 else "voice tremor detected")
+        analysis_context.append(f"Voice stability (jitter): {jitter:.2f}% ({jitter_note})")
+    
+    if speech.get('hnr_db'):
+        hnr = speech['hnr_db']
+        clarity = "excellent clarity" if hnr > 20 else ("good clarity" if hnr > 15 else "some roughness")
+        analysis_context.append(f"Voice clarity (HNR): {hnr:.1f} dB ({clarity})")
+    
+    if speech.get('filler_count'):
+        analysis_context.append(f"Filler words detected: {speech['filler_count']}")
+    
+    if speech.get('pause_count'):
+        analysis_context.append(f"Pauses: {speech['pause_count']} (avg {speech.get('mean_pause_sec', 0):.1f}s)")
+    
+    if speech.get('lexical_diversity'):
+        analysis_context.append(f"Vocabulary diversity: {speech['lexical_diversity']:.2f}")
+    
+    if speech.get('fk_grade_level'):
+        analysis_context.append(f"Language complexity: Grade {speech['fk_grade_level']:.1f}")
+    
+    # Get transcript
+    transcript = speech.get('transcript', '') or ''
+    if not transcript and speech.get('summary'):
+        transcript = speech['summary']
+    
+    analysis_text = "\n".join(analysis_context) if analysis_context else "Audio analysis not available"
+    
+    # Build the coaching prompt
+    prompt = f"""You are a speech coach and you just heard a presentation from someone you are coaching. You also have audio analysis of their speaking. Combining these two sources of information, provide feedback to the speaker on their presentation skills.
+
+AUDIO ANALYSIS:
+{analysis_text}
+
+TRANSCRIPT OF THEIR PRESENTATION:
+"{transcript[:3000]}"
+
+Provide 3-4 paragraphs of constructive coaching feedback:
+1. Start with what they did well
+2. Identify 2-3 specific areas for improvement with actionable advice
+3. End with encouragement
+
+Keep the tone warm and supportive, like a trusted coach."""
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3:latest",
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 500,
+                }
+            },
+            timeout=30,
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            feedback = result.get("response", "").strip()
+            return {
+                "speech_id": speech_id,
+                "feedback": feedback,
+                "analysis_summary": analysis_context,
+            }
+        else:
+            return {
+                "speech_id": speech_id,
+                "feedback": "Great job completing your presentation! Review the detailed analysis for specific metrics.",
+                "analysis_summary": analysis_context,
+            }
+    except Exception as e:
+        logger.warning(f"Session summary error: {e}")
+        return {
+            "speech_id": speech_id,
+            "feedback": "Your session has been recorded and analyzed. Check the full analysis for detailed feedback.",
+            "analysis_summary": analysis_context,
+        }
 
 
 @router.get("/coach/unread", tags=["Coach"])

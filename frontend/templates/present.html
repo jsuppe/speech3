@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Present Mode — SpeakFit{% endblock %}
+
+{% block content %}
+<div class="fade-in max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <a href="/" class="text-indigo-400 text-sm hover:text-indigo-300 transition-colors">← Back to Home</a>
+        <div class="flex items-center gap-4 mt-4">
+            <div class="text-5xl">🎤</div>
+            <div>
+                <h1 class="text-3xl font-bold text-white">Present Mode</h1>
+                <p class="text-amber-400 font-medium">Public Speaking & Presentation Coach</p>
+            </div>
+        </div>
+        <p class="text-gray-400 mt-4 max-w-2xl">Master your presentations with AI-powered feedback on delivery, pacing, confidence, and content structure. Whether you're pitching to investors or presenting to your team, Present mode helps you nail it.</p>
+    </div>
+
+    <!-- Key Features Grid -->
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+        <div class="bg-gradient-to-br from-amber-900/40 to-amber-950/40 border border-amber-500/30 rounded-xl p-5">
+            <div class="text-2xl mb-2">🎯</div>
+            <h3 class="font-semibold text-white mb-1">AI Interview Practice</h3>
+            <p class="text-gray-400 text-sm">Practice job interviews with an AI hiring manager that asks contextual questions based on your resume and the job description.</p>
+            <a href="/interview" class="inline-block mt-3 text-amber-400 text-sm hover:text-amber-300">Try it →</a>
+        </div>
+        
+        <div class="bg-gradient-to-br from-green-900/40 to-green-950/40 border border-green-500/30 rounded-xl p-5">
+            <div class="text-2xl mb-2">📡</div>
+            <h3 class="font-semibold text-white mb-1">Live Coaching</h3>
+            <p class="text-gray-400 text-sm">Real-time feedback as you speak. See your pacing, filler words, and energy level update live while you practice.</p>
+        </div>
+        
+        <div class="bg-gradient-to-br from-blue-900/40 to-blue-950/40 border border-blue-500/30 rounded-xl p-5">
+            <div class="text-2xl mb-2">📊</div>
+            <h3 class="font-semibold text-white mb-1">Delivery Analysis</h3>
+            <p class="text-gray-400 text-sm">Detailed breakdown of pacing, pitch variation, pause quality, filler words, and confidence markers.</p>
+        </div>
+        
+        <div class="bg-gradient-to-br from-purple-900/40 to-purple-950/40 border border-purple-500/30 rounded-xl p-5">
+            <div class="text-2xl mb-2">🎭</div>
+            <h3 class="font-semibold text-white mb-1">Practice Scenarios</h3>
+            <p class="text-gray-400 text-sm">Structured practice for pitch decks, job interviews, team meetings, and conference talks.</p>
+        </div>
+        
+        <div class="bg-gradient-to-br from-pink-900/40 to-pink-950/40 border border-pink-500/30 rounded-xl p-5">
+            <div class="text-2xl mb-2">💡</div>
+            <h3 class="font-semibold text-white mb-1">Opening & Closing Analysis</h3>
+            <p class="text-gray-400 text-sm">Get feedback on your hook and conclusion. Strong openings grab attention; strong closings drive action.</p>
+        </div>
+        
+        <div class="bg-gradient-to-br from-cyan-900/40 to-cyan-950/40 border border-cyan-500/30 rounded-xl p-5">
+            <div class="text-2xl mb-2">📈</div>
+            <h3 class="font-semibold text-white mb-1">Progress Tracking</h3>
+            <p class="text-gray-400 text-sm">Track your metrics over time and see how your presentation skills improve with practice.</p>
+        </div>
+    </div>
+
+    <!-- Metrics Explained -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-10">
+        <h2 class="text-xl font-bold text-white mb-4">What We Measure</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+            <div class="space-y-3">
+                <div class="flex items-start gap-3">
+                    <span class="text-amber-400 font-bold text-lg">⏱️</span>
+                    <div>
+                        <h4 class="text-white font-medium">Pacing Score</h4>
+                        <p class="text-gray-400 text-sm">Are you speaking at the right speed? Too fast loses the audience; too slow loses attention. Ideal: 130-160 WPM.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-amber-400 font-bold text-lg">🎵</span>
+                    <div>
+                        <h4 class="text-white font-medium">Pitch Variation</h4>
+                        <p class="text-gray-400 text-sm">Monotone delivery is boring. We measure how much your voice varies to keep listeners engaged.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-amber-400 font-bold text-lg">😬</span>
+                    <div>
+                        <h4 class="text-white font-medium">Filler Rate</h4>
+                        <p class="text-gray-400 text-sm">Count of "um", "uh", "like", "you know" per minute. Lower is better. Pros: &lt;2/min. Casual: 5-10/min.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-start gap-3">
+                    <span class="text-amber-400 font-bold text-lg">💪</span>
+                    <div>
+                        <h4 class="text-white font-medium">Confidence Score</h4>
+                        <p class="text-gray-400 text-sm">Based on hedging language ("I think", "maybe", "sort of"). Confident speakers make definitive statements.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-amber-400 font-bold text-lg">⏸️</span>
+                    <div>
+                        <h4 class="text-white font-medium">Pause Quality</h4>
+                        <p class="text-gray-400 text-sm">Strategic pauses add emphasis. Too many or too few hurt your delivery. We find the sweet spot.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-amber-400 font-bold text-lg">⚡</span>
+                    <div>
+                        <h4 class="text-white font-medium">Energy Score</h4>
+                        <p class="text-gray-400 text-sm">Vocal energy and intensity. High energy presentations are more memorable and persuasive.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Practice Scenarios -->
+    <div class="mb-10">
+        <h2 class="text-xl font-bold text-white mb-4">Practice Scenarios</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-5 hover:bg-blue-900/30 transition-colors">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-2xl">🚀</span>
+                    <h3 class="font-semibold text-blue-300">Pitch Deck</h3>
+                </div>
+                <p class="text-gray-400 text-sm">Startup pitches, sales presentations, investor decks. Practice your value prop and ask.</p>
+            </div>
+            
+            <div class="bg-purple-900/20 border border-purple-500/30 rounded-xl p-5 hover:bg-purple-900/30 transition-colors">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-2xl">💼</span>
+                    <h3 class="font-semibold text-purple-300">Job Interview</h3>
+                </div>
+                <p class="text-gray-400 text-sm">Behavioral questions, technical screens, case interviews. Build confidence before the real thing.</p>
+            </div>
+            
+            <div class="bg-orange-900/20 border border-orange-500/30 rounded-xl p-5 hover:bg-orange-900/30 transition-colors">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-2xl">👥</span>
+                    <h3 class="font-semibold text-orange-300">Team Meeting</h3>
+                </div>
+                <p class="text-gray-400 text-sm">Status updates, project reviews, all-hands presentations. Clear and concise communication.</p>
+            </div>
+            
+            <div class="bg-teal-900/20 border border-teal-500/30 rounded-xl p-5 hover:bg-teal-900/30 transition-colors">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-2xl">🎙️</span>
+                    <h3 class="font-semibold text-teal-300">Conference Talk</h3>
+                </div>
+                <p class="text-gray-400 text-sm">Keynotes, webinars, panel discussions. Practice your stage presence and timing.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Updates -->
+    <div class="bg-gradient-to-r from-amber-900/30 to-amber-800/20 border border-amber-500/30 rounded-xl p-6 mb-10">
+        <h2 class="text-lg font-bold text-amber-400 mb-4">🆕 Recent Updates</h2>
+        <ul class="space-y-3 text-gray-300">
+            <li class="flex items-start gap-2">
+                <span class="text-amber-400">•</span>
+                <div><strong>AI Interview Practice</strong> — Full conversational interview simulation with an AI hiring manager. Upload job descriptions and your resume for contextual questions.</div>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-amber-400">•</span>
+                <div><strong>Confidence Scoring</strong> — New metric detecting hedging language and uncertainty markers in your speech.</div>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-amber-400">•</span>
+                <div><strong>Opening & Closing Analysis</strong> — Feedback on whether your intro hooks attention and your conclusion drives action.</div>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-amber-400">•</span>
+                <div><strong>Live Coaching Mode</strong> — Real-time feedback dashboard that updates as you speak.</div>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-amber-400">•</span>
+                <div><strong>Practice Scenarios</strong> — Structured prompts for pitch decks, interviews, meetings, and talks.</div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center py-8">
+        <h3 class="text-white text-xl font-bold mb-4">Ready to improve your presentations?</h3>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/interview" class="px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-xl transition-colors">
+                🎯 Try AI Interview Practice
+            </a>
+            <a href="https://speakfit.app/flutter/" class="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors">
+                📱 Get the App
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

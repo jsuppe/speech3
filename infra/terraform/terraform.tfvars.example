@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and fill in values
+
+project_id  = "speakfit-prod"  # Your GCP project ID
+region      = "us-central1"     # Region with GPU availability
+environment = "dev"             # dev, staging, or prod
+domain      = "api.speakfit.app"
+
+# Scaling
+api_min_instances = 1
+api_max_instances = 5
+gpu_worker_count  = 1
