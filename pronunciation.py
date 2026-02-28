@@ -272,8 +272,30 @@ class PronunciationAnalyzer:
         # Step 1: Transcribe with word timestamps
         segments, info = self.whisper.transcribe(audio_path, word_timestamps=True)
         
+        # Filter hallucinated segments
+        from difflib import SequenceMatcher
+        filtered_segments = []
+        prev_texts = []
+        for seg in segments:
+            text = seg.text.strip()
+            if not text:
+                continue
+            duration = seg.end - seg.start
+            wpm = (len(text.split()) / duration * 60) if duration > 0 else 0
+            if wpm > 300:  # Impossible speed = hallucination
+                continue
+            if seg.words:
+                avg_prob = sum(w.probability for w in seg.words) / len(seg.words)
+                if avg_prob < 0.1:  # Very low confidence = hallucination
+                    continue
+            # Check for duplicate text
+            is_dup = any(SequenceMatcher(None, text.lower(), p.lower()).ratio() > 0.8 for p in prev_texts[-3:])
+            if not is_dup:
+                filtered_segments.append(seg)
+                prev_texts.append(text)
+        
         words = []
-        for segment in segments:
+        for segment in filtered_segments:
             for word_info in segment.words:
                 word = word_info.word.strip()
                 if not word or len(word) < 2:

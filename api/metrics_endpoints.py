@@ -41,16 +41,15 @@ async def get_metrics_history(
                 s.id,
                 date(s.created_at) as day,
                 s.created_at,
-                a.score,
+                s.cached_score as score,
                 a.wpm,
-                a.filler_ratio,
-                a.pitch_mean,
-                a.pitch_stddev,
-                a.pause_ratio,
-                a.intensity_mean,
-                a.intensity_stddev
+                a.pitch_mean_hz as pitch_mean,
+                a.pitch_std_hz as pitch_stddev,
+                a.vocal_fry_ratio,
+                a.hnr_db as hnr,
+                a.fluency_score
             FROM speeches s
-            JOIN analyses a ON s.id = a.speech_id
+            LEFT JOIN analyses a ON s.id = a.speech_id
             WHERE s.user_id = ? 
               AND s.profile = ?
               AND s.created_at >= ?
@@ -93,12 +92,7 @@ async def get_metrics_history(
                     d["pacing"].append(pacing)
                     all_metrics["pacing"].append(pacing)
             
-            filler = row["filler_ratio"]
-            if filler is not None:
-                d["filler_rate"].append(filler * 100)  # Convert to percentage
-                all_metrics["filler_rate"].append(filler * 100)
-            
-            # Confidence based on overall score (placeholder - would use hedging analysis)
+            # Confidence based on overall score
             score = row["score"]
             if score:
                 d["confidence"].append(score)
@@ -114,20 +108,19 @@ async def get_metrics_history(
                 d["pitch_variation"].append(pitch_cv)
                 all_metrics["pitch_variation"].append(pitch_cv)
             
-            # Pause quality
-            pause_ratio = row["pause_ratio"]
-            if pause_ratio is not None:
-                d["pause_quality"].append(pause_ratio * 100)
-                all_metrics["pause_quality"].append(pause_ratio * 100)
-            
-            # Energy (intensity variation)
-            int_mean = row["intensity_mean"]
-            int_std = row["intensity_stddev"]
-            if int_mean and int_std:
-                # Normalize to 0-100 scale
-                energy = min(100, max(0, int_mean / 0.5 * 100))
+            # Energy based on HNR (voice clarity/energy)
+            hnr = row["hnr"]
+            if hnr:
+                # HNR typically ranges from 0-30+ dB, normalize to 0-100
+                energy = min(100, max(0, hnr * 3.5))
                 d["energy"].append(energy)
                 all_metrics["energy"].append(energy)
+            
+            # Fluency score as pause quality proxy
+            fluency = row["fluency_score"]
+            if fluency:
+                d["pause_quality"].append(fluency)
+                all_metrics["pause_quality"].append(fluency)
         
         # Average daily metrics
         result_data = []
@@ -200,16 +193,14 @@ async def get_profile_stats(
         
         rows = conn.execute("""
             SELECT 
-                a.score,
+                s.cached_score as score,
                 a.wpm,
-                a.filler_ratio,
-                a.pitch_mean,
-                a.pitch_stddev,
-                a.pause_ratio,
-                a.intensity_mean,
-                a.intensity_stddev
+                a.pitch_mean_hz as pitch_mean,
+                a.pitch_std_hz as pitch_stddev,
+                a.hnr_db as hnr,
+                a.fluency_score
             FROM speeches s
-            JOIN analyses a ON s.id = a.speech_id
+            LEFT JOIN analyses a ON s.id = a.speech_id
             WHERE s.user_id = ? 
               AND s.profile = ?
               AND s.created_at >= ?
@@ -242,9 +233,6 @@ async def get_profile_stats(
                 pacing = max(0, 100 - abs(row["wpm"] - 140) * 2)
                 metrics["pacing"].append(pacing)
             
-            if row["filler_ratio"] is not None:
-                metrics["filler"].append(row["filler_ratio"] * 100)
-            
             if row["score"]:
                 metrics["confidence"].append(row["score"])
                 metrics["accuracy"].append(row["score"])
@@ -252,11 +240,11 @@ async def get_profile_stats(
             if row["pitch_mean"] and row["pitch_stddev"] and row["pitch_mean"] > 0:
                 metrics["pitch_cv"].append((row["pitch_stddev"] / row["pitch_mean"]) * 100)
             
-            if row["pause_ratio"] is not None:
-                metrics["pause"].append(row["pause_ratio"] * 100)
+            if row["hnr"]:
+                metrics["energy"].append(min(100, max(0, row["hnr"] * 3.5)))
             
-            if row["intensity_mean"]:
-                metrics["energy"].append(min(100, row["intensity_mean"] / 0.5 * 100))
+            if row["fluency_score"]:
+                metrics["pause"].append(row["fluency_score"])
         
         def avg(lst):
             return round(sum(lst) / len(lst), 1) if lst else None

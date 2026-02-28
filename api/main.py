@@ -322,6 +322,14 @@ try:
 except ImportError as e:
     logger.warning(f"Metrics endpoints not available: {e}")
 
+# Register quick transcription endpoint (for Live Coach)
+try:
+    from .transcribe_endpoint import router as transcribe_router  # noqa: E402
+    app.include_router(transcribe_router, prefix="/v1", tags=["transcribe"])
+    logger.info("Transcription endpoint registered.")
+except ImportError as e:
+    logger.warning(f"Transcribe endpoint not available: {e}")
+
 # Register TTS routes (ElevenLabs)
 try:
     from .tts_endpoints import router as tts_router  # noqa: E402

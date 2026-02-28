@@ -353,10 +353,9 @@ async def dashboard(request: Request):
     
     # Average scores by product (user recordings only)
     avg_score_rows = db.conn.execute("""
-        SELECT s.profile, ROUND(AVG(a.overall_score), 0) as avg_score
+        SELECT s.profile, ROUND(AVG(s.cached_score), 0) as avg_score
         FROM speeches s
-        JOIN analyses a ON a.speech_id = s.id
-        WHERE s.user_id IS NOT NULL AND a.overall_score IS NOT NULL
+        WHERE s.user_id IS NOT NULL AND s.cached_score IS NOT NULL
         GROUP BY s.profile
         ORDER BY avg_score DESC
     """).fetchall()
@@ -385,10 +384,9 @@ async def dashboard(request: Request):
     # Recent user recordings
     recent_rows = db.conn.execute("""
         SELECT s.id, s.title, s.profile, s.created_at, s.duration_sec,
-               u.name as user_name, a.overall_score
+               u.name as user_name, s.cached_score as overall_score
         FROM speeches s
         LEFT JOIN users u ON u.id = s.user_id
-        LEFT JOIN analyses a ON a.speech_id = s.id
         WHERE s.user_id IS NOT NULL
         ORDER BY s.created_at DESC
         LIMIT 10

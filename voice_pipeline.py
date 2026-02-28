@@ -5,6 +5,68 @@ Transcribes audio with faster-whisper, analyzes with speech3, generates spectrog
 Usage: python voice_pipeline.py <audio_file> [--output-dir /tmp]
 """
 import sys, os, json, time, subprocess, shutil, argparse
+from difflib import SequenceMatcher
+
+
+def filter_hallucinated_segments(segments):
+    """
+    Filter out hallucinated/repeated content from Whisper transcription.
+    
+    Whisper sometimes hallucinates by repeating previous content, especially at 
+    recording boundaries. This filter detects and removes such segments using:
+    1. Text similarity to previous segments (>80% = likely duplicate)
+    2. Impossibly fast WPM (>300 = hallucination)
+    3. Very low average word probability (<0.1 = unreliable)
+    """
+    filtered = []
+    removed_count = 0
+    
+    for i, seg in enumerate(segments):
+        text = seg.text.strip() if hasattr(seg, 'text') else seg.get('text', '').strip()
+        start = seg.start if hasattr(seg, 'start') else seg.get('start', 0)
+        end = seg.end if hasattr(seg, 'end') else seg.get('end', 0)
+        
+        # Skip empty segments
+        if not text:
+            continue
+        
+        # Calculate WPM for this segment
+        duration = end - start
+        word_count = len(text.split())
+        wpm = (word_count / duration * 60) if duration > 0 else 0
+        
+        # Check 1: Impossibly fast speech (>300 WPM is humanly impossible)
+        if wpm > 300:
+            removed_count += 1
+            continue
+        
+        # Check 2: Check word-level probabilities if available
+        if hasattr(seg, 'words') and seg.words:
+            avg_prob = sum(w.probability for w in seg.words) / len(seg.words)
+            # If average word probability is very low, it's likely hallucinated
+            if avg_prob < 0.1:
+                removed_count += 1
+                continue
+        
+        # Check 3: Text similarity to recent segments (look back up to 3 segments)
+        is_duplicate = False
+        for prev_seg in filtered[-3:]:
+            prev_text = prev_seg.text.strip() if hasattr(prev_seg, 'text') else prev_seg.get('text', '').strip()
+            similarity = SequenceMatcher(None, text.lower(), prev_text.lower()).ratio()
+            if similarity > 0.8:
+                is_duplicate = True
+                break
+        
+        if is_duplicate:
+            removed_count += 1
+            continue
+        
+        filtered.append(seg)
+    
+    if removed_count > 0:
+        print(f"[Hallucination Filter] Removed {removed_count} hallucinated/duplicate segment(s)")
+    
+    return filtered
 
 def generate_spectrogram(audio_path, output_dir="/tmp"):
     """Generate spectrogram + mel + loudness visualization using songsee."""
@@ -76,15 +138,35 @@ def main():
 
     t2 = time.time()
     segments, info = model.transcribe(audio_path, beam_size=5, language="en",
+                                       word_timestamps=True,
                                        vad_filter=True, vad_parameters={"min_silence_duration_ms": 300})
+    
+    # Convert generator to list and filter hallucinated segments
+    raw_segments = list(segments)
+    filtered_segments = filter_hallucinated_segments(raw_segments)
     
     segment_list = []
     full_text_parts = []
-    for seg in segments:
+    for seg in filtered_segments:
+        # Build word list with probabilities for detailed analysis
+        words_data = []
+        if hasattr(seg, 'words') and seg.words:
+            for w in seg.words:
+                # Skip words with very low probability (hallucination indicator)
+                if w.probability < 0.05:
+                    continue
+                words_data.append({
+                    "start": round(w.start, 2),
+                    "end": round(w.end, 2),
+                    "word": w.word.strip(),
+                    "probability": round(w.probability, 3)
+                })
+        
         segment_list.append({
             "start": round(seg.start, 2),
             "end": round(seg.end, 2),
-            "text": seg.text.strip()
+            "text": seg.text.strip(),
+            "words": words_data
         })
         full_text_parts.append(seg.text.strip())
     

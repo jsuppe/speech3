@@ -185,9 +185,30 @@ def align_audio(audio_path: str, transcript: Optional[str] = None) -> dict:
     if transcript is None:
         # Use faster-whisper for transcription
         from faster_whisper import WhisperModel
+        from difflib import SequenceMatcher
         model = WhisperModel("large-v3", device="cuda", compute_type="float16")
-        segments, _ = model.transcribe(audio_path)
-        transcript = " ".join([s.text for s in segments])
+        segments, _ = model.transcribe(audio_path, word_timestamps=True)
+        
+        # Filter hallucinated segments (duplicates, impossible WPM, low probability)
+        filtered_texts = []
+        for seg in segments:
+            text = seg.text.strip()
+            if not text:
+                continue
+            duration = seg.end - seg.start
+            wpm = (len(text.split()) / duration * 60) if duration > 0 else 0
+            if wpm > 300:  # Impossible speed
+                continue
+            if hasattr(seg, 'words') and seg.words:
+                avg_prob = sum(w.probability for w in seg.words) / len(seg.words)
+                if avg_prob < 0.1:  # Low confidence
+                    continue
+            # Check for duplicates
+            is_dup = any(SequenceMatcher(None, text.lower(), prev.lower()).ratio() > 0.8 for prev in filtered_texts[-3:])
+            if not is_dup:
+                filtered_texts.append(text)
+        
+        transcript = " ".join(filtered_texts)
     
     result = run_mfa_align(audio_path, transcript)
     

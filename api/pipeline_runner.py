@@ -165,6 +165,40 @@ def is_model_loaded() -> bool:
     return _models_loaded and _whisper_model is not None
 
 
+def run_whisper_stt(audio_path: str, language: str = "en") -> dict:
+    """
+    Quick Whisper STT for Live Coach feature.
+    Returns dict with 'text' key containing transcription.
+    """
+    global _whisper_model
+    
+    if _whisper_model is None:
+        preload_models()
+    
+    if _whisper_model is None:
+        raise RuntimeError("Whisper model not loaded")
+    
+    try:
+        segments_gen, info = _whisper_model.transcribe(
+            audio_path,
+            language=language,
+            beam_size=1,  # Faster
+            best_of=1,
+            temperature=0,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500),
+        )
+        
+        # Collect segments
+        segments = list(segments_gen)
+        full_text = " ".join(seg.text.strip() for seg in segments)
+        
+        return {"text": full_text, "language": info.language}
+    except Exception as e:
+        logger.error(f"Whisper STT error: {e}")
+        return {"text": "", "error": str(e)}
+
+
 def get_audio_duration(audio_path: str) -> float:
     """Get audio duration in seconds using ffprobe.
     
@@ -650,7 +684,14 @@ def persist_result(
         # Check if audio file still exists (may have been cleaned up)
         audio_exists = os.path.exists(original_audio_path)
         if not audio_exists:
-            logger.warning(f"Audio file no longer exists: {original_audio_path}")
+            # Log detailed info for debugging missing audio issue
+            import traceback
+            logger.warning(
+                f"Audio file no longer exists: {original_audio_path}\n"
+                f"  filename={filename}, user_id={user_id}, profile={profile}\n"
+                f"  result has audio_duration_sec={result.get('audio_duration_sec')}\n"
+                f"  Stack: {''.join(traceback.format_stack()[-5:-1])}"
+            )
         
         # Get audio hash and duration (use result data as fallback)
         if audio_exists:
@@ -660,8 +701,13 @@ def persist_result(
             # Generate a unique hash from filename + timestamp
             import hashlib
             audio_hash = hashlib.sha256(f"{filename or original_audio_path}_{time.time()}".encode()).hexdigest()[:32]
-            # Try to get duration from result
-            duration = result.get("audio_metrics", {}).get("duration_sec") or result.get("processing", {}).get("duration_sec") or 0
+            # Try to get duration from result (check all possible keys)
+            duration = (
+                result.get("audio_duration_sec") or  # Top-level key from voice_pipeline
+                result.get("processing", {}).get("duration_s") or  # Processing section uses duration_s
+                result.get("audio_metrics", {}).get("duration_sec") or  # Legacy fallback
+                0
+            )
 
         # Auto-generate title from transcript if not provided
         if not title:
