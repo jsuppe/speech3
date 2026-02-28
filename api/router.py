@@ -5068,6 +5068,191 @@ async def get_dementia_recordings(
         return _error(500, "ERROR", str(e))
 
 
+@router.get("/dementia/recordings/{speech_id}/flagged-segments", tags=["Dementia"])
+async def get_dementia_flagged_segments(speech_id: int, user: dict = Depends(flexible_auth)):
+    """
+    Get flagged segments for caregiver review.
+    
+    Returns segments that triggered aphasic or repetition flags, with:
+    - Transcript text
+    - Audio start/end times for playback
+    - Detection stats (what caused the flag)
+    - Suggested categories for annotation
+    """
+    from .dementia_analysis import detect_aphasic_events
+    
+    try:
+        user_id = user.get("user_id") if user else None
+        db = pipeline_runner.get_db()
+        conn = db.conn
+        cursor = conn.cursor()
+        
+        # Get speech and verify ownership
+        if user_id:
+            cursor.execute("""
+                SELECT s.id, s.title, t.segments, t.text
+                FROM speeches s
+                JOIN transcriptions t ON t.speech_id = s.id
+                WHERE s.id = ? AND s.user_id = ? AND s.profile = 'dementia'
+            """, (speech_id, user_id))
+        else:
+            cursor.execute("""
+                SELECT s.id, s.title, t.segments, t.text
+                FROM speeches s
+                JOIN transcriptions t ON t.speech_id = s.id
+                WHERE s.id = ? AND s.profile = 'dementia'
+            """, (speech_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            return _error(404, "NOT_FOUND", "Recording not found")
+        
+        speech_id = row[0]
+        title = row[1]
+        segments_json = row[2]
+        full_transcript = row[3]
+        
+        segments = json.loads(segments_json) if segments_json else []
+        
+        flagged_segments = []
+        
+        for i, seg in enumerate(segments):
+            seg_text = seg.get('text', '')
+            seg_start = seg.get('start', 0)
+            seg_end = seg.get('end', 0)
+            
+            # Run aphasic detection on this segment
+            aphasic_result = detect_aphasic_events(seg_text)
+            events = aphasic_result.get('events', [])
+            confidence = aphasic_result.get('confidence_score', 0)
+            
+            # Flag segment if it has events or high confidence
+            if events or confidence > 0.3:
+                # Categorize the flags
+                flag_reasons = []
+                for event in events:
+                    flag_reasons.append({
+                        'type': event.get('type'),
+                        'marker': event.get('marker', event.get('phrase', '')),
+                        'confidence': event.get('confidence', 0),
+                    })
+                
+                flagged_segments.append({
+                    'segment_index': i,
+                    'text': seg_text,
+                    'start_time': seg_start,
+                    'end_time': seg_end,
+                    'duration': seg_end - seg_start,
+                    'flags': flag_reasons,
+                    'overall_confidence': confidence,
+                    'event_count': len(events),
+                    # Suggested categories for reviewer
+                    'suggested_categories': list(set(e.get('type') for e in events)),
+                })
+        
+        # Get audio URL for playback
+        audio_url = f"/v1/audio/{speech_id}"
+        
+        return {
+            "speech_id": speech_id,
+            "title": title,
+            "audio_url": audio_url,
+            "total_segments": len(segments),
+            "flagged_count": len(flagged_segments),
+            "flagged_segments": flagged_segments,
+            "categories": [
+                {"id": "hesitation", "label": "Hesitation (um, uh)", "color": "#FFC107"},
+                {"id": "word_search", "label": "Word-finding difficulty", "color": "#FF5722"},
+                {"id": "circumlocution", "label": "Circumlocution (talking around)", "color": "#9C27B0"},
+                {"id": "repetition", "label": "Repetition", "color": "#2196F3"},
+                {"id": "incomplete", "label": "Incomplete thought", "color": "#607D8B"},
+                {"id": "false_positive", "label": "Not an issue (false positive)", "color": "#4CAF50"},
+            ],
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get flagged segments: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+@router.post("/dementia/recordings/{speech_id}/annotations", tags=["Dementia"])
+async def save_dementia_annotations(
+    speech_id: int,
+    annotations: List[Dict] = Body(..., description="List of segment annotations"),
+    user: dict = Depends(flexible_auth)
+):
+    """
+    Save caregiver annotations for flagged segments.
+    
+    Each annotation should have:
+    - segment_index: int
+    - categories: list of category IDs the reviewer confirmed
+    - notes: optional string
+    - is_false_positive: bool
+    """
+    try:
+        user_id = user.get("user_id") if user else None
+        db = pipeline_runner.get_db()
+        conn = db.conn
+        cursor = conn.cursor()
+        
+        # Verify speech exists and user has access
+        if user_id:
+            cursor.execute(
+                "SELECT id FROM speeches WHERE id = ? AND user_id = ?",
+                (speech_id, user_id)
+            )
+        else:
+            cursor.execute("SELECT id FROM speeches WHERE id = ?", (speech_id,))
+        
+        if not cursor.fetchone():
+            return _error(404, "NOT_FOUND", "Recording not found")
+        
+        # Create annotations table if not exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dementia_annotations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                speech_id INTEGER NOT NULL,
+                annotator_user_id INTEGER,
+                segment_index INTEGER NOT NULL,
+                categories TEXT,
+                notes TEXT,
+                is_false_positive BOOLEAN DEFAULT 0,
+                created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                FOREIGN KEY (speech_id) REFERENCES speeches(id)
+            )
+        """)
+        
+        # Save annotations
+        saved_count = 0
+        for ann in annotations:
+            cursor.execute("""
+                INSERT INTO dementia_annotations 
+                (speech_id, annotator_user_id, segment_index, categories, notes, is_false_positive)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                speech_id,
+                user_id,
+                ann.get('segment_index'),
+                json.dumps(ann.get('categories', [])),
+                ann.get('notes'),
+                ann.get('is_false_positive', False),
+            ))
+            saved_count += 1
+        
+        conn.commit()
+        
+        return {
+            "success": True,
+            "saved_count": saved_count,
+            "message": f"Saved {saved_count} annotations. Thank you for helping improve detection!"
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to save annotations: {e}")
+        return _error(500, "ERROR", str(e))
+
+
 @router.get("/dementia/recordings/{speech_id}", tags=["Dementia"])
 async def get_dementia_recording(speech_id: int, user: dict = Depends(flexible_auth)):
     """Get a single dementia assessment recording with full details and transcript highlights."""

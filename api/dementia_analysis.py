@@ -86,6 +86,21 @@ def extract_concepts(text: str) -> List[str]:
     for chunk in doc.noun_chunks:
         concepts.append(chunk.text.lower().strip())
     
+    # Extract verb phrases (VERB + dependencies) - catches "went to the store"
+    for token in doc:
+        if token.pos_ == "VERB":
+            # Get the verb and its dependents
+            phrase_tokens = [token] + list(token.subtree)
+            phrase = " ".join([t.text for t in sorted(phrase_tokens, key=lambda x: x.i)])
+            if len(phrase) > 8:  # Skip very short phrases
+                concepts.append(phrase.lower().strip())
+    
+    # Also add the full segment text as a concept (normalized)
+    # This catches repeated statements like "I went to the store"
+    normalized_text = " ".join(text.lower().split())
+    if len(normalized_text) > 10:
+        concepts.append(normalized_text)
+    
     # Extract sentences (for question repetition)
     sentences = [sent.text.strip() for sent in doc.sents]
     
@@ -97,17 +112,20 @@ def similarity_score(s1: str, s2: str) -> float:
     return SequenceMatcher(None, s1.lower(), s2.lower()).ratio()
 
 
-def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.85, min_segment_gap: int = 2) -> Dict[str, Any]:
+def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, min_segment_gap: int = 1) -> Dict[str, Any]:
     """
     Detect repeated concepts and questions - SAME SPEAKER ONLY.
     
     For dementia screening, we only care about a person repeating themselves,
     not normal conversational echoing between speakers.
     
+    NOTE: Even adjacent repetitions are significant for dementia screening!
+    Repeating "I went to the store" multiple times is a red flag.
+    
     Args:
         segments: List of dicts with 'text' and optionally 'speaker'
-        threshold: Similarity threshold (0.85 = 85% similar, higher = stricter)
-        min_segment_gap: Minimum segments apart to count as repetition (not immediate self-correction)
+        threshold: Similarity threshold (0.80 = 80% similar)
+        min_segment_gap: Minimum segments apart to count as repetition (1 = adjacent OK)
     
     Returns:
         Dict with repetition analysis per speaker
