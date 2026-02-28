@@ -6,171 +6,163 @@
     <!-- Header -->
     <div class="mb-8">
         <h1 class="text-2xl font-bold text-white">Dashboard</h1>
-        <p class="text-sm text-gray-400 mt-1">Recording analysis platform overview</p>
+        <p class="text-sm text-gray-400 mt-1">SpeakFit platform analytics</p>
     </div>
 
-    <!-- Stats Cards -->
+    <!-- Key Metrics Cards -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-white">{{ stats.speeches }}</div>
-            <div class="text-sm text-gray-400 mt-1">Recordings</div>
+        <div class="metric-card bg-gradient-to-br from-indigo-600/20 to-indigo-800/20 rounded-xl border border-indigo-500/30 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-3xl font-bold text-white">{{ stats.users }}</div>
+                    <div class="text-sm text-indigo-300 mt-1">Total Users</div>
+                </div>
+                <div class="text-4xl opacity-50">👥</div>
+            </div>
+            {% if stats.new_users_7d > 0 %}
+            <div class="text-xs text-green-400 mt-2">+{{ stats.new_users_7d }} this week</div>
+            {% endif %}
         </div>
-        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-white">{{ stats.analyses }}</div>
-            <div class="text-sm text-gray-400 mt-1">Analyses</div>
+        <div class="metric-card bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 rounded-xl border border-emerald-500/30 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-3xl font-bold text-white">{{ stats.user_recordings }}</div>
+                    <div class="text-sm text-emerald-300 mt-1">User Recordings</div>
+                </div>
+                <div class="text-4xl opacity-50">🎙️</div>
+            </div>
+            <div class="text-xs text-gray-400 mt-2">{{ stats.recordings_7d }} this week</div>
         </div>
-        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-indigo-400">{{ "%.1f"|format(stats.total_minutes) }}</div>
-            <div class="text-sm text-gray-400 mt-1">Total Minutes</div>
+        <div class="metric-card bg-gradient-to-br from-amber-600/20 to-amber-800/20 rounded-xl border border-amber-500/30 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-3xl font-bold text-white">{{ stats.coach_conversations }}</div>
+                    <div class="text-sm text-amber-300 mt-1">Coach Chats</div>
+                </div>
+                <div class="text-4xl opacity-50">💬</div>
+            </div>
+            <div class="text-xs text-gray-400 mt-2">{{ stats.coach_messages }} messages</div>
         </div>
-        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
-            <div class="text-3xl font-bold text-white">{{ "%.1f"|format(stats.avg_duration) }}s</div>
-            <div class="text-sm text-gray-400 mt-1">Avg Duration</div>
+        <div class="metric-card bg-gradient-to-br from-purple-600/20 to-purple-800/20 rounded-xl border border-purple-500/30 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-3xl font-bold text-white">{{ "%.0f"|format(stats.user_minutes) }}</div>
+                    <div class="text-sm text-purple-300 mt-1">Minutes Recorded</div>
+                </div>
+                <div class="text-4xl opacity-50">⏱️</div>
+            </div>
+            <div class="text-xs text-gray-400 mt-2">by real users</div>
         </div>
     </div>
 
-    <!-- Database Averages Section -->
-    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
-        <h2 class="text-lg font-semibold text-white mb-4">📊 Database Metric Averages</h2>
-        <p class="text-sm text-gray-400 mb-6">Averages across {{ avg_metrics.total_analyzed | default(0) | int }} analyzed recordings</p>
-        
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Voice/Audio Metrics -->
-            <div>
-                <h3 class="text-sm font-medium text-indigo-400 mb-3 uppercase tracking-wide">Voice & Audio</h3>
-                <div class="space-y-2">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Speaking Rate</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_wpm | default('-') }} WPM</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Articulation Rate</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_articulation_rate | default('-') }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Pitch (mean)</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_pitch_hz | default('-') }} Hz</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Pitch Std Dev</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_pitch_std | default('-') }} Hz</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Pitch Range</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_pitch_range | default('-') }} Hz</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Voice Quality Metrics -->
-            <div>
-                <h3 class="text-sm font-medium text-amber-400 mb-3 uppercase tracking-wide">Voice Quality</h3>
-                <div class="space-y-2">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Jitter</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_jitter_pct | default('-') }}%</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Shimmer</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_shimmer_pct | default('-') }}%</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">HNR</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_hnr_db | default('-') }} dB</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Vocal Fry</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_vocal_fry_pct | default('-') }}%</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Uptalk</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_uptalk_pct | default('-') }}%</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">SNR</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_snr_db | default('-') }} dB</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Text/Language Metrics -->
-            <div>
-                <h3 class="text-sm font-medium text-green-400 mb-3 uppercase tracking-wide">Language & Text</h3>
-                <div class="space-y-2">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Lexical Diversity</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_lex_diversity | default('-') }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">FK Grade Level</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_fk_grade | default('-') }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Flesch Ease</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_flesch_ease | default('-') }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">Rate Variability</span>
-                        <span class="text-white font-mono">{{ avg_metrics.avg_rate_var | default('-') }}</span>
-                    </div>
-                </div>
-                
-                <!-- Quality Distribution -->
-                <h3 class="text-sm font-medium text-rose-400 mb-3 mt-6 uppercase tracking-wide">Quality Distribution</h3>
-                <div class="space-y-1">
-                    {% for q in quality_dist[:4] %}
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-400">{{ q.level }}</span>
-                        <span class="text-white font-mono">{{ q.count | int }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Product Distribution + Charts Row -->
+    <!-- Charts Row -->
     <div class="grid md:grid-cols-2 gap-6 mb-8">
-        <!-- Product Distribution -->
-        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 overflow-hidden">
-            <h2 class="text-lg font-semibold text-white mb-4">Profile Coverage</h2>
-            {% for product, count in stats.products.items() %}
-            <div class="flex items-center justify-between py-2">
-                <span class="text-sm text-gray-300 flex-shrink-0 w-24 truncate">{{ product }}</span>
-                <div class="flex items-center gap-3 flex-1 min-w-0 ml-2">
-                    <div class="flex-1 max-w-[120px] bg-gray-800 rounded-full h-2">
-                        <div class="h-2 rounded-full {% if product == 'SpeakFit' %}bg-indigo-500{% elif product == 'OratoScore' %}bg-amber-500{% elif product == 'PitchPerfect' %}bg-green-500{% elif product == 'ReadAloud' %}bg-cyan-500{% else %}bg-rose-500{% endif %}"
-                             style="width: {{ [100, (count / stats.speeches * 100) | int] | min }}%"></div>
+        <!-- Daily Activity Chart -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">📈 Daily User Activity</h2>
+            <canvas id="dailyActivityChart" height="200"></canvas>
+        </div>
+
+        <!-- Product Usage -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">🎯 Product Usage</h2>
+            <div class="space-y-3">
+                {% for product in products %}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">{{ product.icon }}</span>
+                        <span class="text-sm text-gray-300">{{ product.name }}</span>
                     </div>
-                    <span class="text-sm font-mono text-gray-400 w-12 text-right flex-shrink-0">{{ count }}</span>
+                    <div class="flex items-center gap-3 flex-1 max-w-[200px] ml-4">
+                        <div class="flex-1 bg-gray-800 rounded-full h-2">
+                            <div class="h-2 rounded-full {{ product.color }}"
+                                 style="width: {{ [100, product.percent] | min }}%"></div>
+                        </div>
+                        <span class="text-sm font-mono text-gray-400 w-12 text-right">{{ product.count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- User Engagement Row -->
+    <div class="grid md:grid-cols-3 gap-6 mb-8">
+        <!-- Top Users -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">🏆 Top Users</h2>
+            <div class="space-y-3">
+                {% for user in top_users %}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                            {{ user.name[:1].upper() }}
+                        </div>
+                        <div>
+                            <div class="text-sm text-white">{{ user.name }}</div>
+                            <div class="text-xs text-gray-500">{{ user.tier }}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm font-mono text-indigo-400">{{ user.recordings }}</div>
+                        <div class="text-xs text-gray-500">recordings</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Average Scores by Product -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">📊 Avg Scores by Product</h2>
+            <div class="space-y-3">
+                {% for score in avg_scores %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">{{ score.name }}</span>
+                    <div class="flex items-center gap-2">
+                        <div class="w-24 bg-gray-800 rounded-full h-2">
+                            <div class="h-2 rounded-full {{ score.color }}"
+                                 style="width: {{ score.value }}%"></div>
+                        </div>
+                        <span class="text-sm font-mono text-white w-10 text-right">{{ score.value }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">⚡ Quick Stats</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Avg Recording Length</span>
+                    <span class="text-sm font-mono text-white">{{ "%.1f"|format(stats.avg_duration) }}s</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Avg Speaking Rate</span>
+                    <span class="text-sm font-mono text-white">{{ stats.avg_wpm }} WPM</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Reading Practice Sessions</span>
+                    <span class="text-sm font-mono text-white">{{ stats.reading_sessions }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Memory Assessments</span>
+                    <span class="text-sm font-mono text-white">{{ stats.dementia_sessions }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Database Speeches</span>
+                    <span class="text-sm font-mono text-gray-500">{{ stats.total_speeches }}</span>
                 </div>
             </div>
-            {% endfor %}
-        </div>
-
-        <!-- WPM Distribution Chart -->
-        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
-            <h2 class="text-lg font-semibold text-white mb-4">Speaking Rate Distribution</h2>
-            <canvas id="wpmChart" height="200"></canvas>
         </div>
     </div>
 
-    <!-- More Charts -->
-    <div class="grid md:grid-cols-2 gap-6 mb-8">
-        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
-            <h2 class="text-lg font-semibold text-white mb-4">Vocal Fry vs. Repetition Score</h2>
-            <canvas id="fryRepChart" height="200"></canvas>
-        </div>
-        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
-            <h2 class="text-lg font-semibold text-white mb-4">Pitch vs. Lexical Diversity</h2>
-            <canvas id="pitchLexChart" height="200"></canvas>
-        </div>
-    </div>
-
-    <!-- Recent Recordings -->
+    <!-- Recent User Activity -->
     <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-white">Recent Recordings</h2>
+            <h2 class="text-lg font-semibold text-white">🕐 Recent User Recordings</h2>
             <a href="/speeches" class="text-sm text-indigo-400 hover:text-indigo-300">View all →</a>
         </div>
         <div class="overflow-x-auto">
@@ -178,31 +170,32 @@
                 <thead>
                     <tr class="text-gray-400 border-b border-gray-800">
                         <th class="text-left py-2 pr-4 font-medium">Title</th>
-                        <th class="text-left py-2 pr-4 font-medium">Speaker</th>
-                        <th class="text-left py-2 pr-4 font-medium">Products</th>
-                        <th class="text-right py-2 font-medium">Duration</th>
+                        <th class="text-left py-2 pr-4 font-medium">User</th>
+                        <th class="text-left py-2 pr-4 font-medium">Product</th>
+                        <th class="text-left py-2 pr-4 font-medium">Score</th>
+                        <th class="text-right py-2 font-medium">When</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for s in recent %}
-                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/recordings/{{ s.id }}'">
+                    {% for r in recent_user_recordings %}
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onclick="window.location='/recordings/{{ r.id }}'">
                         <td class="py-3 pr-4">
-                            <span class="text-white font-medium">{{ s.title }}</span>
+                            <span class="text-white font-medium">{{ r.title or 'Untitled' }}</span>
                         </td>
-                        <td class="py-3 pr-4 text-gray-400">{{ s.speaker or '—' }}</td>
+                        <td class="py-3 pr-4 text-gray-400">{{ r.user_name or '—' }}</td>
                         <td class="py-3 pr-4">
-                            {% for p in s.products %}
-                            <span class="inline-block px-2 py-0.5 text-xs rounded-full mr-1
-                                {% if p == 'SpeakFit' %}bg-indigo-500/20 text-indigo-300
-                                {% elif p == 'OratoScore' %}bg-amber-500/20 text-amber-300
-                                {% elif p == 'PitchPerfect' %}bg-green-500/20 text-green-300
-                                {% elif p == 'ReadAloud' %}bg-cyan-500/20 text-cyan-300
-                                {% else %}bg-rose-500/20 text-rose-300{% endif %}">{{ p }}</span>
-                            {% endfor %}
+                            <span class="inline-block px-2 py-0.5 text-xs rounded-full {{ r.product_style }}">
+                                {{ r.product_icon }} {{ r.product_name }}
+                            </span>
                         </td>
-                        <td class="py-3 text-right text-gray-400">
-                            {% if s.duration_sec %}{{ "%.0f"|format(s.duration_sec) }}s{% else %}—{% endif %}
+                        <td class="py-3 pr-4">
+                            {% if r.score %}
+                            <span class="font-mono {{ r.score_color }}">{{ r.score }}</span>
+                            {% else %}
+                            <span class="text-gray-600">—</span>
+                            {% endif %}
                         </td>
+                        <td class="py-3 text-right text-gray-400">{{ r.time_ago }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -214,96 +207,45 @@
 
 {% block scripts %}
 <script>
-const data = {{ speeches_data | safe }};
-const chartDefaults = {
-    color: '#9ca3af',
-    borderColor: '#374151',
-};
-Chart.defaults.color = '#9ca3af';
-Chart.defaults.borderColor = '#1f2937';
+const dailyData = {{ daily_activity | safe }};
 
-// WPM histogram
-const wpmValues = data.filter(d => d.wpm).map(d => d.wpm);
-const bins = [80, 100, 120, 140, 160, 180, 200];
-const binLabels = bins.slice(0, -1).map((b, i) => `${b}-${bins[i+1]}`);
-const binCounts = binLabels.map((_, i) => wpmValues.filter(v => v >= bins[i] && v < bins[i+1]).length);
-new Chart(document.getElementById('wpmChart'), {
-    type: 'bar',
+// Daily Activity Line Chart
+new Chart(document.getElementById('dailyActivityChart'), {
+    type: 'line',
     data: {
-        labels: binLabels,
+        labels: dailyData.map(d => d.date),
         datasets: [{
-            data: binCounts,
-            backgroundColor: '#6366f1',
-            borderRadius: 4,
+            label: 'Recordings',
+            data: dailyData.map(d => d.recordings),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointHoverRadius: 6,
         }]
     },
     options: {
-        plugins: { legend: { display: false } },
-        scales: {
-            y: { beginAtZero: true, ticks: { stepSize: 1 } },
-            x: { title: { display: true, text: 'WPM' } }
-        }
-    }
-});
-
-// Fry vs Repetition scatter
-new Chart(document.getElementById('fryRepChart'), {
-    type: 'scatter',
-    data: {
-        datasets: [{
-            data: data.filter(d => d.fry != null && d.rep != null).map(d => ({
-                x: d.fry * 100,
-                y: d.rep,
-                label: d.title
-            })),
-            backgroundColor: '#f59e0b',
-            pointRadius: 6,
-            pointHoverRadius: 8,
-        }]
-    },
-    options: {
-        plugins: {
+        responsive: true,
+        plugins: { 
             legend: { display: false },
             tooltip: {
                 callbacks: {
-                    label: ctx => `${ctx.raw.label}: Fry ${ctx.raw.x.toFixed(1)}%, Rep ${ctx.raw.y.toFixed(2)}`
+                    label: ctx => `${ctx.raw} recordings`
                 }
             }
         },
         scales: {
-            x: { title: { display: true, text: 'Vocal Fry %' } },
-            y: { title: { display: true, text: 'Repetition Score' }, beginAtZero: true }
-        }
-    }
-});
-
-// Pitch vs Lexical Diversity scatter
-new Chart(document.getElementById('pitchLexChart'), {
-    type: 'scatter',
-    data: {
-        datasets: [{
-            data: data.filter(d => d.pitch != null && d.lexdiv != null).map(d => ({
-                x: d.pitch,
-                y: d.lexdiv,
-                label: d.title
-            })),
-            backgroundColor: '#10b981',
-            pointRadius: 6,
-            pointHoverRadius: 8,
-        }]
-    },
-    options: {
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                callbacks: {
-                    label: ctx => `${ctx.raw.label}: ${ctx.raw.x.toFixed(0)}Hz, Div ${ctx.raw.y.toFixed(2)}`
+            y: { 
+                beginAtZero: true,
+                ticks: { stepSize: 1 }
+            },
+            x: {
+                ticks: {
+                    maxRotation: 45,
+                    minRotation: 45
                 }
             }
-        },
-        scales: {
-            x: { title: { display: true, text: 'Mean Pitch (Hz)' } },
-            y: { title: { display: true, text: 'Lexical Diversity' } }
         }
     }
 });

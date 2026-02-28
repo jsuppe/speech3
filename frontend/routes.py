@@ -230,80 +230,212 @@ async def landing_page(request: Request):
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main dashboard with stats overview (requires auth)."""
+    from datetime import datetime, timedelta
+    
     # Require authentication
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     
     db = get_db()
-    stats = db.stats()
-    recent = db.list_speeches(limit=10)
-
-    # Get database-wide metric averages
-    avg_metrics = db.conn.execute("""
-        SELECT 
-            COUNT(*) as total_analyzed,
-            ROUND(AVG(wpm), 1) as avg_wpm,
-            ROUND(AVG(articulation_rate), 1) as avg_articulation_rate,
-            ROUND(AVG(pitch_mean_hz), 1) as avg_pitch_hz,
-            ROUND(AVG(pitch_std_hz), 1) as avg_pitch_std,
-            ROUND(AVG(pitch_range_hz), 1) as avg_pitch_range,
-            ROUND(AVG(jitter_pct), 2) as avg_jitter_pct,
-            ROUND(AVG(shimmer_pct), 2) as avg_shimmer_pct,
-            ROUND(AVG(hnr_db), 1) as avg_hnr_db,
-            ROUND(AVG(vocal_fry_ratio) * 100, 1) as avg_vocal_fry_pct,
-            ROUND(AVG(uptalk_ratio) * 100, 1) as avg_uptalk_pct,
-            ROUND(AVG(rate_variability_cv), 2) as avg_rate_var,
-            ROUND(AVG(lexical_diversity), 2) as avg_lex_diversity,
-            ROUND(AVG(fk_grade_level), 1) as avg_fk_grade,
-            ROUND(AVG(flesch_reading_ease), 1) as avg_flesch_ease,
-            ROUND(AVG(snr_db), 1) as avg_snr_db
-        FROM analyses
-        WHERE quality_level NOT IN ('UNUSABLE', '')
-    """).fetchone()
     
-    # Quality distribution
-    quality_dist = db.conn.execute("""
-        SELECT quality_level, COUNT(*) as count
-        FROM analyses
-        WHERE quality_level IS NOT NULL AND quality_level != ''
-        GROUP BY quality_level
-        ORDER BY count DESC
-    """).fetchall()
-
-    # Get metric distributions for charts
-    rows = db.conn.execute("""
-        SELECT s.id, s.title, s.speaker, s.category, s.products,
-               a.wpm, a.pitch_mean_hz, a.vocal_fry_ratio,
-               a.lexical_diversity, a.repetition_score, a.quality_level
+    # Profile to product mapping
+    PROFILE_MAP = {
+        'general': {'name': 'SpeakFit', 'icon': '🎙️', 'color': 'bg-indigo-500'},
+        'pronunciation': {'name': 'Pronounce', 'icon': '🗣️', 'color': 'bg-blue-500'},
+        'presentation': {'name': 'Present', 'icon': '🎯', 'color': 'bg-green-500'},
+        'reading_fluency': {'name': 'Reader', 'icon': '📖', 'color': 'bg-purple-500'},
+        'oratory': {'name': 'Oratory', 'icon': '🏛️', 'color': 'bg-orange-500'},
+        'dementia': {'name': 'Memory', 'icon': '🧠', 'color': 'bg-teal-500'},
+        'kids': {'name': 'Ollie', 'icon': '🦉', 'color': 'bg-amber-500'},
+    }
+    
+    # Basic stats
+    total_users = db.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    total_speeches = db.conn.execute("SELECT COUNT(*) FROM speeches").fetchone()[0]
+    
+    # User recordings (exclude batch imports - those with user_id)
+    user_recordings = db.conn.execute(
+        "SELECT COUNT(*) FROM speeches WHERE user_id IS NOT NULL"
+    ).fetchone()[0]
+    
+    # New users in last 7 days
+    new_users_7d = db.conn.execute("""
+        SELECT COUNT(*) FROM users 
+        WHERE created_at > datetime('now', '-7 days')
+    """).fetchone()[0]
+    
+    # Recordings in last 7 days (user only)
+    recordings_7d = db.conn.execute("""
+        SELECT COUNT(*) FROM speeches 
+        WHERE user_id IS NOT NULL AND created_at > datetime('now', '-7 days')
+    """).fetchone()[0]
+    
+    # Coach stats
+    coach_messages = db.conn.execute("SELECT COUNT(*) FROM coach_messages").fetchone()[0]
+    coach_conversations = db.conn.execute("""
+        SELECT COUNT(DISTINCT user_id) FROM coach_messages
+    """).fetchone()[0]
+    
+    # User minutes (from user recordings only)
+    user_minutes = db.conn.execute("""
+        SELECT COALESCE(SUM(duration_sec) / 60.0, 0) FROM speeches WHERE user_id IS NOT NULL
+    """).fetchone()[0]
+    
+    # Avg duration and WPM for user recordings
+    avg_stats = db.conn.execute("""
+        SELECT 
+            ROUND(AVG(s.duration_sec), 1) as avg_duration,
+            ROUND(AVG(a.wpm), 0) as avg_wpm
         FROM speeches s
         LEFT JOIN analyses a ON a.speech_id = s.id
-        ORDER BY s.id
+        WHERE s.user_id IS NOT NULL
+    """).fetchone()
+    
+    # Reading and dementia sessions
+    reading_sessions = db.conn.execute("""
+        SELECT COUNT(*) FROM speeches WHERE profile = 'reading_fluency' AND user_id IS NOT NULL
+    """).fetchone()[0]
+    dementia_sessions = db.conn.execute("""
+        SELECT COUNT(*) FROM speeches WHERE profile = 'dementia' AND user_id IS NOT NULL
+    """).fetchone()[0]
+    
+    stats = {
+        'users': total_users,
+        'total_speeches': total_speeches,
+        'user_recordings': user_recordings,
+        'new_users_7d': new_users_7d,
+        'recordings_7d': recordings_7d,
+        'coach_conversations': coach_conversations,
+        'coach_messages': coach_messages,
+        'user_minutes': user_minutes or 0,
+        'avg_duration': avg_stats['avg_duration'] or 0,
+        'avg_wpm': int(avg_stats['avg_wpm'] or 0),
+        'reading_sessions': reading_sessions,
+        'dementia_sessions': dementia_sessions,
+    }
+    
+    # Product usage (user recordings only)
+    product_rows = db.conn.execute("""
+        SELECT COALESCE(profile, 'general') as profile, COUNT(*) as count
+        FROM speeches
+        WHERE user_id IS NOT NULL
+        GROUP BY profile
+        ORDER BY count DESC
     """).fetchall()
-
-    speeches_data = []
-    for r in rows:
-        speeches_data.append({
-            "id": r["id"],
-            "title": r["title"],
-            "speaker": r["speaker"] or "Unknown",
-            "category": r["category"] or "",
-            "wpm": r["wpm"],
-            "pitch": r["pitch_mean_hz"],
-            "fry": r["vocal_fry_ratio"],
-            "lexdiv": r["lexical_diversity"],
-            "rep": r["repetition_score"],
-            "quality": r["quality_level"],
+    
+    total_user_recs = max(1, sum(r['count'] for r in product_rows))
+    products = []
+    for r in product_rows:
+        profile = r['profile'] or 'general'
+        info = PROFILE_MAP.get(profile, {'name': profile, 'icon': '📊', 'color': 'bg-gray-500'})
+        products.append({
+            'name': info['name'],
+            'icon': info['icon'],
+            'color': info['color'],
+            'count': r['count'],
+            'percent': round(r['count'] / total_user_recs * 100, 1),
+        })
+    
+    # Top users
+    top_users_rows = db.conn.execute("""
+        SELECT u.id, u.name, u.tier, COUNT(s.id) as recordings
+        FROM users u
+        LEFT JOIN speeches s ON s.user_id = u.id
+        GROUP BY u.id
+        ORDER BY recordings DESC
+        LIMIT 5
+    """).fetchall()
+    top_users = [
+        {'name': r['name'] or 'Anonymous', 'tier': r['tier'] or 'free', 'recordings': r['recordings']}
+        for r in top_users_rows
+    ]
+    
+    # Average scores by product (user recordings only)
+    avg_score_rows = db.conn.execute("""
+        SELECT s.profile, ROUND(AVG(a.overall_score), 0) as avg_score
+        FROM speeches s
+        JOIN analyses a ON a.speech_id = s.id
+        WHERE s.user_id IS NOT NULL AND a.overall_score IS NOT NULL
+        GROUP BY s.profile
+        ORDER BY avg_score DESC
+    """).fetchall()
+    avg_scores = []
+    for r in avg_score_rows:
+        profile = r['profile'] or 'general'
+        info = PROFILE_MAP.get(profile, {'name': profile, 'color': 'bg-gray-500'})
+        score = int(r['avg_score'] or 0)
+        color = 'bg-green-500' if score >= 80 else 'bg-yellow-500' if score >= 60 else 'bg-red-500'
+        avg_scores.append({
+            'name': info['name'],
+            'value': score,
+            'color': color,
+        })
+    
+    # Daily activity (last 14 days, user recordings only)
+    daily_rows = db.conn.execute("""
+        SELECT date(created_at) as date, COUNT(*) as recordings
+        FROM speeches
+        WHERE user_id IS NOT NULL AND created_at > datetime('now', '-14 days')
+        GROUP BY date(created_at)
+        ORDER BY date
+    """).fetchall()
+    daily_activity = [{'date': r['date'][5:], 'recordings': r['recordings']} for r in daily_rows]
+    
+    # Recent user recordings
+    recent_rows = db.conn.execute("""
+        SELECT s.id, s.title, s.profile, s.created_at, s.duration_sec,
+               u.name as user_name, a.overall_score
+        FROM speeches s
+        LEFT JOIN users u ON u.id = s.user_id
+        LEFT JOIN analyses a ON a.speech_id = s.id
+        WHERE s.user_id IS NOT NULL
+        ORDER BY s.created_at DESC
+        LIMIT 10
+    """).fetchall()
+    
+    def time_ago(dt_str):
+        if not dt_str:
+            return '—'
+        try:
+            dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+            diff = datetime.now(dt.tzinfo) - dt if dt.tzinfo else datetime.now() - dt
+            if diff.days > 0:
+                return f"{diff.days}d ago"
+            elif diff.seconds > 3600:
+                return f"{diff.seconds // 3600}h ago"
+            elif diff.seconds > 60:
+                return f"{diff.seconds // 60}m ago"
+            return "just now"
+        except:
+            return dt_str[:10]
+    
+    recent_user_recordings = []
+    for r in recent_rows:
+        profile = r['profile'] or 'general'
+        info = PROFILE_MAP.get(profile, {'name': profile, 'icon': '📊', 'color': 'bg-gray-500'})
+        score = r['overall_score']
+        score_color = 'text-green-400' if score and score >= 80 else 'text-yellow-400' if score and score >= 60 else 'text-red-400' if score else 'text-gray-600'
+        recent_user_recordings.append({
+            'id': r['id'],
+            'title': r['title'] or 'Untitled',
+            'user_name': r['user_name'] or 'Anonymous',
+            'product_name': info['name'],
+            'product_icon': info['icon'],
+            'product_style': f"{info['color'].replace('bg-', 'bg-')}/20 text-{info['color'].split('-')[1]}-300",
+            'score': int(score) if score else None,
+            'score_color': score_color,
+            'time_ago': time_ago(r['created_at']),
         })
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
-        "recent": recent,
-        "speeches_data": json.dumps(speeches_data),
-        "metric_info": METRIC_EXPLANATIONS,
-        "avg_metrics": dict(avg_metrics) if avg_metrics else {},
-        "quality_dist": [{"level": q["quality_level"], "count": q["count"]} for q in quality_dist],
+        "products": products,
+        "top_users": top_users,
+        "avg_scores": avg_scores,
+        "daily_activity": json.dumps(daily_activity),
+        "recent_user_recordings": recent_user_recordings,
     })
 
 
