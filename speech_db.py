@@ -438,7 +438,7 @@ class SpeechDB:
         query = """SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
                    s.language, s.category, s.products, s.tags, s.notes, s.description, s.audio_hash,
                    s.created_at, s.updated_at, s.user_id, s.profile, s.project_id,
-                   s.cached_score, s.cached_score_profile, t.word_count
+                   s.cached_score, s.cached_score_profile, s.reference_text, t.word_count
                    FROM speeches s
                    LEFT JOIN transcriptions t ON t.speech_id = s.id
                    WHERE 1=1"""

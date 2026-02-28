@@ -231,6 +231,7 @@ async def analyze(
     profile: Optional[str] = Form("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical, dementia"),
     exercise_type: Optional[str] = Form(None, description="Exercise type for voice_health profile (e.g. 'sustained_ah', 'humming', 'projection')"),
     target_duration: Optional[float] = Form(None, description="Target duration in seconds for sustained exercises"),
+    reference_text: Optional[str] = Form(None, description="Reference text for reading practice (stored for later comparison)"),
     auth: dict = Depends(flexible_auth),
 ):
     """
@@ -441,6 +442,7 @@ async def analyze(
             speaker=speaker,
             title=title,
             profile=profile or "general",
+            reference_text=reference_text,
         )
         if speech_id is not None:
             result["speech_id"] = speech_id

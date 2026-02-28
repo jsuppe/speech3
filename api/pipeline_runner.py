@@ -638,6 +638,7 @@ def persist_result(
     spectrogram_path: str = None,
     user_id: int = None,
     profile: str = "general",
+    reference_text: str = None,
 ) -> int | None:
     """
     Persist analysis result + audio (as Opus) to SQLite.
@@ -749,6 +750,17 @@ def persist_result(
                 user_id=user_id,
                 profile=profile,
             )
+            
+            # Store reference text for reading practice
+            if reference_text and speech_id:
+                try:
+                    db.conn.execute(
+                        "UPDATE speeches SET reference_text = ? WHERE id = ?",
+                        (reference_text, speech_id)
+                    )
+                    db.conn.commit()
+                except Exception as e:
+                    logger.warning(f"Failed to save reference_text: {e}")
 
             # Store audio as Opus (if file still exists)
             if audio_exists:
