@@ -2761,6 +2761,414 @@ Start with what they did well, then give one clear improvement."""
         return {"feedback": "Take a breath. You've got this.", "cue": "", "cue_type": "detailed"}
 
 
+@router.post("/coach/scenario-cue", tags=["Coach"])
+async def get_scenario_coach_cue(
+    data: dict,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get scenario-specific coaching cue during live practice.
+    """
+    transcript = data.get("transcript", "").strip()
+    scenario_type = data.get("scenario_type", "pitch")  # pitch, meeting, talk
+    wpm = data.get("wpm", 0)
+    filler_count = data.get("filler_count", 0)
+    target_duration = data.get("target_duration", 120)
+    elapsed_seconds = data.get("elapsed_seconds", 0)
+    
+    if not transcript or len(transcript) < 10:
+        return {"cue": "", "cue_emoji": "", "cue_type": "neutral"}
+    
+    # Scenario-specific ideal WPM ranges
+    SCENARIO_WPM = {
+        "pitch": (130, 160),   # Energetic but clear
+        "meeting": (140, 170), # Efficient
+        "talk": (120, 150),    # Allow for emphasis
+    }
+    
+    ideal_low, ideal_high = SCENARIO_WPM.get(scenario_type, (130, 160))
+    
+    # Time-based cues
+    time_ratio = elapsed_seconds / max(target_duration, 1)
+    
+    # Determine most relevant cue
+    cue = ""
+    emoji = ""
+    cue_type = "neutral"
+    
+    # Pace cues
+    if wpm > ideal_high + 20:
+        cue = "Slow down!"
+        emoji = "🏃"
+        cue_type = "warning"
+    elif wpm < ideal_low - 20 and elapsed_seconds > 10:
+        cue = "Pick up pace!"
+        emoji = "⚡"
+        cue_type = "warning"
+    # Time management cues
+    elif time_ratio > 0.9 and time_ratio < 1.1:
+        cue = "Wrap it up!"
+        emoji = "⏱️"
+        cue_type = "warning"
+    elif time_ratio >= 1.1:
+        cue = "Over time!"
+        emoji = "🛑"
+        cue_type = "alert"
+    # Filler cues
+    elif filler_count > 5:
+        cue = "Watch fillers!"
+        emoji = "⚠️"
+        cue_type = "warning"
+    # Scenario-specific content cues
+    elif scenario_type == "pitch":
+        if elapsed_seconds < 15 and "problem" not in transcript.lower():
+            cue = "State the problem!"
+            emoji = "🎯"
+            cue_type = "warning"
+        elif time_ratio > 0.7 and "ask" not in transcript.lower() and "invest" not in transcript.lower():
+            cue = "Make your ask!"
+            emoji = "💰"
+            cue_type = "warning"
+        elif filler_count == 0 and ideal_low <= wpm <= ideal_high:
+            cue = "Strong delivery!"
+            emoji = "🚀"
+            cue_type = "positive"
+        else:
+            cue = "Keep going!"
+            emoji = "👍"
+            cue_type = "positive"
+    elif scenario_type == "meeting":
+        if time_ratio > 0.6 and "next step" not in transcript.lower() and "action" not in transcript.lower():
+            cue = "Action items!"
+            emoji = "✅"
+            cue_type = "warning"
+        elif filler_count == 0 and wpm <= ideal_high:
+            cue = "Concise!"
+            emoji = "👌"
+            cue_type = "positive"
+        else:
+            cue = "Clear update!"
+            emoji = "📊"
+            cue_type = "positive"
+    elif scenario_type == "talk":
+        if elapsed_seconds < 20 and "?" not in transcript and "imagine" not in transcript.lower():
+            cue = "Hook them!"
+            emoji = "🎣"
+            cue_type = "warning"
+        elif time_ratio > 0.8 and "remember" not in transcript.lower() and "takeaway" not in transcript.lower():
+            cue = "Memorable close!"
+            emoji = "🎬"
+            cue_type = "warning"
+        elif ideal_low <= wpm <= ideal_high:
+            cue = "Great pacing!"
+            emoji = "🎤"
+            cue_type = "positive"
+        else:
+            cue = "Engage them!"
+            emoji = "✨"
+            cue_type = "positive"
+    else:
+        cue = "Keep going!"
+        emoji = "👍"
+        cue_type = "positive"
+    
+    return {
+        "cue": cue,
+        "cue_emoji": emoji,
+        "cue_type": cue_type,
+    }
+
+
+@router.post("/coach/scenario-feedback", tags=["Coach"])
+async def get_scenario_detailed_feedback(
+    data: dict,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get detailed scenario-specific feedback during a pause.
+    """
+    import requests
+    
+    transcript = data.get("transcript", "").strip()
+    scenario_type = data.get("scenario_type", "pitch")
+    wpm = data.get("wpm", 0)
+    filler_count = data.get("filler_count", 0)
+    target_duration = data.get("target_duration", 120)
+    elapsed_seconds = data.get("elapsed_seconds", 0)
+    coaching_context = data.get("coaching_context", "")
+    
+    if not transcript or len(transcript) < 20:
+        return {"feedback": "Keep going! You've got this."}
+    
+    # Scenario-specific coaching prompts
+    SCENARIO_PROMPTS = {
+        "pitch": """You're coaching a startup pitch. Focus on:
+- Hook strength (did they grab attention?)
+- Problem-solution clarity
+- Confidence and conviction
+- Clear ask/call-to-action
+- Time management (pitches should be punchy)""",
+        "meeting": """You're coaching a meeting update. Focus on:
+- Conciseness (respect everyone's time)
+- Clear structure (context → update → blockers → next steps)
+- Action items with owners
+- Professional but efficient delivery""",
+        "talk": """You're coaching a conference talk. Focus on:
+- Opening hook (question, story, surprising fact?)
+- Clear structure and transitions
+- Storytelling and examples
+- Pacing for audience engagement
+- Memorable takeaways""",
+    }
+    
+    scenario_guidance = SCENARIO_PROMPTS.get(scenario_type, SCENARIO_PROMPTS["pitch"])
+    
+    time_status = ""
+    time_ratio = elapsed_seconds / max(target_duration, 1)
+    if time_ratio < 0.5:
+        time_status = f"They're {elapsed_seconds}s in (target: {target_duration}s) - early in the practice"
+    elif time_ratio < 0.9:
+        time_status = f"They're {elapsed_seconds}s in (target: {target_duration}s) - past midpoint"
+    else:
+        time_status = f"They're at {elapsed_seconds}s (target: {target_duration}s) - should be wrapping up"
+    
+    prompt = f"""You are a {scenario_type} coach giving feedback during a PAUSED practice session.
+
+{scenario_guidance}
+
+{coaching_context}
+
+Metrics:
+- Pace: {wpm} WPM
+- Filler words: {filler_count}
+- {time_status}
+
+Their transcript so far:
+"{transcript[-2000:]}"
+
+Give 2-3 sentences of specific, actionable feedback for this {scenario_type}.
+Be encouraging but direct. What's working? What's one thing to improve when they resume?
+Keep it conversational - this will be spoken aloud."""
+    
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3:latest",
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 150,
+                }
+            },
+            timeout=10,
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            feedback = result.get("response", "").strip()
+            feedback = feedback.strip('"\'').strip()
+            if len(feedback) > 350:
+                feedback = feedback[:350].rsplit('.', 1)[0] + '.'
+            return {"feedback": feedback}
+        else:
+            return {"feedback": "You're doing well! Focus on your main points and keep the energy up."}
+    except Exception as e:
+        logger.warning(f"Scenario feedback error: {e}")
+        return {"feedback": "Take a breath. You're doing great - keep going!"}
+
+
+@router.post("/coach/scenario-results", tags=["Coach"])
+async def get_scenario_results(
+    data: dict,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Generate scenario-specific results after practice ends.
+    """
+    import requests
+    
+    speech_id = data.get("speech_id")
+    scenario_type = data.get("scenario_type", "pitch")
+    transcript = data.get("transcript", "").strip()
+    wpm = data.get("wpm", 0)
+    filler_count = data.get("filler_count", 0)
+    filler_details = data.get("filler_details", {})
+    target_duration = data.get("target_duration", 120)
+    actual_duration = data.get("actual_duration", 0)
+    has_hook = data.get("has_hook", False)
+    has_cta = data.get("has_cta", False)
+    key_points_mentioned = data.get("key_points_mentioned", 0)
+    
+    # Calculate scores
+    # Duration score
+    duration_diff = abs(actual_duration - target_duration)
+    tolerance = target_duration * 0.2
+    if duration_diff <= tolerance:
+        duration_score = 100
+    elif duration_diff <= tolerance * 2:
+        duration_score = 80
+    elif duration_diff <= tolerance * 3:
+        duration_score = 60
+    else:
+        duration_score = 40
+    
+    # Pace score (scenario-specific)
+    SCENARIO_WPM = {
+        "pitch": (130, 160),
+        "meeting": (140, 170),
+        "talk": (120, 150),
+    }
+    ideal_low, ideal_high = SCENARIO_WPM.get(scenario_type, (130, 160))
+    
+    if ideal_low <= wpm <= ideal_high:
+        pace_score = 100
+    elif ideal_low - 20 <= wpm <= ideal_high + 20:
+        pace_score = 80
+    else:
+        pace_score = 60
+    
+    # Filler score
+    words = len(transcript.split()) if transcript else 1
+    filler_ratio = filler_count / max(words, 1)
+    if filler_ratio < 0.02:
+        filler_score = 100
+    elif filler_ratio < 0.04:
+        filler_score = 80
+    elif filler_ratio < 0.06:
+        filler_score = 60
+    else:
+        filler_score = 40
+    
+    # Content score (scenario-specific)
+    content_score = 50
+    if scenario_type == "pitch":
+        if has_hook: content_score += 20
+        if has_cta: content_score += 20
+        if "problem" in transcript.lower(): content_score += 5
+        if "solution" in transcript.lower(): content_score += 5
+    elif scenario_type == "meeting":
+        if "update" in transcript.lower() or "progress" in transcript.lower(): content_score += 15
+        if "next step" in transcript.lower() or "action" in transcript.lower(): content_score += 20
+        if actual_duration <= target_duration: content_score += 15  # Brevity bonus
+    elif scenario_type == "talk":
+        if has_hook: content_score += 20
+        if "story" in transcript.lower() or "example" in transcript.lower(): content_score += 15
+        if "takeaway" in transcript.lower() or "remember" in transcript.lower(): content_score += 15
+    
+    content_score = min(content_score, 100)
+    
+    # Overall score
+    overall_score = int((duration_score * 0.2 + pace_score * 0.25 + filler_score * 0.25 + content_score * 0.3))
+    
+    # Generate highlights
+    highlights = []
+    if has_hook:
+        highlights.append("Strong attention-grabbing opening")
+    if has_cta:
+        highlights.append("Clear call-to-action")
+    if filler_count == 0:
+        highlights.append("Zero filler words - clean delivery")
+    elif filler_count <= 2:
+        highlights.append("Minimal filler words")
+    if ideal_low <= wpm <= ideal_high:
+        highlights.append(f"Perfect pacing for {scenario_type}")
+    if duration_score >= 80:
+        highlights.append("Excellent time management")
+    if key_points_mentioned >= 3:
+        highlights.append(f"Covered key {scenario_type} elements")
+    
+    # Generate improvements
+    improvements = []
+    if not has_hook:
+        if scenario_type == "pitch":
+            improvements.append("Start with a surprising stat or bold claim")
+        elif scenario_type == "talk":
+            improvements.append("Open with a question or story to hook the audience")
+    if not has_cta:
+        if scenario_type == "pitch":
+            improvements.append("End with a clear ask (funding, meeting, partnership)")
+        elif scenario_type == "meeting":
+            improvements.append("Close with specific action items and owners")
+    if filler_count > 3:
+        top_filler = max(filler_details.items(), key=lambda x: x[1])[0] if filler_details else "um"
+        improvements.append(f"Reduce \"{top_filler}\" - pause silently instead")
+    if wpm < ideal_low - 10:
+        improvements.append("Increase energy and speaking pace")
+    if wpm > ideal_high + 10:
+        improvements.append("Slow down to let key points land")
+    if actual_duration > target_duration * 1.2:
+        improvements.append("Practice being more concise")
+    
+    # Generate AI feedback
+    feedback = ""
+    SCENARIO_LABELS = {
+        "pitch": "startup pitch",
+        "meeting": "meeting update", 
+        "talk": "conference talk",
+    }
+    scenario_label = SCENARIO_LABELS.get(scenario_type, scenario_type)
+    
+    try:
+        prompt = f"""You're reviewing a completed {scenario_label} practice session.
+
+Results:
+- Duration: {actual_duration}s (target: {target_duration}s)
+- Pace: {wpm} WPM (ideal: {ideal_low}-{ideal_high})
+- Filler words: {filler_count}
+- Had attention hook: {has_hook}
+- Had call-to-action: {has_cta}
+- Overall score: {overall_score}/100
+
+Their transcript:
+"{transcript[-3000:]}"
+
+Give 2-3 paragraphs of coaching feedback. Start with what they did well, then specific improvements.
+Be encouraging and specific. Reference actual content from their practice."""
+        
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3:latest",
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 300,
+                }
+            },
+            timeout=15,
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            feedback = result.get("response", "").strip()
+            feedback = feedback.strip('"\'').strip()
+    except Exception as e:
+        logger.warning(f"Scenario results feedback error: {e}")
+    
+    if not feedback:
+        # Fallback feedback
+        if overall_score >= 80:
+            feedback = f"Excellent {scenario_label}! Your delivery was confident and well-paced."
+        elif overall_score >= 60:
+            feedback = f"Good work on your {scenario_label}. Focus on the improvement areas above for your next practice."
+        else:
+            feedback = f"Keep practicing your {scenario_label}. Each run gets better. Focus on one improvement at a time."
+    
+    return {
+        "overall_score": overall_score,
+        "duration_score": duration_score,
+        "pace_score": pace_score,
+        "filler_score": filler_score,
+        "content_score": content_score,
+        "highlights": highlights[:5],
+        "improvements": improvements[:3],
+        "feedback": feedback,
+    }
+
+
 @router.post("/coach/session-summary/{speech_id}", tags=["Coach"])
 async def get_session_coaching_summary(
     speech_id: int,
