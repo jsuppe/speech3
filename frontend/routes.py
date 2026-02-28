@@ -904,6 +904,21 @@ async def admin_user_detail(request: Request, user_id: int, page: int = Query(1,
     coach_messages = db.get_coach_messages(user_id, limit=50)
     coach_stats = db.get_user_coach_stats(user_id)
     
+    # Get onboarding survey
+    import json
+    survey = None
+    survey_row = db.conn.execute(
+        "SELECT * FROM user_surveys WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if survey_row:
+        survey = dict(survey_row)
+        # Parse focus_areas JSON
+        if survey.get('focus_areas'):
+            try:
+                survey['focus_areas'] = json.loads(survey['focus_areas'])
+            except:
+                survey['focus_areas'] = []
+    
     return templates.TemplateResponse("user_detail.html", {
         "request": request,
         "user": user,
@@ -914,6 +929,7 @@ async def admin_user_detail(request: Request, user_id: int, page: int = Query(1,
         "total_pages": total_pages,
         "coach_messages": coach_messages,
         "coach_stats": coach_stats,
+        "survey": survey,
         "is_admin": True,
     })
 

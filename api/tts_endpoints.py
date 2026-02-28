@@ -81,8 +81,8 @@ async def speak(
         raise HTTPException(401, "Authentication required")
     
     tier = get_user_tier(user["id"])
-    # Accept pro, premium, or paid as valid paid tiers
-    if tier not in ("pro", "premium", "paid"):
+    # Accept admin, pro, premium, or paid as valid paid tiers
+    if tier not in ("admin", "pro", "premium", "paid"):
         raise HTTPException(
             403, 
             detail={
@@ -170,8 +170,8 @@ async def speak_sentence(
         raise HTTPException(401, "Authentication required")
     
     tier = get_user_tier(user["id"])
-    # Accept pro, premium, or paid as valid paid tiers
-    if tier not in ("pro", "premium", "paid"):
+    # Accept admin, pro, premium, or paid as valid paid tiers
+    if tier not in ("admin", "pro", "premium", "paid"):
         raise HTTPException(
             403,
             detail={

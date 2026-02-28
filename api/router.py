@@ -4562,6 +4562,148 @@ async def get_oratory_stats(
         return _error(500, "ERROR", str(e))
 
 
+@router.post("/reading/analyze", tags=["Reading"])
+async def analyze_reading_practice(
+    speech_id: int = Body(..., description="Speech ID to analyze"),
+    reference_text: str = Body(..., description="The text the user was supposed to read"),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Analyze a reading practice recording against the reference text.
+    
+    Returns:
+    - Word-by-word accuracy (correct, substituted, inserted, deleted)
+    - Fluency score and metrics
+    - Problem words identification
+    - Hesitation points
+    - Focus areas for improvement
+    """
+    from reading_analysis import analyze_reading
+    
+    user_id = auth.get("user_id")
+    key_data = auth.get("key_data")
+    
+    # Allow either user auth OR API key
+    if not user_id and not key_data:
+        return _error(401, "UNAUTHORIZED", "Authentication required")
+    
+    db = pipeline_runner.get_db()
+    
+    # Get speech and verify ownership
+    speech = db.get_speech(speech_id)
+    if not speech:
+        return _error(404, "NOT_FOUND", f"Speech {speech_id} not found")
+    
+    # Check ownership (API keys can access any speech)
+    if user_id and speech.get("user_id") != user_id:
+        return _error(403, "FORBIDDEN", "Not authorized to access this speech")
+    
+    # Get transcription
+    cursor = db.conn.execute(
+        "SELECT text, segments FROM transcriptions WHERE speech_id = ?",
+        (speech_id,)
+    )
+    row = cursor.fetchone()
+    
+    if not row:
+        return _error(404, "NOT_FOUND", f"No transcription found for speech {speech_id}")
+    
+    transcription = row[0] or ""
+    segments = []
+    if row[1]:
+        import json as json_module
+        try:
+            segments = json_module.loads(row[1])
+        except:
+            pass
+    
+    duration = speech.get("duration_sec", 0)
+    
+    # Get pitch data if available
+    pitch_data = None
+    cursor = db.conn.execute(
+        "SELECT audio_analysis FROM analysis_results WHERE speech_id = ?",
+        (speech_id,)
+    )
+    audio_row = cursor.fetchone()
+    if audio_row and audio_row[0]:
+        import json as json_module
+        try:
+            audio_analysis = json_module.loads(audio_row[0])
+            pitch_data = {
+                'pitch_mean': audio_analysis.get('pitch_mean'),
+                'pitch_std': audio_analysis.get('pitch_std'),
+                'pitch_range': audio_analysis.get('pitch_range'),
+            }
+        except:
+            pass
+    
+    # Run reading analysis
+    try:
+        result = analyze_reading(
+            reference_text=reference_text,
+            transcription=transcription,
+            duration_seconds=duration,
+            segments=segments,
+            pitch_data=pitch_data,
+        )
+        
+        return {
+            "speech_id": speech_id,
+            "reference_text": reference_text,
+            "transcription": transcription,
+            "duration_sec": duration,
+            **result,
+        }
+    except Exception as e:
+        logger.exception(f"Reading analysis failed: {e}")
+        return _error(500, "ANALYSIS_ERROR", str(e))
+
+
+@router.get("/reading/stats", tags=["Reading"])
+async def get_reading_stats(
+    auth: dict = Depends(flexible_auth),
+    days: int = 30,
+):
+    """
+    Get reading practice statistics for the user.
+    """
+    user_id = auth.get("user_id")
+    if not user_id:
+        return _error(401, "UNAUTHORIZED", "User authentication required")
+    
+    db = pipeline_runner.get_db()
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        today = datetime.now().date()
+        start_date = today - timedelta(days=days)
+        
+        # Get reading_fluency recordings
+        cursor = db.conn.execute("""
+            SELECT 
+                COUNT(*) as count,
+                SUM(duration_sec) as total_duration,
+                AVG(cached_score) as avg_score
+            FROM speeches 
+            WHERE user_id = ? 
+              AND profile = 'reading_fluency'
+              AND DATE(created_at) >= ?
+        """, (user_id, start_date.isoformat()))
+        row = cursor.fetchone()
+        
+        return {
+            "period_days": days,
+            "recording_count": row[0] or 0,
+            "total_minutes": round((row[1] or 0) / 60, 1),
+            "avg_score": round(row[2] or 0, 1) if row[2] else None,
+        }
+    except Exception as e:
+        logger.exception(f"Failed to get reading stats: {e}")
+        return _error(500, "ERROR", str(e))
+
+
 @router.get("/projects/{project_id}/score-progress", tags=["Projects"])
 async def get_project_score_progress(
     project_id: int,
@@ -4891,8 +5033,18 @@ async def get_dementia_metrics_aggregated(user: dict = Depends(flexible_auth)):
         if not all_data:
             return {"has_data": False, "today": None, "metrics": None}
         
-        now = datetime.now()
+        # Use Eastern timezone for "today" calculation (user's timezone)
+        from zoneinfo import ZoneInfo
+        eastern = ZoneInfo('America/New_York')
+        now = datetime.now(eastern)
         today_str = now.strftime('%Y-%m-%d')
+        
+        # Convert all timestamps to Eastern for grouping
+        for d in all_data:
+            if d['ts'].tzinfo is None:
+                # Assume UTC if no timezone
+                d['ts'] = d['ts'].replace(tzinfo=ZoneInfo('UTC'))
+            d['ts'] = d['ts'].astimezone(eastern)
         
         # Group by different time periods
         def group_by_period(data, period_fn):

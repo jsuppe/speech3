@@ -352,24 +352,22 @@ async def accept_eula(user: dict = Depends(user_required)):
 
 
 @auth_router.post("/admin/users/{user_id}/tier")
-async def set_user_tier(user_id: int, tier: str, api_key: str = Query(None)):
+async def set_user_tier(
+    user_id: int, 
+    tier: str = Query(...),
+    user: dict = Depends(user_required),
+):
     """
     Admin endpoint: Set a user's subscription tier.
-    Requires API key for access.
+    Requires admin tier.
     
     Valid tiers: free, pro, power, admin
     """
-    from .auth import lookup_key
     from .usage_limits import get_usage_limiter, TIER_LIMITS
     import sqlite3
     
-    # Verify API key
-    if not api_key:
-        raise HTTPException(status_code=401, detail="API key required")
-    
-    key_data = lookup_key(api_key)
-    if not key_data or not key_data.get("enabled"):
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    # Verify admin access
+    _require_admin(user)
     
     # Validate tier
     if tier not in TIER_LIMITS:
@@ -496,7 +494,7 @@ async def admin_get_user(
     cur.execute("""
         SELECT id, email, name, avatar_url, provider, tier,
                monthly_recordings, monthly_audio_minutes, usage_month,
-               created_at, last_login, eula_accepted_at
+               created_at, last_login, eula_accepted_at, disabled
         FROM users WHERE id = ?
     """, (user_id,))
     row = cur.fetchone()
@@ -507,10 +505,13 @@ async def admin_get_user(
     
     target_user = dict(row)
     
+    # Convert disabled integer to boolean
+    target_user["disabled"] = bool(target_user.get("disabled", 0))
+    
     # Get speech stats
     cur.execute("""
         SELECT COUNT(*) as count, 
-               COALESCE(SUM(duration_seconds), 0) as total_duration
+               COALESCE(SUM(duration_sec), 0) as total_duration
         FROM speeches WHERE user_id = ?
     """, (user_id,))
     stats = dict(cur.fetchone())
@@ -519,7 +520,7 @@ async def admin_get_user(
     
     # Get recent speeches
     cur.execute("""
-        SELECT id, title, profile, duration_seconds, created_at
+        SELECT id, title, profile, duration_sec, created_at
         FROM speeches WHERE user_id = ?
         ORDER BY created_at DESC LIMIT 10
     """, (user_id,))
@@ -527,6 +528,36 @@ async def admin_get_user(
     
     conn.close()
     return target_user
+
+
+@auth_router.post("/admin/users/{user_id}/disable")
+async def admin_disable_user(
+    user_id: int,
+    disabled: bool = Query(...),
+    user: dict = Depends(user_required),
+):
+    """
+    Enable or disable a user account.
+    Disabled users cannot log in.
+    Requires admin tier.
+    """
+    _require_admin(user)
+    
+    import sqlite3
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    cur.execute("UPDATE users SET disabled = ? WHERE id = ?", (1 if disabled else 0, user_id))
+    if cur.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    conn.commit()
+    conn.close()
+    
+    logger.info("User %d %s by admin %d", user_id, "disabled" if disabled else "enabled", user["id"])
+    return {"status": "ok", "user_id": user_id, "disabled": disabled}
 
 
 @auth_router.post("/admin/users/{user_id}/reset-usage")
@@ -584,7 +615,7 @@ async def admin_recalc_user_usage(
     
     # Count recordings this month
     cur.execute("""
-        SELECT COUNT(*), COALESCE(SUM(duration_seconds) / 60.0, 0)
+        SELECT COUNT(*), COALESCE(SUM(duration_sec) / 60.0, 0)
         FROM speeches 
         WHERE user_id = ? AND strftime('%Y-%m', created_at) = ?
     """, (user_id, current_month))

@@ -211,6 +211,43 @@ async def get_all_surveys(
     }
 
 
+@router.get("/admin/surveys/user/{user_id}")
+async def get_user_survey(user_id: int, admin = Depends(get_admin_user)):
+    """Get a specific user's survey response (admin only)"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT s.*, u.name as user_name, u.email as user_email
+        FROM user_surveys s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.user_id = ?
+    """, (user_id,))
+    
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return {"completed": False, "survey": None}
+    
+    return {
+        "completed": True,
+        "survey": {
+            "user_id": row['user_id'],
+            "user_name": row['user_name'],
+            "user_email": row['user_email'],
+            "primary_goal": row['primary_goal'],
+            "skill_level": row['skill_level'],
+            "focus_areas": json.loads(row['focus_areas']),
+            "context": row['context'],
+            "time_commitment": row['time_commitment'],
+            "native_language": row['native_language'],
+            "completed_at": row['completed_at']
+        }
+    }
+
+
 @router.get("/admin/surveys/stats")
 async def get_survey_stats(admin = Depends(get_admin_user)):
     """Get aggregate survey statistics (admin only)"""

@@ -434,27 +434,30 @@ class SpeechDB:
         """List speeches with optional filters. If user_id is set, only return that user's speeches.
         If unassigned=True, only return speeches not assigned to any project."""
         # Explicitly select columns, excluding heavy cached_score_json (3.5KB avg)
-        query = """SELECT id, title, speaker, year, source_url, source_file, duration_sec,
-                   language, category, products, tags, notes, description, audio_hash,
-                   created_at, updated_at, user_id, profile, project_id,
-                   cached_score, cached_score_profile
-                   FROM speeches WHERE 1=1"""
+        # Join transcriptions to get word_count for WPM calculation
+        query = """SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
+                   s.language, s.category, s.products, s.tags, s.notes, s.description, s.audio_hash,
+                   s.created_at, s.updated_at, s.user_id, s.profile, s.project_id,
+                   s.cached_score, s.cached_score_profile, t.word_count
+                   FROM speeches s
+                   LEFT JOIN transcriptions t ON t.speech_id = s.id
+                   WHERE 1=1"""
         params = []
         if user_id is not None:
-            query += " AND user_id = ?"
+            query += " AND s.user_id = ?"
             params.append(user_id)
         elif not include_unowned:
             # If no user_id filter and not explicitly including unowned, exclude NULL user_id
-            query += " AND user_id IS NOT NULL"
+            query += " AND s.user_id IS NOT NULL"
         if unassigned:
-            query += " AND project_id IS NULL"
+            query += " AND s.project_id IS NULL"
         if category:
-            query += " AND category = ?"
+            query += " AND s.category = ?"
             params.append(category)
         if product:
-            query += " AND products LIKE ?"
+            query += " AND s.products LIKE ?"
             params.append(f'%"{product}"%')
-        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        query += " ORDER BY s.created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         rows = self.conn.execute(query, params).fetchall()
         results = []
