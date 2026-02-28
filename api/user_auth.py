@@ -499,6 +499,50 @@ async def flexible_auth(
         )
 
     user_id = int(payload["sub"])
+    
+    # Apply per-user rate limiting for JWT users
+    from .rate_limiter import rate_limiter as rl
+    from .usage import usage_tracker as ut
+    from . import config
+    
+    # Get user's tier from database for rate limit calculation
+    user_tier = "free"  # Default
+    try:
+        conn = sqlite3.connect(config.DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT tier FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        if row and row[0]:
+            user_tier = row[0]
+        conn.close()
+    except Exception:
+        pass  # Default to free tier on error
+    
+    # Create synthetic key_data for rate limiting
+    rate_key_id = f"user:{user_id}"
+    user_key_data = {"key_id": rate_key_id, "tier": user_tier}
+    
+    # Check rate limit
+    rate_check = rl.check_rate_limit(user_key_data)
+    if rate_check:
+        raise HTTPException(
+            status_code=429, 
+            detail={
+                "code": "RATE_LIMITED", 
+                "message": rate_check["reason"],
+                "retry_after_sec": rate_check.get("retry_after_sec", 60)
+            }
+        )
+    
+    # Record request
+    rl.record_request(rate_key_id)
+    ut.record_request(rate_key_id)
+    
+    # Add rate limit headers
+    headers = rl.get_rate_limit_headers(user_key_data)
+    for name, value in headers.items():
+        response.headers[name] = value
+    
     request.state.user_id = user_id
     request.state.user_email = payload.get("email")
     request.state.user_name = payload.get("name")

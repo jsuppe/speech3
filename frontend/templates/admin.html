@@ -79,6 +79,73 @@
         </div>
     </div>
 
+    <!-- Survey Insights Section -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold text-white">📋 Onboarding Survey Insights</h2>
+            <div class="text-sm text-gray-400">
+                {{ stats.survey_total }} responses ({{ "%.0f"|format(stats.survey_completion_rate) }}% completion)
+            </div>
+        </div>
+        
+        <!-- Survey Charts Grid -->
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-800/50 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Primary Goals</h3>
+                <canvas id="surveyGoalsChart" height="150"></canvas>
+            </div>
+            <div class="bg-gray-800/50 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Skill Levels</h3>
+                <canvas id="surveySkillChart" height="150"></canvas>
+            </div>
+            <div class="bg-gray-800/50 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Usage Context</h3>
+                <canvas id="surveyContextChart" height="150"></canvas>
+            </div>
+            <div class="bg-gray-800/50 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Focus Areas</h3>
+                <canvas id="surveyFocusChart" height="150"></canvas>
+            </div>
+        </div>
+        
+        <!-- Recent Surveys Table -->
+        {% if recent_surveys %}
+        <h3 class="text-sm font-medium text-gray-400 mb-3">Recent Survey Submissions</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-700">
+                        <th class="text-left py-2 pr-4 font-medium">User</th>
+                        <th class="text-left py-2 pr-4 font-medium">Primary Goal</th>
+                        <th class="text-left py-2 pr-4 font-medium">Skill Level</th>
+                        <th class="text-left py-2 pr-4 font-medium">Context</th>
+                        <th class="text-left py-2 pr-4 font-medium">Focus Areas</th>
+                        <th class="text-right py-2 font-medium">Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in recent_surveys %}
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                        <td class="py-2 pr-4 text-white">{{ s.name or s.email }}</td>
+                        <td class="py-2 pr-4">
+                            <span class="px-2 py-1 bg-indigo-500/20 text-indigo-300 rounded text-xs">{{ s.primary_goal }}</span>
+                        </td>
+                        <td class="py-2 pr-4">
+                            <span class="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded text-xs">{{ s.skill_level }}</span>
+                        </td>
+                        <td class="py-2 pr-4 text-gray-400">{{ s.context | replace('_', ' ') }}</td>
+                        <td class="py-2 pr-4 text-gray-400 text-xs">{{ s.focus_areas | replace('[', '') | replace(']', '') | replace('"', '') }}</td>
+                        <td class="py-2 text-right text-gray-500">{{ s.completed_at[:10] if s.completed_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">No survey responses yet.</p>
+        {% endif %}
+    </div>
+
     <!-- Top Users Table -->
     <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
         <div class="flex items-center justify-between mb-4">
@@ -305,5 +372,81 @@ new Chart(document.getElementById('categoryChart'), {
         }
     }
 });
+
+// Survey Charts
+const surveyColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+// Survey Goals
+if (chartData.survey_goals && chartData.survey_goals.length > 0) {
+    new Chart(document.getElementById('surveyGoalsChart'), {
+        type: 'doughnut',
+        data: {
+            labels: chartData.survey_goals.map(g => g.goal.replace('_', ' ')),
+            datasets: [{
+                data: chartData.survey_goals.map(g => g.count),
+                backgroundColor: surveyColors,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// Survey Skill Levels
+if (chartData.survey_skill_levels && chartData.survey_skill_levels.length > 0) {
+    new Chart(document.getElementById('surveySkillChart'), {
+        type: 'doughnut',
+        data: {
+            labels: chartData.survey_skill_levels.map(s => s.level),
+            datasets: [{
+                data: chartData.survey_skill_levels.map(s => s.count),
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// Survey Contexts
+if (chartData.survey_contexts && chartData.survey_contexts.length > 0) {
+    new Chart(document.getElementById('surveyContextChart'), {
+        type: 'doughnut',
+        data: {
+            labels: chartData.survey_contexts.map(c => c.context.replace('_', ' ')),
+            datasets: [{
+                data: chartData.survey_contexts.map(c => c.count),
+                backgroundColor: surveyColors,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// Survey Focus Areas (horizontal bar)
+if (chartData.survey_focus_areas && chartData.survey_focus_areas.length > 0) {
+    new Chart(document.getElementById('surveyFocusChart'), {
+        type: 'bar',
+        data: {
+            labels: chartData.survey_focus_areas.slice(0, 6).map(a => a.area.replace('_', ' ')),
+            datasets: [{
+                data: chartData.survey_focus_areas.slice(0, 6).map(a => a.count),
+                backgroundColor: '#6366f1',
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+}
 </script>
 {% endblock %}

@@ -60,12 +60,13 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 # Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # /home/jsuppe/speech3
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # /home/melchior/speech3
 API_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "speechscore.db")
 LOG_DIR = os.path.join(API_DIR, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "api.log")
 ASYNC_UPLOAD_DIR = os.path.join(API_DIR, "tmp_uploads")
+AUDIO_DIR = BASE_DIR  # Audio files are stored relative to BASE_DIR
 
 # Whisper
 WHISPER_MODEL = "large-v3"

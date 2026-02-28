@@ -1,0 +1,63 @@
+{
+  "title": "The Birds Christmas Carol",
+  "source": "lit2go",
+  "url": "https://etc.usf.edu/lit2go/124/the-birds-christmas-carol/",
+  "chapters": [
+    {
+      "index": 0,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/000_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/000_lit2go.mp3",
+      "lexile": null,
+      "word_count": 57
+    },
+    {
+      "index": 1,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/001_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/001_lit2go.mp3",
+      "lexile": null,
+      "word_count": 51
+    },
+    {
+      "index": 2,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/002_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/002_lit2go.mp3",
+      "lexile": null,
+      "word_count": 54
+    },
+    {
+      "index": 3,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/003_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/003_lit2go.mp3",
+      "lexile": null,
+      "word_count": 63
+    },
+    {
+      "index": 4,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/004_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/004_lit2go.mp3",
+      "lexile": null,
+      "word_count": 66
+    },
+    {
+      "index": 5,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/005_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/005_lit2go.mp3",
+      "lexile": null,
+      "word_count": 75
+    },
+    {
+      "index": 6,
+      "title": "Lit2Go",
+      "text_file": "the-birds-christmas-carol/006_lit2go.txt",
+      "audio_file": "the-birds-christmas-carol/006_lit2go.mp3",
+      "lexile": null,
+      "word_count": 57
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "title": "Alices Adventures In Wonderland",
+  "source": "lit2go",
+  "url": "https://etc.usf.edu/lit2go/1/alices-adventures-in-wonderland/",
+  "chapters": [
+    {
+      "index": 0,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/000_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/000_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 1,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/001_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/001_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 2,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/002_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/002_lit2go.mp3",
+      "lexile": null,
+      "word_count": 61
+    },
+    {
+      "index": 3,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/003_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/003_lit2go.mp3",
+      "lexile": null,
+      "word_count": 64
+    },
+    {
+      "index": 4,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/004_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/004_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 5,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/005_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/005_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 6,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/006_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/006_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 7,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/007_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/007_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 8,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/008_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/008_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 9,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/009_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/009_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 10,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/010_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/010_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 11,
+      "title": "Lit2Go",
+      "text_file": "alices-adventures-in-wonderland/011_lit2go.txt",
+      "audio_file": "alices-adventures-in-wonderland/011_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    }
+  ]
+}

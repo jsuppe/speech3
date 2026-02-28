@@ -3,38 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpeakFit — Comprehensive Speech Analysis API</title>
+    <title>SpeakFit — Speech & Language Apps for Every Stage of Life</title>
+    <meta name="description" content="A family of AI-powered speech apps: pronunciation training, public speaking, literacy, cognitive assessment, and phonics for kids.">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        .fade-in-delay { animation: fadeIn 0.5s ease-out 0.2s both; }
-        .fade-in-delay-2 { animation: fadeIn 0.5s ease-out 0.4s both; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .gradient-text { background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .glow { box-shadow: 0 0 60px rgba(99, 102, 241, 0.3); }
-        .feature-card { transition: all 0.3s ease; }
-        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
-        .metric-pill { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .fade-in { animation: fadeIn 0.6s ease-out; }
+        .fade-in-delay { animation: fadeIn 0.6s ease-out 0.15s both; }
+        .fade-in-delay-2 { animation: fadeIn 0.6s ease-out 0.3s both; }
+        .fade-in-delay-3 { animation: fadeIn 0.6s ease-out 0.45s both; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(20px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        .gradient-text { 
+            background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            background-clip: text; 
+        }
+        .app-card { 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        .app-card:hover { 
+            transform: translateY(-8px); 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .app-icon {
+            font-size: 3rem;
+            line-height: 1;
+        }
     </style>
 </head>
-<body class="text-gray-100">
+<body class="text-gray-100 min-h-screen">
     <!-- Nav -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800/50">
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-gray-950/90 backdrop-blur-lg border-b border-gray-800/50">
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="flex h-16 items-center justify-between">
                 <a href="/" class="text-xl font-bold text-white tracking-tight">
                     <span class="text-indigo-400">Speak</span>Fit
                 </a>
                 <div class="flex items-center gap-6">
-                    <a href="#features" class="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
-                    <a href="#metrics" class="text-sm text-gray-400 hover:text-white transition-colors">Metrics</a>
-                    <a href="/docs" class="text-sm text-gray-400 hover:text-white transition-colors">API Docs</a>
-                    <a href="#login" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
-                        Sign In
+                    <a href="#apps" class="text-sm text-gray-400 hover:text-white transition-colors">Apps</a>
+                    <a href="#about" class="text-sm text-gray-400 hover:text-white transition-colors">About</a>
+                    <a href="/docs" class="text-sm text-gray-400 hover:text-white transition-colors">API</a>
+                    <a href="/login" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+                        Dashboard
                     </a>
                 </div>
             </div>
@@ -44,405 +61,149 @@
     <!-- Hero -->
     <section class="pt-32 pb-20 px-4">
         <div class="mx-auto max-w-4xl text-center fade-in">
-            <div class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-sm text-indigo-300 mb-8">
-                <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                10 Analysis Modules • REST API • Real-time Processing
-            </div>
             <h1 class="text-5xl sm:text-6xl font-extrabold text-white mb-6 leading-tight">
-                Understand Speech<br>
-                <span class="gradient-text">Like Never Before</span>
+                Speech & Language Apps<br>
+                <span class="gradient-text">For Every Stage of Life</span>
             </h1>
             <p class="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-                SpeakFit analyzes audio with 10 specialized modules — transcription, voice quality, 
-                rhetorical patterns, sentiment, and more. Get actionable insights from any speech recording.
+                AI-powered tools to help you speak clearly, present confidently, read fluently, and monitor cognitive health — from childhood through adulthood.
+            </p>
+        </div>
+    </section>
+
+    <!-- Apps Grid -->
+    <section id="apps" class="py-16 px-4">
+        <div class="mx-auto max-w-6xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- SpeakFit (Main) -->
+                <div class="app-card bg-gradient-to-br from-indigo-900/50 to-indigo-950/50 border border-indigo-500/30 rounded-2xl p-8 fade-in-delay">
+                    <div class="app-icon mb-4">🎯</div>
+                    <h3 class="text-2xl font-bold text-white mb-2">SpeakFit</h3>
+                    <p class="text-indigo-300 text-sm font-medium mb-4">Complete Speech Analysis</p>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        The full platform — analyze any recording for voice quality, pacing, clarity, and rhetorical patterns. Get detailed scores and AI coaching.
+                    </p>
+                    <div class="pt-4 border-t border-indigo-500/20">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
+                        <p class="text-sm text-gray-300">Professionals, students, anyone wanting comprehensive speech feedback</p>
+                    </div>
+                </div>
+
+                <!-- Pronounce -->
+                <div class="app-card bg-gradient-to-br from-emerald-900/50 to-emerald-950/50 border border-emerald-500/30 rounded-2xl p-8 fade-in-delay">
+                    <div class="app-icon mb-4">🗣️</div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Pronounce</h3>
+                    <p class="text-emerald-300 text-sm font-medium mb-4">Pronunciation Training</p>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        Master difficult sounds with word-by-word feedback. Practice tongue twisters, get tips for TH, R, L, and more. Perfect your accent.
+                    </p>
+                    <div class="pt-4 border-t border-emerald-500/20">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
+                        <p class="text-sm text-gray-300">ESL learners, accent reduction, speech therapy support</p>
+                    </div>
+                </div>
+
+                <!-- Present -->
+                <div class="app-card bg-gradient-to-br from-amber-900/50 to-amber-950/50 border border-amber-500/30 rounded-2xl p-8 fade-in-delay">
+                    <div class="app-icon mb-4">🎤</div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Present</h3>
+                    <p class="text-amber-300 text-sm font-medium mb-4">Public Speaking Coach</p>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        Practice presentations and get feedback on pacing, filler words, pitch variation, and confidence markers. Nail your next talk.
+                    </p>
+                    <div class="pt-4 border-t border-amber-500/20">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
+                        <p class="text-sm text-gray-300">Business professionals, students, public speakers, interview prep</p>
+                    </div>
+                </div>
+
+                <!-- Reading -->
+                <div class="app-card bg-gradient-to-br from-sky-900/50 to-sky-950/50 border border-sky-500/30 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4">📖</div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Reading</h3>
+                    <p class="text-sky-300 text-sm font-medium mb-4">Adult Literacy</p>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        Build reading fluency with guided practice. Track words per minute, accuracy, and comprehension. Supportive, judgment-free learning.
+                    </p>
+                    <div class="pt-4 border-t border-sky-500/20">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
+                        <p class="text-sm text-gray-300">Adult literacy learners, GED prep, reading improvement programs</p>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div class="app-card bg-gradient-to-br from-purple-900/50 to-purple-950/50 border border-purple-500/30 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4">🧠</div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Memory</h3>
+                    <p class="text-purple-300 text-sm font-medium mb-4">Cognitive Assessment</p>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        Track speech patterns that may indicate cognitive changes — word-finding, repetition, language complexity. For home monitoring between checkups.
+                    </p>
+                    <div class="pt-4 border-t border-purple-500/20">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
+                        <p class="text-sm text-gray-300">Seniors, caregivers, families monitoring cognitive health</p>
+                    </div>
+                </div>
+
+                <!-- Phonics -->
+                <div class="app-card bg-gradient-to-br from-pink-900/50 to-pink-950/50 border border-pink-500/30 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4">🦉</div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Phonics</h3>
+                    <p class="text-pink-300 text-sm font-medium mb-4">Kids Learning to Read</p>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        Fun reading practice with Ollie the Owl! Earn stars and badges, explore stories, and build phonics skills from Pre-K through 5th grade.
+                    </p>
+                    <div class="pt-4 border-t border-pink-500/20">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
+                        <p class="text-sm text-gray-300">Children ages 4-11, parents, teachers, homeschool families</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="py-20 px-4 border-t border-gray-800/50">
+        <div class="mx-auto max-w-3xl text-center fade-in-delay-3">
+            <h2 class="text-3xl font-bold text-white mb-6">Built on Science</h2>
+            <p class="text-gray-400 leading-relaxed mb-8">
+                All SpeakFit apps are powered by the same advanced speech analysis engine — 
+                combining state-of-the-art speech recognition, acoustic analysis, and natural language processing 
+                to give you actionable, personalized feedback.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="#login" class="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all hover:scale-105 glow">
-                    Get Started →
+                <a href="/docs" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-all border border-gray-700">
+                    API Documentation
                 </a>
-                <a href="/docs" class="px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all border border-gray-700">
-                    View API Docs
+                <a href="/methodology" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-all border border-gray-700">
+                    Our Methodology
                 </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Live Metrics Preview -->
-    <section class="py-16 px-4 border-y border-gray-800/50 bg-gray-900/30">
-        <div class="mx-auto max-w-5xl fade-in-delay">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="text-center p-6">
-                    <div class="text-4xl font-bold text-white mb-2">{{ stats.speeches }}</div>
-                    <div class="text-sm text-gray-400">Recordings Analyzed</div>
-                </div>
-                <div class="text-center p-6">
-                    <div class="text-4xl font-bold text-indigo-400 mb-2">10</div>
-                    <div class="text-sm text-gray-400">Analysis Modules</div>
-                </div>
-                <div class="text-center p-6">
-                    <div class="text-4xl font-bold text-white mb-2">50+</div>
-                    <div class="text-sm text-gray-400">Metrics Extracted</div>
-                </div>
-                <div class="text-center p-6">
-                    <div class="text-4xl font-bold text-green-400 mb-2">&lt;30s</div>
-                    <div class="text-sm text-gray-400">Avg Processing Time</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features -->
-    <section id="features" class="py-20 px-4">
-        <div class="mx-auto max-w-6xl">
-            <div class="text-center mb-16 fade-in-delay">
-                <h2 class="text-3xl font-bold text-white mb-4">Comprehensive Analysis Pipeline</h2>
-                <p class="text-gray-400 max-w-2xl mx-auto">Each audio file passes through specialized modules that extract different aspects of speech quality and content.</p>
-            </div>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 fade-in-delay-2">
-                <!-- Module cards -->
-                <div class="feature-card bg-gray-900 rounded-xl border border-gray-800 p-6">
-                    <div class="w-12 h-12 bg-indigo-500/20 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">Transcription</h3>
-                    <p class="text-sm text-gray-400">Whisper large-v3 with word-level timestamps and speaker diarization support.</p>
-                </div>
-                
-                <div class="feature-card bg-gray-900 rounded-xl border border-gray-800 p-6">
-                    <div class="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">Voice Quality</h3>
-                    <p class="text-sm text-gray-400">Pitch, jitter, shimmer, HNR, vocal fry detection, and formant analysis.</p>
-                </div>
-                
-                <div class="feature-card bg-gray-900 rounded-xl border border-gray-800 p-6">
-                    <div class="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">Text Analysis</h3>
-                    <p class="text-sm text-gray-400">Lexical diversity, readability scores, syntactic complexity, and named entities.</p>
-                </div>
-                
-                <div class="feature-card bg-gray-900 rounded-xl border border-gray-800 p-6">
-                    <div class="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rhetorical Patterns</h3>
-                    <p class="text-sm text-gray-400">Anaphora, repetition scoring, rhythm regularity, and persuasion techniques.</p>
-                </div>
-                
-                <div class="feature-card bg-gray-900 rounded-xl border border-gray-800 p-6">
-                    <div class="w-12 h-12 bg-rose-500/20 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">Sentiment Analysis</h3>
-                    <p class="text-sm text-gray-400">RoBERTa-based classification with emotional arc tracking throughout the speech.</p>
-                </div>
-                
-                <div class="feature-card bg-gray-900 rounded-xl border border-gray-800 p-6">
-                    <div class="w-12 h-12 bg-cyan-500/20 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">Quality Scoring</h3>
-                    <p class="text-sm text-gray-400">Composite scores with percentile rankings against our benchmark database.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Metrics Catalog -->
-    <section id="metrics" class="py-20 px-4 bg-gray-900/50">
-        <div class="mx-auto max-w-5xl">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-white mb-4">{{ metrics_catalog|length }} Metrics Extracted</h2>
-                <p class="text-gray-400">From voice characteristics to linguistic patterns, get deep insights into any speech.<br>
-                <span class="text-indigo-400">Click any metric to learn more.</span></p>
-            </div>
-            
-            <!-- Category Tabs -->
-            <div class="flex flex-wrap justify-center gap-2 mb-8">
-                <button onclick="filterMetrics('all')" class="metric-filter active px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="all">
-                    All ({{ metrics_catalog|length }})
-                </button>
-                <button onclick="filterMetrics('Voice')" class="metric-filter px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="Voice">
-                    🎤 Voice (12)
-                </button>
-                <button onclick="filterMetrics('Text')" class="metric-filter px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="Text">
-                    📝 Text (6)
-                </button>
-                <button onclick="filterMetrics('Rhetoric')" class="metric-filter px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="Rhetoric">
-                    🎭 Rhetoric (3)
-                </button>
-                <button onclick="filterMetrics('Sentiment')" class="metric-filter px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="Sentiment">
-                    💭 Sentiment (4)
-                </button>
-                <button onclick="filterMetrics('Quality')" class="metric-filter px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="Quality">
-                    📊 Quality (2)
-                </button>
-                <button onclick="filterMetrics('Formants')" class="metric-filter px-4 py-2 rounded-full text-sm font-medium transition-all" data-filter="Formants">
-                    🔊 Formants (3)
-                </button>
-            </div>
-            
-            <!-- Metrics Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="metricsGrid">
-                {% for metric in metrics_catalog %}
-                <button onclick="showMetricModal({{ loop.index0 }})" 
-                        class="metric-pill px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-indigo-500 rounded-xl text-sm text-gray-300 hover:text-white transition-all text-left group"
-                        data-category="{{ metric.category }}">
-                    <div class="font-medium truncate">{{ metric.name }}</div>
-                    <div class="text-xs text-gray-500 group-hover:text-gray-400 mt-0.5">{{ metric.category }}</div>
-                </button>
-                {% endfor %}
-            </div>
-        </div>
-    </section>
-    
-    <!-- Metric Detail Modal -->
-    <div id="metricModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div class="p-6">
-                <div class="flex items-start justify-between mb-4">
-                    <div>
-                        <span id="modalCategory" class="text-xs font-medium text-indigo-400 uppercase tracking-wide"></span>
-                        <h3 id="modalTitle" class="text-xl font-bold text-white mt-1"></h3>
-                    </div>
-                    <button onclick="closeMetricModal()" class="text-gray-400 hover:text-white transition-colors p-1">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                
-                <p id="modalDescription" class="text-gray-300 mb-4"></p>
-                
-                <div class="space-y-4">
-                    <div class="bg-gray-800/50 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-gray-400 mb-2">What It Measures</h4>
-                        <p id="modalDetails" class="text-sm text-gray-300"></p>
-                    </div>
-                    
-                    <div class="bg-gray-800/50 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-gray-400 mb-2">How It's Scored</h4>
-                        <p id="modalScoring" class="text-sm text-gray-300"></p>
-                    </div>
-                    
-                    <div class="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-indigo-400 mb-2">Typical Range</h4>
-                        <p id="modalRange" class="text-sm text-indigo-200 font-mono"></p>
-                    </div>
-                </div>
-                
-                <div class="mt-6 flex gap-3">
-                    <button onclick="prevMetric()" class="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors">
-                        ← Previous
-                    </button>
-                    <button onclick="nextMetric()" class="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors">
-                        Next →
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Login Section -->
-    <section id="login" class="py-20 px-4">
-        <div class="mx-auto max-w-md">
-            <div class="bg-gray-900 rounded-2xl border border-gray-800 p-8 shadow-2xl glow">
-                <div class="text-center mb-8">
-                    <h2 class="text-2xl font-bold text-white mb-2">Sign In to Dashboard</h2>
-                    <p class="text-gray-400 text-sm">Access the admin dashboard to manage speeches and view analytics.</p>
-                </div>
-                
-                {% if error %}
-                <div class="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg">
-                    <p class="text-red-400 text-sm">{{ error }}</p>
-                </div>
-                {% endif %}
-                
-                <div class="flex justify-center">
-                    <div id="g_id_onload"
-                         data-client_id="{{ google_client_id }}"
-                         data-context="signin"
-                         data-ux_mode="popup"
-                         data-callback="handleCredentialResponse"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin"
-                         data-type="standard"
-                         data-shape="rectangular"
-                         data-theme="filled_black"
-                         data-text="signin_with"
-                         data-size="large"
-                         data-logo_alignment="left">
-                    </div>
-                </div>
-                
-                <p class="mt-6 text-center text-xs text-gray-500">
-                    Access restricted to authorized administrators.
-                </p>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="py-8 px-4 border-t border-gray-800">
-        <div class="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="text-sm text-gray-500">
-                © 2026 SpeakFit. Comprehensive speech analysis.
+    <footer class="py-12 px-4 border-t border-gray-800/50 bg-gray-900/30">
+        <div class="mx-auto max-w-6xl">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+                <div class="text-center md:text-left">
+                    <span class="text-xl font-bold text-white">
+                        <span class="text-indigo-400">Speak</span>Fit
+                    </span>
+                    <p class="text-sm text-gray-500 mt-2">AI-powered speech analysis for everyone</p>
+                </div>
+                <div class="flex gap-8 text-sm text-gray-400">
+                    <a href="/legal/privacy" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="/legal/terms" class="hover:text-white transition-colors">Terms</a>
+                    <a href="/docs" class="hover:text-white transition-colors">API</a>
+                </div>
             </div>
-            <div class="flex gap-6">
-                <a href="/docs" class="text-sm text-gray-400 hover:text-white transition-colors">API Documentation</a>
-                <a href="/methodology" class="text-sm text-gray-400 hover:text-white transition-colors">Methodology</a>
+            <div class="mt-8 pt-8 border-t border-gray-800/50 text-center text-sm text-gray-600">
+                © 2026 SpeakFit. All rights reserved.
             </div>
         </div>
     </footer>
-
-    <script>
-        // Metrics data from backend
-        const metricsData = {{ metrics_catalog | tojson | safe }};
-        let currentMetricIndex = 0;
-        let currentFilter = 'all';
-        
-        function handleCredentialResponse(response) {
-            fetch('/auth/google/callback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'credential=' + encodeURIComponent(response.credential)
-            })
-            .then(response => {
-                if (response.redirected) {
-                    window.location.href = response.url;
-                } else if (response.ok) {
-                    window.location.href = '/dashboard';
-                } else {
-                    return response.json().then(data => {
-                        alert(data.error || 'Login failed');
-                        window.location.reload();
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Login failed. Please try again.');
-            });
-        }
-
-        // Smooth scroll for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
-        
-        // Metric filtering
-        function filterMetrics(category) {
-            currentFilter = category;
-            const pills = document.querySelectorAll('#metricsGrid .metric-pill');
-            const filters = document.querySelectorAll('.metric-filter');
-            
-            filters.forEach(f => {
-                f.classList.remove('active', 'bg-indigo-600', 'text-white');
-                f.classList.add('bg-gray-800', 'text-gray-400');
-                if (f.dataset.filter === category) {
-                    f.classList.add('active', 'bg-indigo-600', 'text-white');
-                    f.classList.remove('bg-gray-800', 'text-gray-400');
-                }
-            });
-            
-            pills.forEach(pill => {
-                if (category === 'all' || pill.dataset.category === category) {
-                    pill.classList.remove('hidden');
-                } else {
-                    pill.classList.add('hidden');
-                }
-            });
-        }
-        
-        // Initialize filter buttons
-        document.querySelectorAll('.metric-filter').forEach(f => {
-            if (f.dataset.filter === 'all') {
-                f.classList.add('bg-indigo-600', 'text-white');
-            } else {
-                f.classList.add('bg-gray-800', 'text-gray-400');
-            }
-        });
-        
-        // Modal functions
-        function showMetricModal(index) {
-            currentMetricIndex = index;
-            const metric = metricsData[index];
-            
-            document.getElementById('modalCategory').textContent = metric.category;
-            document.getElementById('modalTitle').textContent = metric.name;
-            document.getElementById('modalDescription').textContent = metric.description;
-            document.getElementById('modalDetails').textContent = metric.details;
-            document.getElementById('modalScoring').textContent = metric.scoring;
-            document.getElementById('modalRange').textContent = metric.range;
-            
-            const modal = document.getElementById('metricModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-        }
-        
-        function closeMetricModal() {
-            const modal = document.getElementById('metricModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            document.body.style.overflow = '';
-        }
-        
-        function getVisibleIndices() {
-            if (currentFilter === 'all') {
-                return metricsData.map((_, i) => i);
-            }
-            return metricsData.map((m, i) => m.category === currentFilter ? i : -1).filter(i => i >= 0);
-        }
-        
-        function prevMetric() {
-            const visible = getVisibleIndices();
-            const currentPos = visible.indexOf(currentMetricIndex);
-            const newPos = currentPos <= 0 ? visible.length - 1 : currentPos - 1;
-            showMetricModal(visible[newPos]);
-        }
-        
-        function nextMetric() {
-            const visible = getVisibleIndices();
-            const currentPos = visible.indexOf(currentMetricIndex);
-            const newPos = currentPos >= visible.length - 1 ? 0 : currentPos + 1;
-            showMetricModal(visible[newPos]);
-        }
-        
-        // Close modal on escape key or backdrop click
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeMetricModal();
-            if (e.key === 'ArrowLeft') prevMetric();
-            if (e.key === 'ArrowRight') nextMetric();
-        });
-        
-        document.getElementById('metricModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeMetricModal();
-        });
-    </script>
 </body>
 </html>

@@ -125,9 +125,10 @@ def run_diarization(
             )
         else:
             # Auto-detect number of speakers
+            # Lower threshold (0.5) to better separate similar-sounding speakers
             clustering = AgglomerativeClustering(
                 n_clusters=None,
-                distance_threshold=0.7,
+                distance_threshold=0.5,
                 linkage='average'
             )
         

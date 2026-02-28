@@ -43,6 +43,38 @@ WEAK_WORDS = {
     "bad": "Consider a more descriptive adjective",
 }
 
+# Hedging/confidence-undermining phrases
+# These phrases weaken authority and reduce perceived confidence
+HEDGING_PHRASES = {
+    # Uncertainty markers
+    "i think": "State directly without hedging",
+    "i believe": "State directly without hedging",
+    "i feel like": "State directly without hedging",
+    "i guess": "State directly without hedging",
+    "maybe": "Be more definitive",
+    "perhaps": "Be more definitive",
+    "probably": "Be more definitive",
+    "possibly": "Be more definitive",
+    # Qualifiers
+    "kind of": "Remove qualifier for stronger statement",
+    "sort of": "Remove qualifier for stronger statement",
+    "somewhat": "Remove qualifier for stronger statement",
+    "a little bit": "Remove qualifier for stronger statement",
+    "just": "Often unnecessary - try removing",
+    # Permission-seeking
+    "if that makes sense": "Trust your explanation",
+    "does that make sense": "Trust your explanation",
+    "if you know what i mean": "Trust your explanation",
+    # Apologetic
+    "sorry but": "No need to apologize for your point",
+    "i'm sorry but": "No need to apologize for your point",
+    "i'm no expert but": "Own your expertise",
+    "this might be wrong but": "State confidently or verify first",
+    # Minimizers
+    "i was just going to say": "Just say it directly",
+    "i just wanted to": "Just do/say it directly",
+}
+
 
 @dataclass
 class GrammarIssue:
@@ -131,6 +163,25 @@ def analyze_grammar(transcript: str) -> Dict[str, Any]:
                 "suggestion": suggestion,
             })
     
+    # Detect hedging/confidence-undermining phrases
+    hedging_count = 0
+    for hedge, suggestion in HEDGING_PHRASES.items():
+        if ' ' in hedge:
+            pattern = re.escape(hedge)
+        else:
+            pattern = r'\b' + re.escape(hedge) + r'\b'
+        
+        for match in re.finditer(pattern, transcript_lower):
+            hedging_count += 1
+            issues.append({
+                "type": "hedging",
+                "text": match.group(),
+                "position": match.start(),
+                "length": len(match.group()),
+                "severity": "warning",
+                "suggestion": suggestion,
+            })
+    
     # Sort issues by position
     issues.sort(key=lambda x: x["position"])
     
@@ -159,10 +210,40 @@ def analyze_grammar(transcript: str) -> Dict[str, Any]:
             "message": "Repeated words detected. This often indicates hesitation - try pausing to collect thoughts.",
         })
     
+    # Calculate hedging ratio
+    hedging_ratio = hedging_count / word_count if word_count > 0 else 0.0
+    
+    # Calculate confidence score (0-100)
+    # Start at 100, deduct for hedging and weak words
+    # Target: <2% hedging phrases for score >80
+    weak_word_count = sum(1 for i in issues if i["type"] == "weak_word")
+    
+    # Hedging has bigger impact than weak words
+    hedging_penalty = min(hedging_count * 5, 40)  # Max 40 point penalty
+    weak_word_penalty = min(weak_word_count * 2, 20)  # Max 20 point penalty
+    filler_penalty = min(filler_count * 1.5, 20)  # Max 20 point penalty
+    
+    confidence_score = max(0, 100 - hedging_penalty - weak_word_penalty - filler_penalty)
+    
+    # Add hedging-specific suggestion
+    if hedging_ratio > 0.03:
+        suggestions.append({
+            "type": "high_hedging",
+            "message": f"High hedging rate ({hedging_count} instances). Own your statements - speak with authority.",
+        })
+    elif hedging_ratio > 0.01:
+        suggestions.append({
+            "type": "moderate_hedging",
+            "message": f"Some hedging detected ({hedging_count} instances). Consider being more direct.",
+        })
+    
     return {
         "issues": issues,
         "filler_count": filler_count,
         "filler_ratio": round(filler_ratio, 4),
+        "hedging_count": hedging_count,
+        "hedging_ratio": round(hedging_ratio, 4),
+        "confidence_score": round(confidence_score, 1),
         "suggestions": suggestions,
         "word_count": word_count,
     }

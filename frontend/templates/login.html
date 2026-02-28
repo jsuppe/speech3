@@ -3,79 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - SpeakFit Dashboard</title>
+    <title>Sign In — SpeakFit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-    </style>
 </head>
-<body class="h-full text-gray-100 flex items-center justify-center">
-    <div class="max-w-md w-full mx-4">
-        <div class="bg-gray-900 rounded-xl border border-gray-800 p-8 shadow-2xl">
-            <div class="text-center mb-8">
-                <h1 class="text-2xl font-bold text-white mb-2">SpeakFit Dashboard</h1>
-                <p class="text-gray-400">Sign in to access the admin dashboard</p>
-            </div>
-            
-            {% if error %}
-            <div class="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg">
-                <p class="text-red-400 text-sm">{{ error }}</p>
-            </div>
-            {% endif %}
-            
-            <div class="flex justify-center">
-                <div id="g_id_onload"
-                     data-client_id="{{ google_client_id }}"
-                     data-context="signin"
-                     data-ux_mode="popup"
-                     data-callback="handleCredentialResponse"
-                     data-auto_prompt="false">
+<body class="h-full">
+    <div class="min-h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div class="sm:mx-auto sm:w-full sm:max-w-md">
+            <h1 class="text-center text-3xl font-bold text-white">
+                <span class="text-indigo-400">Speak</span>Fit
+            </h1>
+            <h2 class="mt-6 text-center text-xl font-semibold text-gray-300">
+                Sign in to your account
+            </h2>
+        </div>
+
+        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+            <div class="bg-gray-900 py-8 px-4 shadow-xl border border-gray-800 sm:rounded-xl sm:px-10">
+                {% if error %}
+                <div class="mb-6 p-4 bg-red-900/50 border border-red-500/50 rounded-lg">
+                    <p class="text-sm text-red-300">{{ error }}</p>
                 </div>
-                <div class="g_id_signin"
-                     data-type="standard"
-                     data-shape="rectangular"
-                     data-theme="filled_black"
-                     data-text="signin_with"
-                     data-size="large"
-                     data-logo_alignment="left">
+                {% endif %}
+
+                <div class="flex flex-col items-center">
+                    <p class="text-sm text-gray-400 mb-6">Sign in with your Google account</p>
+                    
+                    <!-- Google Sign-In Button -->
+                    <div id="g_id_onload"
+                         data-client_id="{{ google_client_id }}"
+                         data-context="signin"
+                         data-ux_mode="popup"
+                         data-callback="handleGoogleSignIn"
+                         data-auto_prompt="false">
+                    </div>
+                    
+                    <div class="g_id_signin"
+                         data-type="standard"
+                         data-shape="rectangular"
+                         data-theme="filled_black"
+                         data-text="signin_with"
+                         data-size="large"
+                         data-logo_alignment="left">
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-800">
+                    <p class="text-xs text-gray-500 text-center">
+                        Access is restricted to authorized users only.
+                    </p>
                 </div>
             </div>
-            
-            <p class="mt-6 text-center text-xs text-gray-500">
-                Access restricted to authorized users only.
-            </p>
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+                ← Back to home
+            </a>
         </div>
     </div>
-    
+
     <script>
-        function handleCredentialResponse(response) {
-            // Send the credential to our backend
-            fetch('/auth/google/callback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'credential=' + encodeURIComponent(response.credential)
-            })
-            .then(response => {
-                if (response.redirected) {
-                    window.location.href = response.url;
-                } else if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    return response.json().then(data => {
-                        alert(data.error || 'Login failed');
-                        window.location.reload();
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Login failed. Please try again.');
-            });
-        }
+    function handleGoogleSignIn(response) {
+        // Send the credential to our backend
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/auth/google/callback';
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'credential';
+        input.value = response.credential;
+        
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
     </script>
 </body>
 </html>

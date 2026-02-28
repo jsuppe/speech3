@@ -23,7 +23,12 @@
             {% endif %}
             
             <div class="flex-1">
-                <h1 class="text-2xl font-bold text-white mb-1">{{ user.name or 'Unknown User' }}</h1>
+                <div class="flex items-center gap-3 mb-1">
+                    <h1 class="text-2xl font-bold text-white">{{ user.name or 'Unknown User' }}</h1>
+                    {% if user.enabled is defined and not user.enabled %}
+                    <span class="bg-red-500/20 text-red-400 text-xs font-semibold px-2.5 py-1 rounded-full border border-red-500/30">DISABLED</span>
+                    {% endif %}
+                </div>
                 <p class="text-gray-400 mb-4">{{ user.email }}</p>
                 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -48,9 +53,94 @@
         </div>
     </div>
 
+    <!-- Admin Controls -->
+    {% if is_admin %}
+    <div class="bg-gray-900 rounded-xl border border-indigo-500/30 p-6 mb-6">
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span class="bg-indigo-500/20 text-indigo-400 text-xs font-semibold px-2 py-0.5 rounded">ADMIN</span>
+            User Management
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Usage Stats -->
+            <div>
+                <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">Current Usage</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center bg-gray-800 rounded-lg px-4 py-2">
+                        <span class="text-gray-300">Tier</span>
+                        <span class="font-medium text-white">{{ user.tier or 'free' | upper }}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-800 rounded-lg px-4 py-2">
+                        <span class="text-gray-300">Monthly Recordings</span>
+                        <span class="font-medium text-white">{{ user.monthly_recordings or 0 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-800 rounded-lg px-4 py-2">
+                        <span class="text-gray-300">Monthly Audio Minutes</span>
+                        <span class="font-medium text-white">{{ '%.1f' | format(user.monthly_audio_minutes or 0) }}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-800 rounded-lg px-4 py-2">
+                        <span class="text-gray-300">Usage Month</span>
+                        <span class="font-medium text-white">{{ user.usage_month or '-' }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div>
+                <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">Actions</h3>
+                <div class="space-y-3">
+                    <!-- Recalculate Usage -->
+                    <form action="/admin/users/{{ user.id }}/recalc-usage" method="POST" class="inline">
+                        <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors text-sm">
+                            📊 Recalculate Usage
+                        </button>
+                    </form>
+                    
+                    <!-- Reset Usage -->
+                    <form action="/admin/users/{{ user.id }}/reset-usage" method="POST" class="inline">
+                        <button type="submit" class="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition-colors text-sm">
+                            🔄 Reset to Zero
+                        </button>
+                    </form>
+                    
+                    <!-- Change Tier -->
+                    <form action="/admin/users/{{ user.id }}/set-tier" method="POST" class="flex gap-2">
+                        <select name="tier" class="flex-1 bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm">
+                            <option value="free" {% if user.tier == 'free' %}selected{% endif %}>Free</option>
+                            <option value="pro" {% if user.tier == 'pro' %}selected{% endif %}>Pro</option>
+                            <option value="enterprise" {% if user.tier == 'enterprise' %}selected{% endif %}>Enterprise</option>
+                            <option value="qa" {% if user.tier == 'qa' %}selected{% endif %}>QA</option>
+                            <option value="admin" {% if user.tier == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors text-sm">
+                            Set Tier
+                        </button>
+                    </form>
+                    
+                    <!-- Enable/Disable Account Toggle -->
+                    <form action="/admin/users/{{ user.id }}/toggle-enabled" method="POST">
+                        {% if user.enabled is not defined or user.enabled %}
+                        <button type="submit" class="w-full px-4 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 font-medium rounded-lg transition-colors text-sm">
+                            🚫 Disable Account
+                        </button>
+                        {% else %}
+                        <button type="submit" class="w-full px-4 py-2 bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-600/30 font-medium rounded-lg transition-colors text-sm">
+                            ✅ Enable Account
+                        </button>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- User's Speeches -->
     <div class="mb-6">
-        <h2 class="text-xl font-bold text-white mb-4">Recordings</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold text-white">Recordings</h2>
+            <span class="text-sm text-gray-400">{{ total_speeches or speeches|length }} total</span>
+        </div>
         
         {% if speeches %}
         <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
@@ -90,9 +180,9 @@
                             {% else %}-{% endif %}
                         </td>
                         <td class="px-6 py-4 text-gray-300">
-                            {% if speech.score is not none %}
-                            <span class="font-medium {% if speech.score >= 70 %}text-green-400{% elif speech.score >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
-                                {{ '%.1f' | format(speech.score) }}
+                            {% if speech.cached_score is not none %}
+                            <span class="font-medium {% if speech.cached_score >= 70 %}text-green-400{% elif speech.cached_score >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                                {{ '%.1f' | format(speech.cached_score) }}
                             </span>
                             {% else %}-{% endif %}
                         </td>
@@ -107,6 +197,44 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination -->
+        {% if total_pages is defined and total_pages > 1 %}
+        <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-400">
+                Showing {{ ((page - 1) * per_page) + 1 }} - {{ [page * per_page, total_speeches] | min }} of {{ total_speeches }}
+            </div>
+            <div class="flex items-center gap-2">
+                {% if page > 1 %}
+                <a href="/admin/users/{{ user.id }}?page={{ page - 1 }}" 
+                   class="px-3 py-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg transition-colors text-sm">
+                    ← Previous
+                </a>
+                {% endif %}
+                
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">{{ p }}</span>
+                    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                    <a href="/admin/users/{{ user.id }}?page={{ p }}" 
+                       class="px-3 py-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg transition-colors text-sm">
+                        {{ p }}
+                    </a>
+                    {% elif p == page - 3 or p == page + 3 %}
+                    <span class="px-2 text-gray-500">...</span>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page < total_pages %}
+                <a href="/admin/users/{{ user.id }}?page={{ page + 1 }}" 
+                   class="px-3 py-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg transition-colors text-sm">
+                    Next →
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
         {% else %}
         <div class="bg-gray-900 rounded-xl border border-gray-800 p-12 text-center">
             <p class="text-gray-400">This user hasn't made any recordings yet.</p>

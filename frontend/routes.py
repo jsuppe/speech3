@@ -18,10 +18,36 @@ from speech_db import SpeechDB
 from scoring import score_speech, benchmark_speech, SCORING_PROFILES
 from .auth import (
     get_current_user, require_auth, create_session, destroy_session,
-    verify_google_token, is_email_allowed, SESSION_COOKIE
+    verify_google_token, is_email_allowed, SESSION_COOKIE, ALLOWED_TIERS
 )
 
 logger = logging.getLogger("speechscore.frontend")
+
+
+def is_admin_user(request: Request) -> bool:
+    """Check if the current user has admin tier."""
+    user = get_current_user(request)
+    if not user:
+        return False
+    email = user.get("email", "")
+    db = get_db()
+    row = db.conn.execute("SELECT tier FROM users WHERE LOWER(email) = LOWER(?)", (email,)).fetchone()
+    if not row:
+        return False
+    return (row[0] or "free").lower() == "admin"
+
+
+def get_user_tier(request: Request) -> str:
+    """Get the current user's tier."""
+    user = get_current_user(request)
+    if not user:
+        return "none"
+    email = user.get("email", "")
+    db = get_db()
+    row = db.conn.execute("SELECT tier FROM users WHERE LOWER(email) = LOWER(?)", (email,)).fetchone()
+    if not row:
+        return "none"
+    return (row[0] or "free").lower()
 
 # Google OAuth client ID (same as API)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "819724788424-r7p1tr8l7k2b2glsdn1ktj0o6k7cspb0.apps.googleusercontent.com")
@@ -83,6 +109,11 @@ METRIC_EXPLANATIONS = {
     "Vowel Space Index": "How distinctly vowels are articulated, based on formant frequencies. Larger vowel space = clearer pronunciation.",
     "Fluency Score": "Overall fluency rating combining pause patterns, hesitations, and flow. Higher = smoother, more connected speech.",
     "Reading Ease": "Flesch Reading Ease — how easy the text is to read. 90–100 = very easy (5th grade). 30–50 = college level. 0–30 = very difficult.",
+    
+    # Pronunciation metrics
+    "Pronunciation Clarity": "Mean confidence score across all words from Wav2Vec2 acoustic model. 90%+ = excellent clarity. 70-90% = good. Below 70% = needs work.",
+    "Pronunciation Consistency": "Standard deviation of per-word confidence scores. Lower = more consistent pronunciation. High variance suggests some words are clear while others are problematic.",
+    "Pronunciation Accuracy": "Percentage of words scoring below the 70% confidence threshold. Lower = better. Identifies proportion of potentially mispronounced words.",
 }
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -106,16 +137,29 @@ def get_db() -> SpeechDB:
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = Query(None)):
-    """Login page — redirects to landing page with login section."""
+    """Login page with Google Sign-In."""
     # If already logged in, redirect to dashboard
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/dashboard", status_code=302)
     
-    # Redirect to landing page login section
-    if error:
-        return RedirectResponse(url=f"/?error={error}#login", status_code=302)
-    return RedirectResponse(url="/#login", status_code=302)
+    # Get Google client ID from config
+    import json
+    import os
+    oauth_config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "api", "oauth_config.json")
+    google_client_id = ""
+    if os.path.exists(oauth_config_path):
+        with open(oauth_config_path) as f:
+            oauth_config = json.load(f)
+            client_ids = oauth_config.get("google", {}).get("client_ids", [])
+            if client_ids:
+                google_client_id = client_ids[0]
+    
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "error": error,
+        "google_client_id": google_client_id,
+    })
 
 
 @router.post("/auth/google/callback")
@@ -175,273 +219,12 @@ async def logout(request: Request):
 # ---------------------------------------------------------------------------
 
 @router.get("/", response_class=HTMLResponse)
-async def landing_page(request: Request, error: str = Query(None)):
-    """Landing page — public info about SpeechScore with login option."""
-    # If already logged in, redirect to dashboard
+async def landing_page(request: Request):
+    """Landing page — redirects to login if not authenticated, dashboard if authenticated."""
     user = get_current_user(request)
-    if user:
-        return RedirectResponse(url="/dashboard", status_code=302)
-    
-    db = get_db()
-    stats = db.stats()
-    
-    # Full metrics catalog with explanations, categories, and scoring info
-    metrics_catalog = [
-        # Voice Quality Metrics
-        {
-            "name": "Speaking Rate (WPM)",
-            "category": "Voice",
-            "description": "Words Per Minute — how fast the speaker talks.",
-            "details": "Measures the overall pace of speech including pauses. Deliberate orators like MLK spoke at 100–130 WPM. Conversational speech is typically 140–170 WPM. Fast readers and debaters can exceed 180 WPM.",
-            "scoring": "Scored on a bell curve. Moderate rates (120–160 WPM) score highest for general audiences. Very slow or very fast rates score lower.",
-            "range": "60–220 WPM typical",
-        },
-        {
-            "name": "Pitch Mean",
-            "category": "Voice",
-            "description": "Average fundamental frequency (F0) of the voice.",
-            "details": "The base pitch of the speaker's voice measured in Hertz. Typical male voices range 85–180 Hz. Female voices typically range 165–255 Hz. Children have higher pitches.",
-            "scoring": "Not directly scored — used as a baseline for other pitch metrics.",
-            "range": "85–300 Hz typical",
-        },
-        {
-            "name": "Pitch Variation",
-            "category": "Voice",
-            "description": "Standard deviation of pitch — how much the voice pitch varies.",
-            "details": "High variation indicates expressive, dynamic delivery that keeps listeners engaged. Low variation suggests monotone delivery. Great speakers use pitch strategically for emphasis.",
-            "scoring": "Higher variation scores better (up to a point). Monotone speech scores poorly.",
-            "range": "10–80 Hz std typical",
-        },
-        {
-            "name": "Pitch Range",
-            "category": "Voice",
-            "description": "The span between lowest and highest pitch used.",
-            "details": "Wider pitch range indicates more vocal expression and emotional range. Narrow range can sound flat, robotic, or disengaged. Skilled speakers use their full range.",
-            "scoring": "Wider ranges score higher, indicating vocal expressiveness.",
-            "range": "50–300 Hz span typical",
-        },
-        {
-            "name": "Jitter",
-            "category": "Voice",
-            "description": "Cycle-to-cycle variation in vocal pitch timing.",
-            "details": "Measures micro-instabilities in vocal fold vibration. Low jitter (<1%) indicates a steady, healthy voice. High jitter (>2%) may indicate vocal strain, fatigue, aging, or neurological conditions.",
-            "scoring": "Lower is better. Very high jitter indicates voice quality issues.",
-            "range": "0.2–3% typical",
-        },
-        {
-            "name": "Shimmer",
-            "category": "Voice",
-            "description": "Cycle-to-cycle variation in vocal loudness.",
-            "details": "Measures amplitude stability of the voice. Low shimmer (<5%) indicates smooth voice production. High values suggest breathiness, hoarseness, or reduced vocal control.",
-            "scoring": "Lower is better. High shimmer indicates voice quality problems.",
-            "range": "1–10% typical",
-        },
-        {
-            "name": "HNR (Harmonics-to-Noise)",
-            "category": "Voice",
-            "description": "How clear and resonant the voice sounds.",
-            "details": "Measures the ratio of periodic (harmonic) to aperiodic (noise) components in the voice. Higher HNR means a cleaner, more resonant voice. 20+ dB is excellent. Below 7 dB suggests significant hoarseness.",
-            "scoring": "Higher is better. Low HNR indicates hoarse or breathy voice.",
-            "range": "5–25 dB typical",
-        },
-        {
-            "name": "Vocal Fry",
-            "category": "Voice",
-            "description": "Ratio of creaky, low-frequency vocal pulses.",
-            "details": "A vocal register characterized by low, creaky sounds. Common in casual modern speech (20–50% of utterances). Rare in classically trained speakers (<5%). Not inherently bad — it's a style marker that signals casualness or intimacy.",
-            "scoring": "Context-dependent. High fry scores lower for formal presentations but may be neutral for casual speech.",
-            "range": "0–60% typical",
-        },
-        {
-            "name": "Uptalk Ratio",
-            "category": "Voice",
-            "description": "Fraction of phrases ending with rising pitch.",
-            "details": "Rising intonation at the end of statements (making them sound like questions). Common in uncertain or seeking-approval speech. Less common in authoritative, confident delivery.",
-            "scoring": "Lower scores better for authoritative speech. High uptalk can undermine perceived confidence.",
-            "range": "0–40% typical",
-        },
-        {
-            "name": "Articulation Rate",
-            "category": "Voice",
-            "description": "Speech rate excluding pauses.",
-            "details": "Measures how quickly words are produced during active speaking segments (not counting silent pauses). Differs from WPM by isolating pure articulation speed.",
-            "scoring": "Moderate rates score highest. Very fast articulation can reduce clarity.",
-            "range": "3–7 syllables/sec typical",
-        },
-        {
-            "name": "Rate Variability",
-            "category": "Voice",
-            "description": "How much speaking speed changes throughout.",
-            "details": "Coefficient of variation in speaking rate across segments. Some variation is natural and engaging. Too much may indicate disfluency or poor planning. Too little sounds robotic.",
-            "scoring": "Moderate variability scores best. Extremes score lower.",
-            "range": "0.1–0.5 CV typical",
-        },
-        {
-            "name": "Fluency Score",
-            "category": "Voice",
-            "description": "Overall smoothness combining pause patterns and flow.",
-            "details": "Composite metric evaluating pause duration, frequency, filled pauses (um, uh), false starts, and overall speech flow. Higher scores indicate smoother, more connected speech.",
-            "scoring": "Higher is better. Frequent hesitations and long pauses score lower.",
-            "range": "0–100 scale",
-        },
-        # Text & Language Metrics
-        {
-            "name": "Lexical Diversity",
-            "category": "Text",
-            "description": "Ratio of unique words to total words.",
-            "details": "Type-token ratio measuring vocabulary richness. Higher values indicate more varied word choice. Lou Gehrig's farewell speech scored 0.84 (exceptional). Typical speech ranges 0.40–0.65.",
-            "scoring": "Higher is better, indicating richer vocabulary and less repetition of common words.",
-            "range": "0.3–0.9 typical",
-        },
-        {
-            "name": "Syntactic Complexity",
-            "category": "Text",
-            "description": "Average parse-tree depth of sentences.",
-            "details": "Measures grammatical complexity via sentence structure analysis. Higher values indicate more embedded clauses, subordination, and complex grammar. Academic writing: 15+. Casual speech: 8–12.",
-            "scoring": "Context-dependent. Higher complexity isn't always better — clarity matters.",
-            "range": "5–20 depth typical",
-        },
-        {
-            "name": "Grade Level (Flesch-Kincaid)",
-            "category": "Text",
-            "description": "U.S. school grade needed to understand the text.",
-            "details": "Based on sentence length and syllable count. Grade 6 means readable by most adults. Grade 12+ indicates college-level complexity. Most successful speeches aim for grade 8–10.",
-            "scoring": "Lower is often better for broad audiences. Very high levels may lose listeners.",
-            "range": "4–16 grade level",
-        },
-        {
-            "name": "Reading Ease",
-            "category": "Text",
-            "description": "Flesch Reading Ease score — how easy to understand.",
-            "details": "Scale from 0–100. 90–100 is very easy (5th grade). 60–70 is standard. 30–50 is college level. 0–30 is very difficult (academic/legal). Inverse of grade level.",
-            "scoring": "Higher is easier to understand. Best speeches often score 60–80.",
-            "range": "0–100 scale",
-        },
-        {
-            "name": "Mean Length of Utterance",
-            "category": "Text",
-            "description": "Average words per sentence or clause.",
-            "details": "Simple measure of sentence length. Shorter MLU is easier to follow. Very long sentences can lose listeners. Great speakers vary their sentence length strategically.",
-            "scoring": "Moderate lengths score best. Very long or very short sentences score lower.",
-            "range": "8–25 words typical",
-        },
-        {
-            "name": "Discourse Connectedness",
-            "category": "Text",
-            "description": "How well ideas flow from sentence to sentence.",
-            "details": "Measured by semantic similarity between adjacent sentences. Higher scores indicate logical flow and coherent progression of ideas. Low scores suggest disjointed or random topic shifts.",
-            "scoring": "Higher is better, indicating smooth logical flow.",
-            "range": "0.2–0.8 similarity",
-        },
-        # Rhetorical Metrics
-        {
-            "name": "Repetition Score",
-            "category": "Rhetoric",
-            "description": "Deliberate reuse of phrases for emphasis.",
-            "details": "Measures rhetorical repetition — intentional restatement for persuasive effect. MLK's 'I Have a Dream' scored 24.5. Most speakers score 0–3. High scores indicate oratorical craft.",
-            "scoring": "Higher indicates more sophisticated rhetorical technique.",
-            "range": "0–30 typical",
-        },
-        {
-            "name": "Anaphora Count",
-            "category": "Rhetoric",
-            "description": "Phrases repeated at the start of consecutive clauses.",
-            "details": "Classic rhetorical device where the same words begin multiple sentences or clauses. Churchill's 'We shall fight...' is a famous example. Creates rhythm and emphasis.",
-            "scoring": "Presence of anaphora indicates rhetorical sophistication.",
-            "range": "0–20 instances",
-        },
-        {
-            "name": "Rhythm Regularity",
-            "category": "Rhetoric",
-            "description": "How evenly spaced stressed syllables are.",
-            "details": "Measures the metered quality of speech. Higher regularity creates a more speech-like, almost poetic cadence. Lower values indicate choppy or irregular pacing.",
-            "scoring": "Higher regularity can enhance memorability and impact.",
-            "range": "0–1 scale",
-        },
-        # Sentiment Metrics
-        {
-            "name": "Sentiment",
-            "category": "Sentiment",
-            "description": "Overall emotional tone — positive, negative, or neutral.",
-            "details": "Classified using a RoBERTa language model trained on diverse text. Indicates the predominant emotional valence of the speech content.",
-            "scoring": "Not scored — descriptive classification.",
-            "range": "Positive / Neutral / Negative",
-        },
-        {
-            "name": "Sentiment Positive",
-            "category": "Sentiment",
-            "description": "Confidence score for positive sentiment.",
-            "details": "Probability that the overall speech is positive in tone. Used with negative and neutral scores to determine final classification.",
-            "scoring": "Higher indicates more confident positive classification.",
-            "range": "0–1 probability",
-        },
-        {
-            "name": "Sentiment Negative",
-            "category": "Sentiment",
-            "description": "Confidence score for negative sentiment.",
-            "details": "Probability that the overall speech is negative in tone. High values indicate critical, sad, angry, or pessimistic content.",
-            "scoring": "Higher indicates more confident negative classification.",
-            "range": "0–1 probability",
-        },
-        {
-            "name": "Sentiment Neutral",
-            "category": "Sentiment",
-            "description": "Confidence score for neutral sentiment.",
-            "details": "Probability that the speech is emotionally neutral — factual, informational, or balanced without strong positive/negative lean.",
-            "scoring": "Higher indicates more confident neutral classification.",
-            "range": "0–1 probability",
-        },
-        # Audio Quality Metrics
-        {
-            "name": "Signal-to-Noise Ratio",
-            "category": "Quality",
-            "description": "How much louder speech is versus background noise.",
-            "details": "Measured in decibels (dB). 30+ dB is studio quality. 20–30 dB is good. 10–20 dB is acceptable. Below 10 dB is very noisy and may affect analysis accuracy.",
-            "scoring": "Higher is better. Low SNR may cause analysis to be flagged as unreliable.",
-            "range": "-10 to 50 dB",
-        },
-        {
-            "name": "Audio Quality Level",
-            "category": "Quality",
-            "description": "Overall recording quality classification.",
-            "details": "Categorical assessment based on SNR and other factors. HIGH = clean studio recording. MEDIUM = acceptable with some noise. LOW = noisy but usable. UNUSABLE = too noisy for reliable analysis.",
-            "scoring": "HIGH/MEDIUM preferred. LOW/UNUSABLE may affect metric reliability.",
-            "range": "HIGH / MEDIUM / LOW / UNUSABLE",
-        },
-        # Formant Metrics
-        {
-            "name": "F1 Mean",
-            "category": "Formants",
-            "description": "First formant frequency — related to tongue height.",
-            "details": "Acoustic resonance related to vowel quality and mouth openness. Higher F1 indicates more open vowels (like 'ah'). Lower F1 indicates closed vowels (like 'ee').",
-            "scoring": "Not directly scored — used for vowel space analysis.",
-            "range": "200–900 Hz typical",
-        },
-        {
-            "name": "F2 Mean",
-            "category": "Formants",
-            "description": "Second formant frequency — related to tongue position.",
-            "details": "Acoustic resonance related to front-back tongue position. Higher F2 indicates front vowels (like 'ee'). Lower F2 indicates back vowels (like 'oo').",
-            "scoring": "Not directly scored — used for vowel space analysis.",
-            "range": "800–2500 Hz typical",
-        },
-        {
-            "name": "Vowel Space Index",
-            "category": "Formants",
-            "description": "How distinctly vowels are articulated.",
-            "details": "Calculated from the spread of F1/F2 formant values. Larger vowel space indicates clearer pronunciation and better articulation. Reduced vowel space may indicate mumbling or slurred speech.",
-            "scoring": "Larger vowel space scores better, indicating clearer articulation.",
-            "range": "Relative scale",
-        },
-    ]
-    
-    return templates.TemplateResponse("landing.html", {
-        "request": request,
-        "stats": stats,
-        "metrics_catalog": metrics_catalog,
-        "google_client_id": GOOGLE_CLIENT_ID,
-        "error": error,
-    })
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    return RedirectResponse(url="/dashboard", status_code=302)
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -450,7 +233,7 @@ async def dashboard(request: Request):
     # Require authentication
     user = get_current_user(request)
     if not user:
-        return RedirectResponse(url="/", status_code=302)
+        return RedirectResponse(url="/login", status_code=302)
     
     db = get_db()
     stats = db.stats()
@@ -712,7 +495,7 @@ async def methodology_page(request: Request):
         return RedirectResponse(url="/", status_code=302)
     
     # Check if user is admin (for pipeline internals section)
-    is_admin = user.get("email", "").lower() == "jon.suppe@gmail.com"
+    is_admin = is_admin_user(request)
     
     from scoring import METRIC_DEFS, SCORING_PROFILES
     db = get_db()
@@ -789,14 +572,14 @@ async def compare_page(
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
-    """Admin dashboard with platform statistics. Restricted to jon.suppe@gmail.com."""
+    """Admin dashboard with platform statistics. Restricted to admin tier users."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/", status_code=302)
     
-    # Only allow Jon
-    if user.get("email", "").lower() != "jon.suppe@gmail.com":
-        return HTMLResponse("<h1>Access Denied</h1><p>Admin access is restricted.</p>", status_code=403)
+    # Only allow admin tier
+    if not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1><p>Admin access is restricted to admin tier users.</p>", status_code=403)
     
     db = get_db()
     from datetime import datetime, timedelta
@@ -924,11 +707,65 @@ async def admin_dashboard(request: Request):
         ORDER BY count DESC
     """).fetchall()
     
+    # Survey stats
+    survey_total = db.conn.execute("SELECT COUNT(*) FROM user_surveys").fetchone()[0]
+    survey_completion_rate = (survey_total / total_users * 100) if total_users > 0 else 0
+    
+    # Survey breakdown by primary goal
+    survey_goals = db.conn.execute("""
+        SELECT primary_goal, COUNT(*) as count
+        FROM user_surveys
+        GROUP BY primary_goal
+        ORDER BY count DESC
+    """).fetchall()
+    
+    # Survey breakdown by skill level
+    survey_skill_levels = db.conn.execute("""
+        SELECT skill_level, COUNT(*) as count
+        FROM user_surveys
+        GROUP BY skill_level
+        ORDER BY count DESC
+    """).fetchall()
+    
+    # Survey breakdown by context
+    survey_contexts = db.conn.execute("""
+        SELECT context, COUNT(*) as count
+        FROM user_surveys
+        GROUP BY context
+        ORDER BY count DESC
+    """).fetchall()
+    
+    # Focus areas (need to parse JSON array)
+    focus_areas_raw = db.conn.execute("SELECT focus_areas FROM user_surveys").fetchall()
+    focus_area_counts = {}
+    for row in focus_areas_raw:
+        try:
+            areas = json.loads(row[0])
+            for area in areas:
+                focus_area_counts[area] = focus_area_counts.get(area, 0) + 1
+        except:
+            pass
+    focus_areas_sorted = sorted(focus_area_counts.items(), key=lambda x: -x[1])
+    
+    # Recent survey submissions
+    recent_surveys = db.conn.execute("""
+        SELECT us.*, u.name, u.email
+        FROM user_surveys us
+        JOIN users u ON us.user_id = u.id
+        ORDER BY us.completed_at DESC
+        LIMIT 10
+    """).fetchall()
+    recent_surveys = [dict(r) for r in recent_surveys]
+    
     chart_data = json.dumps({
         "recordings_by_day": [{"date": r[0], "count": r[1]} for r in recordings_by_day],
         "users_by_day": [{"date": r[0], "count": r[1]} for r in users_by_day],
         "score_distribution": score_dist,
         "categories": [{"category": c[0], "count": c[1]} for c in categories],
+        "survey_goals": [{"goal": g[0], "count": g[1]} for g in survey_goals],
+        "survey_skill_levels": [{"level": s[0], "count": s[1]} for s in survey_skill_levels],
+        "survey_contexts": [{"context": c[0], "count": c[1]} for c in survey_contexts],
+        "survey_focus_areas": [{"area": a[0], "count": a[1]} for a in focus_areas_sorted],
     })
     
     # Get all users for the full users table
@@ -952,29 +789,84 @@ async def admin_dashboard(request: Request):
             "recordings_week": recordings_week,
             "storage_mb": storage_mb,
             "avg_score": avg_score,
+            "survey_total": survey_total,
+            "survey_completion_rate": survey_completion_rate,
         },
         "top_users": top_users,
         "all_users": all_users,
         "recent_recordings": recent_recordings,
+        "recent_surveys": recent_surveys,
         "chart_data": chart_data,
     })
 
 
 @router.get("/users", response_class=HTMLResponse)
-async def users_page(request: Request):
-    """Redirect to admin page."""
-    return RedirectResponse(url="/admin", status_code=302)
+async def users_page(request: Request, page: int = Query(1, ge=1), q: str = Query(None)):
+    """List all users with pagination and search (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/", status_code=302)
+    
+    # Only allow Jon
+    if not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1><p>Admin access is restricted.</p>", status_code=403)
+    
+    db = get_db()
+    per_page = 20
+    offset = (page - 1) * per_page
+    
+    # Build query with optional search
+    if q:
+        search_query = f"%{q}%"
+        count_row = db.conn.execute(
+            "SELECT COUNT(*) FROM users WHERE name LIKE ? OR email LIKE ?",
+            (search_query, search_query)
+        ).fetchone()
+        total = count_row[0]
+        
+        rows = db.conn.execute("""
+            SELECT u.*, 
+                   (SELECT COUNT(*) FROM speeches WHERE user_id = u.id) as speech_count
+            FROM users u
+            WHERE u.name LIKE ? OR u.email LIKE ?
+            ORDER BY u.created_at DESC
+            LIMIT ? OFFSET ?
+        """, (search_query, search_query, per_page, offset)).fetchall()
+    else:
+        count_row = db.conn.execute("SELECT COUNT(*) FROM users").fetchone()
+        total = count_row[0]
+        
+        rows = db.conn.execute("""
+            SELECT u.*, 
+                   (SELECT COUNT(*) FROM speeches WHERE user_id = u.id) as speech_count
+            FROM users u
+            ORDER BY u.created_at DESC
+            LIMIT ? OFFSET ?
+        """, (per_page, offset)).fetchall()
+    
+    users = [dict(r) for r in rows]
+    total_pages = (total + per_page - 1) // per_page
+    
+    return templates.TemplateResponse("users.html", {
+        "request": request,
+        "users": users,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "search_query": q,
+    })
 
 
 @router.get("/admin/users/{user_id}", response_class=HTMLResponse)
-async def admin_user_detail(request: Request, user_id: int):
+async def admin_user_detail(request: Request, user_id: int, page: int = Query(1, ge=1)):
     """View details for a specific user (admin only)."""
     current_user = get_current_user(request)
     if not current_user:
         return RedirectResponse(url="/", status_code=302)
     
     # Only allow Jon
-    if current_user.get("email", "").lower() != "jon.suppe@gmail.com":
+    if not is_admin_user(request):
         return HTMLResponse("<h1>Access Denied</h1><p>Admin access is restricted.</p>", status_code=403)
     
     db = get_db()
@@ -986,14 +878,26 @@ async def admin_user_detail(request: Request, user_id: int):
     
     user = dict(row)
     
-    # Get user's speeches with analysis data
+    # Pagination for speeches
+    per_page = 10
+    offset = (page - 1) * per_page
+    
+    # Get total speech count
+    count_row = db.conn.execute(
+        "SELECT COUNT(*) FROM speeches WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    total_speeches = count_row[0]
+    total_pages = (total_speeches + per_page - 1) // per_page if total_speeches > 0 else 1
+    
+    # Get user's speeches with analysis data (paginated)
     speech_rows = db.conn.execute("""
         SELECT s.*, a.quality_level, a.wpm
         FROM speeches s
         LEFT JOIN analyses a ON a.speech_id = s.id
         WHERE s.user_id = ?
         ORDER BY s.created_at DESC
-    """, (user_id,)).fetchall()
+        LIMIT ? OFFSET ?
+    """, (user_id, per_page, offset)).fetchall()
     speeches = [dict(r) for r in speech_rows]
     
     # Get coach messages
@@ -1004,10 +908,123 @@ async def admin_user_detail(request: Request, user_id: int):
         "request": request,
         "user": user,
         "speeches": speeches,
+        "total_speeches": total_speeches,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
         "coach_messages": coach_messages,
         "coach_stats": coach_stats,
         "is_admin": True,
     })
+
+
+@router.post("/admin/users/{user_id}/recalc-usage")
+async def admin_recalc_user_usage(request: Request, user_id: int):
+    """Recalculate a user's monthly usage from actual recordings (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user or not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    from datetime import datetime
+    current_month = datetime.utcnow().strftime("%Y-%m")
+    month_start = f"{current_month}-01"
+    
+    db = get_db()
+    db.conn.execute("""
+        UPDATE users 
+        SET monthly_recordings = (
+            SELECT COUNT(*) FROM speeches 
+            WHERE user_id = ? AND created_at >= ?
+        ),
+        monthly_audio_minutes = (
+            SELECT COALESCE(SUM(duration_sec)/60.0, 0) FROM speeches 
+            WHERE user_id = ? AND created_at >= ?
+        ),
+        usage_month = ?
+        WHERE id = ?
+    """, (user_id, month_start, user_id, month_start, current_month, user_id))
+    db.conn.commit()
+    
+    return RedirectResponse(url=f"/admin/users/{user_id}", status_code=302)
+
+
+@router.post("/admin/users/{user_id}/reset-usage")
+async def admin_reset_user_usage(request: Request, user_id: int):
+    """Reset a user's monthly usage counters to zero (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user or not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    db = get_db()
+    db.conn.execute("""
+        UPDATE users 
+        SET monthly_recordings = 0, monthly_audio_minutes = 0.0 
+        WHERE id = ?
+    """, (user_id,))
+    db.conn.commit()
+    
+    return RedirectResponse(url=f"/admin/users/{user_id}", status_code=302)
+
+
+@router.post("/admin/users/{user_id}/set-tier")
+async def admin_set_user_tier(request: Request, user_id: int, tier: str = Form(...)):
+    """Change a user's tier (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user or not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    # Validate tier
+    valid_tiers = ['free', 'pro', 'enterprise', 'admin']
+    if tier not in valid_tiers:
+        return HTMLResponse(f"<h1>Invalid tier: {tier}</h1>", status_code=400)
+    
+    db = get_db()
+    db.conn.execute("UPDATE users SET tier = ? WHERE id = ?", (tier, user_id))
+    db.conn.commit()
+    
+    return RedirectResponse(url=f"/admin/users/{user_id}", status_code=302)
+
+
+@router.post("/admin/users/{user_id}/toggle-enabled")
+async def admin_toggle_user_enabled(request: Request, user_id: int):
+    """Toggle a user's enabled status (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user or not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    # Don't allow disabling yourself
+    db = get_db()
+    row = db.conn.execute("SELECT email, enabled FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row and row[0].lower() == current_user.get("email", "").lower():
+        return HTMLResponse("<h1>Cannot disable your own account</h1>", status_code=400)
+    
+    # Toggle enabled status (default to 1 if null)
+    current_enabled = row[1] if row and row[1] is not None else 1
+    new_enabled = 0 if current_enabled else 1
+    db.conn.execute("UPDATE users SET enabled = ? WHERE id = ?", (new_enabled, user_id))
+    db.conn.commit()
+    
+    return RedirectResponse(url=f"/admin/users/{user_id}", status_code=302)
+
+
+@router.post("/admin/users/{user_id}/delete")
+async def admin_delete_user(request: Request, user_id: int):
+    """Delete a user and all their data (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user or not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    # Don't allow deleting yourself
+    db = get_db()
+    row = db.conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row and row[0].lower() == current_user.get("email", "").lower():
+        return HTMLResponse("<h1>Cannot delete your own account</h1>", status_code=400)
+    
+    # Delete user (CASCADE should handle speeches, analyses, etc.)
+    db.conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    db.conn.commit()
+    
+    return RedirectResponse(url="/admin", status_code=302)
 
 
 @router.get("/users/{user_id}", response_class=HTMLResponse)

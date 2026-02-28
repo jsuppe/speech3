@@ -13,6 +13,10 @@ from .oratory_analysis import get_oratory_analyzer, OratoryAnalysisResult
 from .user_auth import flexible_auth
 from .config import DB_PATH
 
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from argument_analysis import analyze_arguments, format_for_display
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/speeches", tags=["Oratory Analysis"])
 
@@ -225,7 +229,7 @@ async def get_oratory_summary(
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT oratory_analysis FROM analysis 
+        SELECT oratory_analysis FROM analyses 
         WHERE speech_id = ? AND oratory_analysis IS NOT NULL
     """, (speech_id,))
     row = cursor.fetchone()
@@ -249,3 +253,54 @@ async def get_oratory_summary(
     
     # No cache - run quick analysis
     return await analyze_oratory(speech_id, segment_duration=10.0, auth=auth)
+
+
+@router.post("/{speech_id}/arguments")
+async def analyze_speech_arguments(
+    speech_id: int,
+    auth: dict = Depends(flexible_auth)
+):
+    """
+    Extract argument structure (claim-evidence-impact) from a speech.
+    
+    Uses LLM to identify:
+    - Claims: Main assertions or positions
+    - Evidence: Supporting facts, examples, statistics
+    - Impact: Consequences and importance
+    
+    Returns:
+    - List of argument cards for display
+    - Argument flow diagram data
+    - Summary with metrics
+    """
+    # Get transcript
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT text FROM transcriptions 
+        WHERE speech_id = ?
+    """, (speech_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row or not row['text']:
+        raise HTTPException(
+            status_code=400, 
+            detail="No transcript available for this speech"
+        )
+    
+    # Run argument analysis
+    try:
+        raw_analysis = analyze_arguments(row['text'])
+        display_data = format_for_display(raw_analysis)
+        
+        return {
+            "speech_id": speech_id,
+            "raw": raw_analysis,
+            "display": display_data,
+        }
+    except Exception as e:
+        logger.exception(f"Argument analysis failed for speech {speech_id}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")

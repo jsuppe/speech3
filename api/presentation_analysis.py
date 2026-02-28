@@ -174,8 +174,17 @@ class PresentationAnalyzer:
         # Analyze energy/engagement
         energy_metric, energy_dips = self._analyze_energy(segments, advanced_audio)
         
-        # Analyze confidence (uptalk, vocal fry)
-        confidence_metric = self._analyze_confidence(analysis_data, advanced_audio)
+        # Get grammar analysis for hedging detection
+        grammar_analysis = analysis_data.get('grammar_analysis')
+        
+        # Analyze confidence (uptalk, vocal fry, hedging)
+        confidence_metric = self._analyze_confidence(analysis_data, advanced_audio, grammar_analysis)
+        
+        # Analyze opening hook
+        opening_metric = self._analyze_opening(transcript_text)
+        
+        # Analyze closing
+        closing_metric = self._analyze_closing(transcript_text)
         
         # Find problem spots
         problem_spots = self._find_problem_spots(
@@ -190,8 +199,16 @@ class PresentationAnalyzer:
             filler_words, problem_spots, pace_metric, energy_metric
         )
         
-        # Compile metrics
-        metrics = [pace_metric, clarity_metric, filler_metric, energy_metric, confidence_metric]
+        # Compile metrics (ordered to match website)
+        metrics = [
+            pace_metric,       # Pacing Analysis
+            filler_metric,     # Filler Word Detection
+            energy_metric,     # Pitch Variation / Energy
+            confidence_metric, # Confidence Markers
+            opening_metric,    # Opening & Closing
+            closing_metric,
+            clarity_metric,    # Voice clarity
+        ]
         
         # Calculate overall readiness
         readiness_score, overall_readiness = self._calculate_readiness(metrics)
@@ -466,16 +483,19 @@ class PresentationAnalyzer:
     def _analyze_confidence(
         self,
         analysis_data: Dict,
-        advanced_audio: Optional[Dict]
+        advanced_audio: Optional[Dict],
+        grammar_analysis: Optional[Dict] = None
     ) -> ReadinessMetric:
-        """Analyze confidence indicators (uptalk, vocal fry, etc.)."""
+        """Analyze confidence indicators (uptalk, vocal fry, hedging language)."""
         
         issues = []
+        confidence_score = 100
         
         # Check vocal fry
         vocal_fry = analysis_data.get('vocal_fry_ratio', 0)
         if vocal_fry > 0.3:
             issues.append("vocal fry")
+            confidence_score -= 15
         
         # Check uptalk from pitch contour
         if advanced_audio and 'pitch_contour' in advanced_audio:
@@ -484,30 +504,169 @@ class PresentationAnalyzer:
             total = len(trends)
             if total > 0 and rising_endings / total > 0.4:
                 issues.append("uptalk")
+                confidence_score -= 15
         
-        if not issues:
+        # Check hedging language from grammar analysis
+        if grammar_analysis:
+            hedging_count = grammar_analysis.get('hedging_count', 0)
+            conf_from_grammar = grammar_analysis.get('confidence_score', 100)
+            if hedging_count > 5:
+                issues.append("hedging language")
+                confidence_score = min(confidence_score, conf_from_grammar)
+            elif hedging_count > 2:
+                confidence_score = min(confidence_score, (confidence_score + conf_from_grammar) // 2)
+        
+        if confidence_score >= 80 and not issues:
             return ReadinessMetric(
                 name="Confidence",
                 status="pass",
-                value="Strong",
+                value=f"{int(confidence_score)}",
                 detail="Your delivery sounds confident and assured",
                 icon="psychology"
             )
-        elif len(issues) == 1:
+        elif confidence_score >= 60:
+            detail = f"Minor issues: {', '.join(issues)}" if issues else "Some hedging detected"
             return ReadinessMetric(
                 name="Confidence",
                 status="warning",
-                value="Good",
-                detail=f"Minor issue: {issues[0]} detected",
+                value=f"{int(confidence_score)}",
+                detail=detail,
                 icon="psychology"
             )
         else:
+            detail = f"Issues: {', '.join(issues)}" if issues else "Too much hedging language"
             return ReadinessMetric(
                 name="Confidence",
                 status="fail",
-                value="Needs work",
-                detail=f"Issues: {', '.join(issues)}",
+                value=f"{int(confidence_score)}",
+                detail=detail + " — speak with more authority",
                 icon="psychology"
+            )
+    
+    def _analyze_opening(self, transcript_text: str) -> ReadinessMetric:
+        """Analyze opening/hook strength."""
+        import re
+        
+        if not transcript_text:
+            return ReadinessMetric(
+                name="Opening",
+                status="warning",
+                value="N/A",
+                detail="No transcript available",
+                icon="start"
+            )
+        
+        words = transcript_text.split()
+        opening_text = " ".join(words[:50]).lower()
+        
+        # Strong hook patterns
+        strong_hooks = [
+            r"^(imagine|picture this|what if|consider|think about)",
+            r"^(did you know|here's a fact|surprisingly)",
+            r"^(let me (tell|share|ask) you)",
+            r"^(today (i'll|we'll|i'm going|we're going))",
+            r"^(the (biggest|most important|key|critical))",
+            r"^(have you ever|when was the last time)",
+        ]
+        
+        # Weak opening patterns
+        weak_openings = [
+            r"^(so|okay|um|uh|well|alright)",
+            r"^(i'm (going to|gonna) talk about)",
+            r"^(today's (topic|presentation|talk) is)",
+        ]
+        
+        has_strong_hook = any(re.search(p, opening_text) for p in strong_hooks)
+        has_weak_opening = any(re.search(p, opening_text) for p in weak_openings)
+        
+        if has_strong_hook:
+            return ReadinessMetric(
+                name="Opening",
+                status="pass",
+                value="Strong hook",
+                detail="Great attention-grabbing opener",
+                icon="start"
+            )
+        elif has_weak_opening:
+            return ReadinessMetric(
+                name="Opening",
+                status="fail",
+                value="Needs work",
+                detail="Start with a question, story, or surprising fact",
+                icon="start"
+            )
+        else:
+            return ReadinessMetric(
+                name="Opening",
+                status="warning",
+                value="Neutral",
+                detail="Consider adding a stronger hook to grab attention",
+                icon="start"
+            )
+    
+    def _analyze_closing(self, transcript_text: str) -> ReadinessMetric:
+        """Analyze closing/conclusion strength."""
+        import re
+        
+        if not transcript_text:
+            return ReadinessMetric(
+                name="Closing",
+                status="warning",
+                value="N/A",
+                detail="No transcript available",
+                icon="stop"
+            )
+        
+        words = transcript_text.split()
+        closing_text = " ".join(words[-50:]).lower()
+        
+        # Strong closing patterns
+        strong_closings = [
+            r"(in (conclusion|summary|closing))",
+            r"(the (key|main) takeaway)",
+            r"(i challenge you to|i urge you to|i invite you to)",
+            r"(remember|don't forget|keep in mind)",
+            r"(thank you)",
+            r"(let's make it happen|together we can)",
+        ]
+        
+        # Weak closing patterns
+        weak_closings = [
+            r"(that's (it|all|about it)|i guess that's)",
+            r"(so (yeah|yep)|and yeah)",
+            r"(i think i covered|did i miss)",
+        ]
+        
+        has_strong_close = any(re.search(p, closing_text) for p in strong_closings)
+        has_weak_closing = any(re.search(p, closing_text) for p in weak_closings)
+        has_cta = any(re.search(p, closing_text) for p in [
+            r"(i challenge|i urge|i invite|let's|we should)"
+        ])
+        
+        if has_strong_close:
+            cta_text = " + Call to action" if has_cta else ""
+            return ReadinessMetric(
+                name="Closing",
+                status="pass",
+                value=f"Strong{cta_text}",
+                detail="Memorable conclusion that lands well",
+                icon="stop"
+            )
+        elif has_weak_closing:
+            return ReadinessMetric(
+                name="Closing",
+                status="fail",
+                value="Abrupt",
+                detail="End with a clear takeaway and call to action",
+                icon="stop"
+            )
+        else:
+            return ReadinessMetric(
+                name="Closing",
+                status="warning",
+                value="OK",
+                detail="Consider a stronger summary or call to action",
+                icon="stop"
             )
     
     def _find_problem_spots(

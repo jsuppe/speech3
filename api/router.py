@@ -41,6 +41,7 @@ from .job_manager import manager as job_manager, QueueFullError
 from .auth import auth_required, admin_required
 from .user_auth import get_current_user, decode_token, flexible_auth
 from .rate_limiter import rate_limiter, TIER_LIMITS
+from .usage_limits import get_usage_limiter, TIER_LIMITS as USAGE_TIER_LIMITS
 from .metrics import metrics
 from .usage import usage_tracker
 
@@ -227,7 +228,7 @@ async def analyze(
     language: Optional[str] = Form(None, description="Language code for Whisper (e.g. 'en', 'es'). Default: auto-detect."),
     speaker: Optional[str] = Form(None, description="Speaker name (used for diarization when single speaker detected)"),
     title: Optional[str] = Form(None, description="Title for the speech"),
-    profile: Optional[str] = Form("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical, voice_health"),
+    profile: Optional[str] = Form("general", description="Scoring profile: general, oratory, reading_fluency, presentation, clinical, dementia"),
     exercise_type: Optional[str] = Form(None, description="Exercise type for voice_health profile (e.g. 'sustained_ah', 'humming', 'projection')"),
     target_duration: Optional[float] = Form(None, description="Target duration in seconds for sustained exercises"),
     auth: dict = Depends(flexible_auth),
@@ -244,8 +245,9 @@ async def analyze(
     For voice_health profile, pass exercise_type and target_duration for enhanced feedback.
     """
     key_data = auth.get("key_data")
-    key_id = key_data["key_id"] if key_data else "user"
     user_id = auth.get("user_id")
+    # Use user_id for rate limiting JWT users, key_id for API keys
+    key_id = key_data["key_id"] if key_data else f"user:{user_id}"
     
     # Generate request ID for tracing
     request_id = str(uuid.uuid4())[:8]
@@ -347,8 +349,49 @@ async def analyze(
                 f"Audio duration {duration:.0f}s exceeds {config.MAX_DURATION_SEC}s limit."
             )
 
-        # Record audio minutes in rate limiter and usage tracker
+        # --- USAGE LIMIT CHECK ---
         audio_minutes = duration / 60.0
+        if user_id:
+            db = pipeline_runner.get_db()
+            usage_limiter = get_usage_limiter(db.conn)
+            
+            # Check recording count limit
+            can_record, limit_error = usage_limiter.check_can_record(user_id)
+            if not can_record:
+                if tmp_wav and os.path.exists(tmp_wav):
+                    os.remove(tmp_wav)
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": {
+                            "code": "RECORDING_LIMIT_REACHED",
+                            "message": limit_error["reason"],
+                            "details": limit_error,
+                        }
+                    }
+                )
+            
+            # Check audio minutes limit
+            can_use_audio, audio_error = usage_limiter.check_audio_minutes(user_id, audio_minutes)
+            if not can_use_audio:
+                if tmp_wav and os.path.exists(tmp_wav):
+                    os.remove(tmp_wav)
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": {
+                            "code": "AUDIO_LIMIT_REACHED",
+                            "message": audio_error["reason"],
+                            "details": audio_error,
+                        }
+                    }
+                )
+
+        # Record audio minutes in rate limiter and usage tracker
         rate_limiter.record_audio_minutes(key_id, audio_minutes)
         usage_tracker.record_audio_minutes(key_id, audio_minutes)
 
@@ -373,6 +416,14 @@ async def analyze(
             logger.exception("Pipeline error")
             return _error(500, "PIPELINE_ERROR", f"Analysis failed: {str(e)[:500]}")
 
+        # Check for empty transcript (silent/no speech)
+        transcript = result.get("transcript", "").strip()
+        if not transcript:
+            return _error(
+                422, "NO_SPEECH_DETECTED",
+                "No speech was detected in the recording. Please speak clearly and try again."
+            )
+
         # Override filename
         result["audio_file"] = audio.filename
 
@@ -393,6 +444,15 @@ async def analyze(
         )
         if speech_id is not None:
             result["speech_id"] = speech_id
+            
+            # Record usage after successful save
+            if user_id:
+                try:
+                    db = pipeline_runner.get_db()
+                    usage_limiter = get_usage_limiter(db.conn)
+                    usage_limiter.record_usage(user_id, audio_minutes)
+                except Exception as e:
+                    logger.warning(f"Failed to record usage for user {user_id}: {e}")
 
         logger.info(
             f"Completed: {audio.filename} | "
@@ -451,8 +511,9 @@ async def analyze_stream(
     Connect with EventSource or fetch with streaming body.
     """
     key_data = auth.get("key_data")
-    key_id = key_data["key_id"] if key_data else "user"
     user_id = auth.get("user_id")
+    # Use user_id for rate limiting JWT users, key_id for API keys
+    key_id = key_data["key_id"] if key_data else f"user:{user_id}"
 
     os.makedirs(config.ASYNC_UPLOAD_DIR, exist_ok=True)
 
@@ -1040,6 +1101,42 @@ async def get_speech_full(
         except Exception as e:
             logger.warning(f"Grammar analysis failed: {e}")
     
+    # Add presentation analysis for presentation profile
+    if profile == "presentation" and transcription and transcription.get("text"):
+        try:
+            from presentation_analysis import analyze_presentation
+            
+            # Get timing data if available
+            wpm_segments = None
+            pause_data = None
+            pitch_data = None
+            
+            if audio_result:
+                pitch_data = {
+                    "pitch_mean_hz": audio_result.get("pitch_mean_hz"),
+                    "pitch_std_hz": audio_result.get("pitch_std_hz"),
+                    "pitch_range_hz": audio_result.get("pitch_range_hz"),
+                }
+                pause_data = {
+                    "pause_ratio": audio_result.get("pause_ratio"),
+                    "pause_count": audio_result.get("pause_count", 0),
+                    "avg_pause_duration": audio_result.get("avg_pause_duration"),
+                }
+            
+            # Get WPM segments if available
+            if result.get("wpm_segments"):
+                wpm_segments = result["wpm_segments"]
+            
+            presentation_result = analyze_presentation(
+                transcript=transcription["text"],
+                wpm_segments=wpm_segments,
+                pitch_data=pitch_data,
+                pause_data=pause_data,
+            )
+            result["presentation_analysis"] = presentation_result
+        except Exception as e:
+            logger.warning(f"Presentation analysis failed: {e}")
+    
     # Add AI summary for the current profile (if available)
     try:
         from ai_summary import get_summary
@@ -1089,7 +1186,7 @@ async def update_speech(
     category: Optional[str] = Body(None, description="Category (e.g. presentation, casual)"),
     tags: Optional[List[str]] = Body(None, description="Tags for the speech"),
     notes: Optional[str] = Body(None, description="Notes about the speech"),
-    profile: Optional[str] = Body(None, description="Scoring profile (general, oratory, reading_fluency, presentation, clinical)"),
+    profile: Optional[str] = Body(None, description="Scoring profile (general, oratory, reading_fluency, presentation, clinical, dementia)"),
     project_id: Optional[int] = Body(None, description="Project ID to assign speech to (null to unassign)"),
     auth: dict = Depends(flexible_auth),
 ):
@@ -1132,6 +1229,79 @@ async def get_speech_analysis(speech_id: int, auth: dict = Depends(flexible_auth
     if not result:
         return _error(404, "NOT_FOUND", f"No analysis found for speech {speech_id}.")
     return result
+
+
+@router.get("/speeches/{speech_id}/emotional-arc", tags=["Database"])
+async def get_emotional_arc(speech_id: int, auth: dict = Depends(flexible_auth)):
+    """
+    Get normalized emotional arc data for real-time playback visualization.
+    
+    Returns intensity points normalized to the speech's own emotional range,
+    with phase detection (Setup, Build, Peak, Resolution).
+    """
+    import json as json_module
+    from sentiment_analysis import compute_normalized_arc
+    
+    db = pipeline_runner.get_db()
+    
+    # Get the speech and check it exists
+    speech = db.get_speech(speech_id)
+    if not speech:
+        return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
+    
+    # Get transcript segments from transcriptions table
+    cursor = db.conn.execute("""
+        SELECT segments_json FROM transcriptions WHERE speech_id = ?
+    """, (speech_id,))
+    row = cursor.fetchone()
+    
+    if not row or not row[0]:
+        return _error(400, "NO_TRANSCRIPT", "No transcript segments available for this speech.")
+    
+    try:
+        segments = json_module.loads(row[0])
+    except:
+        return _error(500, "PARSE_ERROR", "Failed to parse transcript segments.")
+    
+    if not segments or len(segments) < 2:
+        return _error(400, "INSUFFICIENT_DATA", "Need at least 2 segments for arc analysis.")
+    
+    # Check if we have cached sentiment per-segment data
+    cursor = db.conn.execute("""
+        SELECT analysis_json FROM analyses WHERE speech_id = ?
+    """, (speech_id,))
+    analysis_row = cursor.fetchone()
+    
+    per_segment = None
+    if analysis_row and analysis_row[0]:
+        try:
+            analysis = json_module.loads(analysis_row[0])
+            sentiment = analysis.get("sentiment", {})
+            per_segment = sentiment.get("per_segment", [])
+        except:
+            pass
+    
+    # If no cached sentiment, compute it now
+    if not per_segment:
+        from sentiment_analysis import analyze_sentiment
+        
+        # Build text from segments
+        full_text = " ".join(s.get("text", "") for s in segments)
+        result = analyze_sentiment(full_text, segments)
+        per_segment = result.get("per_segment", [])
+    
+    if not per_segment or len(per_segment) < 2:
+        return _error(400, "INSUFFICIENT_DATA", "Not enough sentiment data for arc analysis.")
+    
+    # Compute normalized arc
+    arc_data = compute_normalized_arc(per_segment)
+    
+    return {
+        "speech_id": speech_id,
+        "title": speech.get("title", "Untitled"),
+        "duration_sec": speech.get("duration_sec", 0),
+        **arc_data,
+    }
 
 
 @router.get("/speeches/{speech_id}/group", tags=["Database"])
@@ -2811,6 +2981,182 @@ How should the child say "{word}"? (Keep it short and fun!)"""
 
 
 # ---------------------------------------------------------------------------
+# Dementia Conversation Analysis
+# ---------------------------------------------------------------------------
+
+from .dementia_analysis import analyze_dementia_markers, calculate_preposition_rate
+
+class DementiaAnalysisRequest(BaseModel):
+    """Request model for dementia conversation analysis."""
+    speech_id: Optional[int] = None
+    segments: Optional[List[Dict[str, Any]]] = None
+    speaker_labels: Optional[Dict[str, str]] = None
+    # Tunable analysis parameters
+    repetition_threshold: Optional[float] = 0.85  # Similarity threshold (0.5-1.0)
+    min_segment_gap: Optional[int] = 2  # Min segments apart for repetition
+
+@router.post("/dementia/analyze", tags=["Dementia"])
+async def analyze_dementia_conversation(
+    request: DementiaAnalysisRequest,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Analyze a conversation for dementia markers.
+    
+    Metrics scored per speaker:
+    1. Prepositions per 10 words (lower rates correlate with cognitive decline)
+    2. Repeated concepts/questions (memory issues indicator)
+    
+    Provide either:
+    - speech_id: ID of a previously analyzed speech with diarization
+    - segments: List of {text, speaker, start, end} objects
+    """
+    user_id = auth.get("user_id")
+    
+    segments = request.segments
+    
+    # If speech_id provided, load segments from database
+    if request.speech_id and not segments:
+        db = pipeline_runner.get_db()
+        
+        # Check ownership
+        speech = db.get_speech(request.speech_id)
+        if not speech:
+            return _error(404, "NOT_FOUND", "Speech not found")
+        
+        if speech.get("user_id") and speech.get("user_id") != user_id:
+            return _error(403, "FORBIDDEN", "Not authorized to access this speech")
+        
+        # Get analysis result (contains transcript and optionally diarization)
+        conn = db.conn
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT result 
+            FROM analyses 
+            WHERE speech_id = ? 
+            ORDER BY created_at DESC LIMIT 1
+        """, (request.speech_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return _error(404, "NOT_FOUND", "No analysis found for this speech")
+        
+        # Parse the result JSON
+        try:
+            result_data = json.loads(row[0]) if row[0] else {}
+        except:
+            result_data = {}
+        
+        transcript = result_data.get("transcript", "")
+        diarization = result_data.get("diarization", [])
+        
+        # Use diarization segments if available
+        if diarization:
+            segments = diarization
+        # Fallback: create single segment from transcript
+        elif transcript:
+            segments = [{"text": transcript, "speaker": "Speaker 1", "start": 0, "end": 0}]
+    
+    if not segments:
+        return _error(400, "BAD_REQUEST", "No segments provided. Either provide speech_id or segments array.")
+    
+    # Run dementia analysis
+    try:
+        results = analyze_dementia_markers(
+            segments=segments,
+            speaker_labels=request.speaker_labels,
+            repetition_threshold=request.repetition_threshold or 0.85,
+            min_segment_gap=request.min_segment_gap or 2,
+        )
+        
+        # Store dementia metrics in the speech record if speech_id provided
+        if request.speech_id:
+            db = pipeline_runner.get_db()
+            conn = db.conn
+            cursor = conn.cursor()
+            
+            # Aggregate metrics from all speakers
+            speakers_data = results.get("speakers", {})
+            total_words = 0
+            total_preps = 0
+            total_rep_concepts = 0
+            total_rep_questions = 0
+            total_aphasic = 0
+            max_aphasic_conf = 0
+            
+            for speaker_id, speaker_data in speakers_data.items():
+                metrics = speaker_data.get("metrics", {})
+                prep_analysis = speaker_data.get("preposition_analysis", {})
+                rep_analysis = speaker_data.get("repetition_analysis", {})
+                aphasic_analysis = speaker_data.get("aphasic_analysis", {})
+                
+                words = prep_analysis.get("word_count", 0)
+                total_words += words
+                total_preps += prep_analysis.get("preposition_count", 0)
+                total_rep_concepts += rep_analysis.get("repeated_concepts_count", 0)
+                total_rep_questions += rep_analysis.get("repeated_questions_count", 0)
+                total_aphasic += aphasic_analysis.get("event_count", 0)
+                max_aphasic_conf = max(max_aphasic_conf, aphasic_analysis.get("confidence_score", 0))
+            
+            # Calculate overall preposition rate
+            prep_rate = (total_preps / total_words * 10) if total_words > 0 else 0
+            
+            # Build dementia_metrics from aggregated results
+            dementia_metrics = {
+                "prepositions_per_10_words": round(prep_rate, 2),
+                "preposition_count": total_preps,
+                "word_count": total_words,
+                "repetition_count": total_rep_concepts + total_rep_questions,
+                "aphasic_events": total_aphasic,
+                "aphasic_confidence": round(max_aphasic_conf, 2),
+                "num_speakers": len(speakers_data),
+            }
+            
+            # Update speech record with dementia metrics and set profile to 'dementia'
+            cursor.execute("""
+                UPDATE speeches 
+                SET dementia_metrics = ?, profile = 'dementia'
+                WHERE id = ?
+            """, (json.dumps(dementia_metrics), request.speech_id))
+            conn.commit()
+        
+        return {
+            "success": True,
+            "analysis": results,
+            "speech_id": request.speech_id,
+        }
+        
+    except Exception as e:
+        logger.error(f"Dementia analysis error: {e}")
+        return _error(500, "ANALYSIS_ERROR", str(e))
+
+
+@router.get("/dementia/analyze/{speech_id}", tags=["Dementia"])
+async def get_dementia_analysis(
+    speech_id: int,
+    repetition_threshold: float = Query(default=0.85, ge=0.5, le=1.0, description="Similarity threshold for repetitions (0.5-1.0)"),
+    min_segment_gap: int = Query(default=2, ge=1, le=10, description="Min segments apart for repetition"),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get dementia analysis for a previously recorded conversation.
+    The speech must have been analyzed with speaker diarization.
+    
+    Query params:
+    - repetition_threshold: How similar phrases must be (0.5=lenient, 1.0=strict)
+    - min_segment_gap: Min speech segments apart to count as repetition (filters immediate corrections)
+    """
+    return await analyze_dementia_conversation(
+        request=DementiaAnalysisRequest(
+            speech_id=speech_id,
+            repetition_threshold=repetition_threshold,
+            min_segment_gap=min_segment_gap,
+        ),
+        auth=auth
+    )
+
+
+# ---------------------------------------------------------------------------
 # Speaker Fingerprinting (Voice Identification)
 # ---------------------------------------------------------------------------
 
@@ -3824,6 +4170,398 @@ async def get_practice_stats(
         return _error(500, "ERROR", str(e))
 
 
+@router.get("/practice/stats/pronunciation", tags=["Practice"])
+async def get_pronunciation_stats(
+    auth: dict = Depends(flexible_auth),
+    days: int = 30,
+):
+    """
+    Get pronunciation-specific progress statistics.
+    Returns clarity trends, problem sounds breakdown, and mastery progress.
+    """
+    user_id = auth.get("user_id")
+    if not user_id:
+        return _error(401, "UNAUTHORIZED", "User authentication required")
+    
+    db = pipeline_runner.get_db()
+    
+    try:
+        from datetime import datetime, timedelta
+        import json as json_module
+        import re
+        
+        today = datetime.now().date()
+        start_date = today - timedelta(days=days)
+        
+        # Get all pronunciation recordings with analysis data
+        cursor = db.conn.execute("""
+            SELECT 
+                DATE(created_at) as recording_date,
+                pronunciation_mean_confidence,
+                pronunciation_problem_ratio,
+                pronunciation_words_analyzed,
+                word_analysis_json
+            FROM speeches 
+            WHERE user_id = ? 
+              AND profile = 'pronunciation'
+              AND pronunciation_mean_confidence IS NOT NULL
+              AND DATE(created_at) >= ?
+            ORDER BY created_at DESC
+        """, (user_id, start_date.isoformat()))
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return {
+                "has_data": False,
+                "message": "No pronunciation practice data yet. Start practicing to see your progress!",
+                "clarity_trend": [],
+                "problem_sounds": {},
+                "words_practiced": 0,
+                "words_mastered": 0,
+                "overall_clarity": None,
+                "sessions_count": 0,
+            }
+        
+        # Calculate daily clarity averages for trend
+        daily_clarity = {}
+        total_words = 0
+        total_mastered = 0  # confidence >= 0.85
+        all_word_analyses = []
+        
+        for row in rows:
+            date_str = row[0]
+            clarity = row[1]
+            words_count = row[3] or 0
+            word_json = row[4]
+            
+            # Aggregate daily clarity
+            if date_str not in daily_clarity:
+                daily_clarity[date_str] = []
+            daily_clarity[date_str].append(clarity)
+            
+            total_words += words_count
+            
+            # Parse word analysis for sound patterns
+            if word_json:
+                try:
+                    words = json_module.loads(word_json)
+                    all_word_analyses.extend(words)
+                    # Count mastered words (high confidence)
+                    for w in words:
+                        conf = w.get('confidence', 0) or w.get('pronunciation_score', 0)
+                        if conf >= 0.85:
+                            total_mastered += 1
+                except:
+                    pass
+        
+        # Build clarity trend (daily averages)
+        clarity_trend = []
+        for date_str in sorted(daily_clarity.keys()):
+            values = daily_clarity[date_str]
+            avg = sum(values) / len(values) if values else 0
+            clarity_trend.append({
+                "date": date_str,
+                "clarity": round(avg * 100, 1),
+                "sessions": len(values),
+            })
+        
+        # Analyze problem sounds from word data
+        sound_patterns = {
+            'TH': r'th',
+            'R': r'r',
+            'L': r'l',
+            'S/SH': r's[h]?',
+            'CH': r'ch',
+            'V/W': r'[vw]',
+            'NG': r'ng',
+            'Clusters': r'[bcdfghjklmnpqrstvwxyz]{3,}',
+        }
+        
+        sound_stats = {sound: {'total': 0, 'problems': 0} for sound in sound_patterns}
+        
+        for word_data in all_word_analyses:
+            word = (word_data.get('word') or '').lower()
+            is_problem = word_data.get('is_problem', False)
+            conf = word_data.get('confidence', 0) or word_data.get('pronunciation_score', 0)
+            
+            # Check which sounds this word contains
+            for sound, pattern in sound_patterns.items():
+                if re.search(pattern, word, re.IGNORECASE):
+                    sound_stats[sound]['total'] += 1
+                    if is_problem or conf < 0.7:
+                        sound_stats[sound]['problems'] += 1
+        
+        # Calculate mastery percentage for each sound
+        problem_sounds = {}
+        for sound, stats in sound_stats.items():
+            if stats['total'] >= 5:  # Only include if enough samples
+                mastery = 1 - (stats['problems'] / stats['total']) if stats['total'] > 0 else 0
+                problem_sounds[sound] = {
+                    'mastery': round(mastery * 100, 1),
+                    'total_words': stats['total'],
+                    'problem_words': stats['problems'],
+                }
+        
+        # Sort by mastery (lowest first = needs most work)
+        problem_sounds = dict(sorted(problem_sounds.items(), key=lambda x: x[1]['mastery']))
+        
+        # Calculate overall stats
+        overall_clarity = sum(r[1] for r in rows) / len(rows) if rows else 0
+        
+        # Identify most improved (compare first half vs second half of period)
+        most_improved = None
+        if len(clarity_trend) >= 4:
+            mid = len(clarity_trend) // 2
+            first_half_avg = sum(d['clarity'] for d in clarity_trend[:mid]) / mid
+            second_half_avg = sum(d['clarity'] for d in clarity_trend[mid:]) / (len(clarity_trend) - mid)
+            improvement = second_half_avg - first_half_avg
+            if improvement > 2:  # At least 2% improvement
+                most_improved = {
+                    'from': round(first_half_avg, 1),
+                    'to': round(second_half_avg, 1),
+                    'change': round(improvement, 1),
+                }
+        
+        # Find sounds that need most work (lowest mastery with enough samples)
+        needs_work = []
+        for sound, stats in list(problem_sounds.items())[:3]:  # Top 3 problem areas
+            if stats['mastery'] < 80:
+                needs_work.append({
+                    'sound': sound,
+                    'mastery': stats['mastery'],
+                    'tip': _get_sound_tip(sound),
+                })
+        
+        return {
+            "has_data": True,
+            "clarity_trend": clarity_trend,
+            "problem_sounds": problem_sounds,
+            "words_practiced": total_words,
+            "words_mastered": total_mastered,
+            "overall_clarity": round(overall_clarity * 100, 1),
+            "sessions_count": len(rows),
+            "most_improved": most_improved,
+            "needs_work": needs_work,
+            "period_days": days,
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get pronunciation stats: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+def _get_sound_tip(sound: str) -> str:
+    """Get a practice tip for a specific sound."""
+    tips = {
+        'TH': "Place tongue between teeth, blow air gently. Practice: think, this, that",
+        'R': "Curl tongue back without touching roof. Practice: red, right, car",
+        'L': "Touch tongue tip behind upper teeth. Practice: light, all, feel",
+        'S/SH': "S = teeth together, SH = lips rounded. Practice: see vs she",
+        'CH': "Start with 't' then release into 'sh'. Practice: church, cheese",
+        'V/W': "V = teeth on lip, W = rounded lips. Practice: vine vs wine",
+        'NG': "Back of tongue touches soft palate. Practice: sing, ring, long",
+        'Clusters': "Slow down and hit each consonant. Practice: strengths, twelfths",
+    }
+    return tips.get(sound, "Practice slowly and deliberately.")
+
+
+@router.get("/practice/stats/oratory", tags=["Practice"])
+async def get_oratory_stats(
+    auth: dict = Depends(flexible_auth),
+    days: int = 30,
+):
+    """
+    Get oratory-specific progress statistics.
+    Returns persuasion trends, metric averages, device usage, and great speech comparison.
+    """
+    user_id = auth.get("user_id")
+    if not user_id:
+        return _error(401, "UNAUTHORIZED", "User authentication required")
+    
+    db = pipeline_runner.get_db()
+    
+    try:
+        from datetime import datetime, timedelta
+        import json as json_module
+        
+        today = datetime.now().date()
+        start_date = today - timedelta(days=days)
+        
+        # Get all oratory recordings with analysis data
+        cursor = db.conn.execute("""
+            SELECT 
+                s.id,
+                DATE(s.created_at) as recording_date,
+                s.duration_sec,
+                s.cached_score,
+                a.words_per_minute,
+                a.pitch_variation,
+                a.pitch_range_semitones,
+                a.hnr_mean,
+                a.repetition_score,
+                a.discourse_connectedness,
+                a.analysis_json
+            FROM speeches s
+            LEFT JOIN analyses a ON s.id = a.speech_id
+            WHERE s.user_id = ? 
+              AND s.profile = 'oratory'
+              AND DATE(s.created_at) >= ?
+            ORDER BY s.created_at DESC
+        """, (user_id, start_date.isoformat()))
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return {
+                "has_data": False,
+                "message": "No oratory recordings yet. Start practicing to see your progress!",
+                "persuasion_trend": [],
+                "metric_averages": {},
+                "device_stats": {},
+                "speech_count": 0,
+            }
+        
+        # Calculate daily persuasion score averages for trend
+        daily_scores = {}
+        total_minutes = 0
+        
+        # Metric accumulators
+        metric_sums = {
+            'pitch_variation': 0,
+            'repetition_score': 0,
+            'pitch_range': 0,
+            'wpm': 0,
+            'hnr': 0,
+            'discourse': 0,
+        }
+        metric_counts = {k: 0 for k in metric_sums}
+        
+        # Device stats
+        device_totals = {
+            'anaphora': 0,
+            'epistrophe': 0,
+            'repetition': 0,
+        }
+        
+        for row in rows:
+            date_str = row[1]
+            duration = row[2] or 0
+            score = row[3] or 0
+            wpm = row[4]
+            pitch_var = row[5]
+            pitch_range = row[6]
+            hnr = row[7]
+            rep_score = row[8]
+            discourse = row[9]
+            analysis_json = row[10]
+            
+            total_minutes += duration / 60
+            
+            # Aggregate daily scores
+            if date_str not in daily_scores:
+                daily_scores[date_str] = []
+            daily_scores[date_str].append(score)
+            
+            # Accumulate metrics
+            if wpm: 
+                metric_sums['wpm'] += wpm
+                metric_counts['wpm'] += 1
+            if pitch_var:
+                metric_sums['pitch_variation'] += pitch_var
+                metric_counts['pitch_variation'] += 1
+            if pitch_range:
+                metric_sums['pitch_range'] += pitch_range
+                metric_counts['pitch_range'] += 1
+            if hnr:
+                metric_sums['hnr'] += hnr
+                metric_counts['hnr'] += 1
+            if rep_score:
+                metric_sums['repetition_score'] += rep_score
+                metric_counts['repetition_score'] += 1
+            if discourse:
+                metric_sums['discourse'] += discourse
+                metric_counts['discourse'] += 1
+            
+            # Extract device usage from analysis JSON
+            if analysis_json:
+                try:
+                    analysis = json_module.loads(analysis_json)
+                    rhetorical = analysis.get('advanced_text_analysis', {}).get('rhetorical', {})
+                    if rhetorical:
+                        anaphora = rhetorical.get('anaphora_examples', [])
+                        epistrophe = rhetorical.get('epistrophe_examples', [])
+                        device_totals['anaphora'] += len(anaphora) if isinstance(anaphora, list) else 0
+                        device_totals['epistrophe'] += len(epistrophe) if isinstance(epistrophe, list) else 0
+                        device_totals['repetition'] += 1 if rhetorical.get('uses_repetition') else 0
+                except:
+                    pass
+        
+        # Build persuasion trend (daily averages)
+        persuasion_trend = []
+        for date_str in sorted(daily_scores.keys()):
+            values = daily_scores[date_str]
+            avg = sum(values) / len(values) if values else 0
+            persuasion_trend.append({
+                "date": date_str,
+                "score": round(avg, 1),
+                "count": len(values),
+            })
+        
+        # Calculate metric averages
+        metric_averages = {}
+        for metric, total in metric_sums.items():
+            count = metric_counts[metric]
+            if count > 0:
+                metric_averages[metric] = round(total / count, 1)
+        
+        # Remove zero device counts
+        device_stats = {k: v for k, v in device_totals.items() if v > 0}
+        
+        # Calculate overall averages
+        all_scores = [s for scores in daily_scores.values() for s in scores]
+        avg_persuasion = sum(all_scores) / len(all_scores) if all_scores else 0
+        
+        # Great speech comparison
+        # Compare user's WPM to famous speakers
+        user_wpm = metric_averages.get('wpm', 120)
+        great_speeches = {
+            "MLK - I Have a Dream": 107,
+            "JFK - Inaugural": 127,
+            "Churchill - We Shall Fight": 128,
+            "Lincoln - Gettysburg": 112,
+            "FDR - Day of Infamy": 118,
+        }
+        
+        closest_orator = None
+        min_diff = float('inf')
+        for name, wpm in great_speeches.items():
+            diff = abs(user_wpm - wpm)
+            if diff < min_diff:
+                min_diff = diff
+                closest_orator = name
+        
+        # Similarity based on WPM match (simplified)
+        similarity = max(0, 100 - min_diff * 3)
+        
+        return {
+            "has_data": True,
+            "persuasion_trend": persuasion_trend,
+            "metric_averages": metric_averages,
+            "device_stats": device_stats,
+            "avg_persuasion_score": round(avg_persuasion, 1),
+            "speech_count": len(rows),
+            "total_minutes": round(total_minutes, 1),
+            "great_speech_comparison": {
+                "closest": closest_orator,
+                "similarity": round(similarity, 0),
+            },
+            "period_days": days,
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get oratory stats: {e}")
+        return _error(500, "ERROR", str(e))
+
+
 @router.get("/projects/{project_id}/score-progress", tags=["Projects"])
 async def get_project_score_progress(
     project_id: int,
@@ -3935,4 +4673,474 @@ async def get_project_score_progress(
         
     except Exception as e:
         logger.exception(f"Failed to get project score progress: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+# ========== Dementia Mode Endpoints ==========
+
+@router.get("/dementia/stats", tags=["Dementia"])
+async def get_dementia_stats(user: dict = Depends(flexible_auth)):
+    """Get aggregated statistics for dementia assessments with daily best values and trends."""
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    
+    try:
+        user_id = user.get("user_id") if user else None
+        db = pipeline_runner.get_db()
+        conn = db.conn
+        cursor = conn.cursor()
+        
+        # Get all dementia recordings with dates
+        if user_id:
+            cursor.execute("""
+                SELECT dementia_metrics, DATE(created_at) as day, created_at
+                FROM speeches 
+                WHERE user_id = ? AND profile = 'dementia' AND dementia_metrics IS NOT NULL
+                ORDER BY created_at ASC
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                SELECT dementia_metrics, DATE(created_at) as day, created_at
+                FROM speeches 
+                WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
+                ORDER BY created_at ASC
+            """)
+        
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return {
+                "total_assessments": 0,
+                "daily_best": [],
+                "trends": {"prepositions": None, "repetitions": None, "aphasic": None},
+                "trend_summary": "No data yet",
+            }
+        
+        # Group by day and get BEST values (highest preposition rate = better)
+        daily_metrics = defaultdict(list)
+        for row in rows:
+            try:
+                metrics = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                day = row[1]
+                daily_metrics[day].append(metrics)
+            except:
+                continue
+        
+        # Calculate daily best values
+        # For prepositions: higher is better (more normal speech)
+        # For repetitions/aphasic: lower is better (fewer issues)
+        daily_best = []
+        for day in sorted(daily_metrics.keys()):
+            day_data = daily_metrics[day]
+            best_prep = max(m.get('prepositions_per_10_words', 0) for m in day_data)
+            best_rep = min(m.get('repetition_count', 0) for m in day_data)  # Lower is better
+            best_aph = min(m.get('aphasic_events', 0) for m in day_data)  # Lower is better
+            
+            daily_best.append({
+                "date": day,
+                "prepositions_per_10_words": round(best_prep, 2),
+                "repetition_count": best_rep,
+                "aphasic_events": best_aph,
+            })
+        
+        # Calculate trends
+        def calculate_trend(values, higher_is_better=True):
+            if len(values) < 2:
+                return {"change": 0, "direction": "stable", "percent": 0}
+            
+            # Compare last 7 days vs previous 7 days (or available data)
+            half = len(values) // 2
+            if half < 1:
+                return {"change": 0, "direction": "stable", "percent": 0}
+            
+            recent = values[-half:] if half > 0 else values
+            older = values[:half] if half > 0 else values
+            
+            recent_avg = sum(recent) / len(recent) if recent else 0
+            older_avg = sum(older) / len(older) if older else 0
+            
+            if older_avg == 0:
+                return {"change": 0, "direction": "stable", "percent": 0}
+            
+            change = recent_avg - older_avg
+            percent = round((change / older_avg) * 100, 1)
+            
+            if higher_is_better:
+                direction = "improving" if change > 0.1 else ("declining" if change < -0.1 else "stable")
+            else:
+                direction = "improving" if change < -0.1 else ("declining" if change > 0.1 else "stable")
+            
+            return {
+                "change": round(change, 2),
+                "direction": direction,
+                "percent": percent,
+                "recent_avg": round(recent_avg, 2),
+                "older_avg": round(older_avg, 2),
+            }
+        
+        prep_values = [d['prepositions_per_10_words'] for d in daily_best]
+        rep_values = [d['repetition_count'] for d in daily_best]
+        aph_values = [d['aphasic_events'] for d in daily_best]
+        
+        trends = {
+            "prepositions": calculate_trend(prep_values, higher_is_better=True),
+            "repetitions": calculate_trend(rep_values, higher_is_better=False),
+            "aphasic": calculate_trend(aph_values, higher_is_better=False),
+        }
+        
+        # Generate human-readable trend summary
+        summaries = []
+        if trends["prepositions"]["direction"] == "improving":
+            summaries.append(f"Preposition usage improving {abs(trends['prepositions']['percent'])}%")
+        elif trends["prepositions"]["direction"] == "declining":
+            summaries.append(f"Preposition usage decreased {abs(trends['prepositions']['percent'])}%")
+        
+        if trends["repetitions"]["direction"] == "improving":
+            summaries.append(f"Repetitions reduced {abs(trends['repetitions']['percent'])}%")
+        elif trends["repetitions"]["direction"] == "declining":
+            summaries.append(f"Repetitions increased {abs(trends['repetitions']['percent'])}%")
+            
+        if trends["aphasic"]["direction"] == "improving":
+            summaries.append(f"Word-finding improved {abs(trends['aphasic']['percent'])}%")
+        elif trends["aphasic"]["direction"] == "declining":
+            summaries.append(f"Word-finding difficulties increased {abs(trends['aphasic']['percent'])}%")
+        
+        trend_summary = ". ".join(summaries) if summaries else "Metrics stable"
+        
+        return {
+            "total_assessments": len(rows),
+            "days_tracked": len(daily_best),
+            "daily_best": daily_best,  # Time series for graphing
+            "trends": trends,
+            "trend_summary": trend_summary,
+            "latest": daily_best[-1] if daily_best else None,
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get dementia stats: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+@router.get("/dementia/metrics/aggregated", tags=["Dementia"])
+async def get_dementia_metrics_aggregated(user: dict = Depends(flexible_auth)):
+    """
+    Get dementia metrics aggregated by time period for dashboard display.
+    
+    Returns today's average plus the last 5 periods (with data) for each granularity:
+    - day: last 5 days with recordings
+    - week: last 5 weeks with recordings  
+    - month: last 5 months with recordings
+    - year: last 5 years with recordings
+    
+    Each metric (repetitions, aphasia, prepositions) is returned separately
+    so the UI can display them as individual cards.
+    """
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    
+    try:
+        user_id = user.get("user_id") if user else None
+        db = pipeline_runner.get_db()
+        conn = db.conn
+        cursor = conn.cursor()
+        
+        # Get all dementia recordings
+        if user_id:
+            cursor.execute("""
+                SELECT dementia_metrics, created_at
+                FROM speeches 
+                WHERE user_id = ? AND profile = 'dementia' AND dementia_metrics IS NOT NULL
+                ORDER BY created_at DESC
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                SELECT dementia_metrics, created_at
+                FROM speeches 
+                WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
+                ORDER BY created_at DESC
+            """)
+        
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return {
+                "has_data": False,
+                "today": None,
+                "metrics": {
+                    "repetitions": {"today": None, "history": {"day": [], "week": [], "month": [], "year": []}},
+                    "aphasia": {"today": None, "history": {"day": [], "week": [], "month": [], "year": []}},
+                    "prepositions": {"today": None, "history": {"day": [], "week": [], "month": [], "year": []}},
+                }
+            }
+        
+        # Parse all metrics with timestamps
+        all_data = []
+        for row in rows:
+            try:
+                metrics = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                ts = datetime.fromisoformat(row[1].replace('Z', '+00:00')) if isinstance(row[1], str) else row[1]
+                all_data.append({
+                    "ts": ts,
+                    "repetitions": metrics.get('repetition_count', 0),
+                    "aphasia": metrics.get('aphasic_events', 0),
+                    "prepositions": metrics.get('prepositions_per_10_words', 0),
+                })
+            except:
+                continue
+        
+        if not all_data:
+            return {"has_data": False, "today": None, "metrics": None}
+        
+        now = datetime.now()
+        today_str = now.strftime('%Y-%m-%d')
+        
+        # Group by different time periods
+        def group_by_period(data, period_fn):
+            """Group data by period function and return averages."""
+            grouped = defaultdict(list)
+            for d in data:
+                period_key = period_fn(d['ts'])
+                grouped[period_key].append(d)
+            return grouped
+        
+        def avg_metrics(items):
+            """Calculate average for each metric from a list of items."""
+            if not items:
+                return None
+            return {
+                "repetitions": round(sum(i['repetitions'] for i in items) / len(items), 2),
+                "aphasia": round(sum(i['aphasia'] for i in items) / len(items), 2),
+                "prepositions": round(sum(i['prepositions'] for i in items) / len(items), 2),
+                "count": len(items),
+            }
+        
+        # Period functions
+        def day_key(ts): return ts.strftime('%Y-%m-%d')
+        def week_key(ts): return ts.strftime('%Y-W%W')  # ISO week
+        def month_key(ts): return ts.strftime('%Y-%m')
+        def year_key(ts): return ts.strftime('%Y')
+        
+        # Group data
+        by_day = group_by_period(all_data, day_key)
+        by_week = group_by_period(all_data, week_key)
+        by_month = group_by_period(all_data, month_key)
+        by_year = group_by_period(all_data, year_key)
+        
+        # Get today's average
+        today_data = by_day.get(today_str, [])
+        today_avg = avg_metrics(today_data) if today_data else None
+        
+        # Build sorted period lists (last 5 with data, most recent first for storage, but we'll reverse for display)
+        def get_last_n_periods(grouped, n=5):
+            """Get last N periods with data, sorted chronologically."""
+            sorted_keys = sorted(grouped.keys(), reverse=True)[:n]
+            result = []
+            for key in reversed(sorted_keys):  # Reverse to chronological order
+                avg = avg_metrics(grouped[key])
+                if avg:
+                    result.append({"period": key, **avg})
+            return result
+        
+        day_history = get_last_n_periods(by_day, 5)
+        week_history = get_last_n_periods(by_week, 5)
+        month_history = get_last_n_periods(by_month, 5)
+        year_history = get_last_n_periods(by_year, 5)
+        
+        # Build per-metric response (what the UI cards need)
+        def extract_metric_history(history_list, metric_key):
+            """Extract single metric from aggregated history."""
+            return [{"period": h["period"], "value": h[metric_key], "count": h["count"]} for h in history_list]
+        
+        metrics = {
+            "repetitions": {
+                "today": today_avg["repetitions"] if today_avg else None,
+                "label": "Repetitions",
+                "unit": "count",
+                "lower_is_better": True,
+                "history": {
+                    "day": extract_metric_history(day_history, "repetitions"),
+                    "week": extract_metric_history(week_history, "repetitions"),
+                    "month": extract_metric_history(month_history, "repetitions"),
+                    "year": extract_metric_history(year_history, "repetitions"),
+                }
+            },
+            "aphasia": {
+                "today": today_avg["aphasia"] if today_avg else None,
+                "label": "Word-Finding",
+                "unit": "events",
+                "lower_is_better": True,
+                "history": {
+                    "day": extract_metric_history(day_history, "aphasia"),
+                    "week": extract_metric_history(week_history, "aphasia"),
+                    "month": extract_metric_history(month_history, "aphasia"),
+                    "year": extract_metric_history(year_history, "aphasia"),
+                }
+            },
+            "prepositions": {
+                "today": today_avg["prepositions"] if today_avg else None,
+                "label": "Prepositions",
+                "unit": "/10 words",
+                "lower_is_better": False,  # Higher is better for prepositions
+                "history": {
+                    "day": extract_metric_history(day_history, "prepositions"),
+                    "week": extract_metric_history(week_history, "prepositions"),
+                    "month": extract_metric_history(month_history, "prepositions"),
+                    "year": extract_metric_history(year_history, "prepositions"),
+                }
+            },
+        }
+        
+        return {
+            "has_data": True,
+            "today": today_avg,
+            "total_recordings": len(all_data),
+            "metrics": metrics,
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get aggregated dementia metrics: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+@router.get("/dementia/recordings", tags=["Dementia"])
+async def get_dementia_recordings(
+    limit: int = Query(100, ge=1, le=500),
+    user: dict = Depends(flexible_auth)
+):
+    """Get all dementia assessment recordings."""
+    try:
+        user_id = user.get("user_id") if user else None
+        db = pipeline_runner.get_db()
+        conn = db.conn
+        cursor = conn.cursor()
+        
+        if user_id:
+            cursor.execute("""
+                SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
+                FROM speeches s
+                LEFT JOIN analyses a ON a.speech_id = s.id
+                WHERE s.user_id = ? AND s.profile = 'dementia'
+                ORDER BY s.created_at DESC
+                LIMIT ?
+            """, (user_id, limit))
+        else:
+            cursor.execute("""
+                SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
+                FROM speeches s
+                LEFT JOIN analyses a ON a.speech_id = s.id
+                WHERE s.profile = 'dementia'
+                ORDER BY s.created_at DESC
+                LIMIT ?
+            """, (limit,))
+        
+        rows = cursor.fetchall()
+        recordings = []
+        
+        for row in rows:
+            dementia_metrics = None
+            if row[3]:
+                try:
+                    dementia_metrics = json.loads(row[3]) if isinstance(row[3], str) else row[3]
+                except:
+                    pass
+            
+            # Extract transcript from analysis result
+            transcript = ""
+            if row[4]:
+                try:
+                    result_data = json.loads(row[4]) if isinstance(row[4], str) else row[4]
+                    transcript = result_data.get("transcript", "")
+                except:
+                    pass
+            
+            recordings.append({
+                "id": row[0],
+                "title": row[1],
+                "created_at": row[2],
+                "dementia_metrics": dementia_metrics,
+                "transcript": transcript[:200] + "..." if transcript and len(transcript) > 200 else transcript,
+            })
+        
+        return {"recordings": recordings}
+        
+    except Exception as e:
+        logger.exception(f"Failed to get dementia recordings: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+@router.get("/dementia/recordings/{speech_id}", tags=["Dementia"])
+async def get_dementia_recording(speech_id: int, user: dict = Depends(flexible_auth)):
+    """Get a single dementia assessment recording with full details and transcript highlights."""
+    from .dementia_analysis import detect_aphasic_events, detect_repetitions
+    
+    try:
+        user_id = user.get("user_id") if user else None
+        db = pipeline_runner.get_db()
+        conn = db.conn
+        cursor = conn.cursor()
+        
+        if user_id:
+            cursor.execute("""
+                SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
+                FROM speeches s
+                LEFT JOIN analyses a ON a.speech_id = s.id
+                WHERE s.id = ? AND s.user_id = ? AND s.profile = 'dementia'
+            """, (speech_id, user_id))
+        else:
+            cursor.execute("""
+                SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
+                FROM speeches s
+                LEFT JOIN analyses a ON a.speech_id = s.id
+                WHERE s.id = ? AND s.profile = 'dementia'
+            """, (speech_id,))
+        
+        row = cursor.fetchone()
+        
+        if not row:
+            return _error(404, "NOT_FOUND", "Recording not found")
+        
+        dementia_metrics = None
+        if row[3]:
+            try:
+                dementia_metrics = json.loads(row[3]) if isinstance(row[3], str) else row[3]
+            except:
+                pass
+        
+        # Extract transcript and diarization from analysis result
+        transcript = ""
+        diarization = []
+        if row[4]:
+            try:
+                result_data = json.loads(row[4]) if isinstance(row[4], str) else row[4]
+                transcript = result_data.get("transcript", "")
+                diarization = result_data.get("diarization", [])
+            except:
+                pass
+        
+        # Re-run aphasic event detection to get highlights
+        transcript_highlights = []
+        if transcript:
+            aphasic_result = detect_aphasic_events(transcript)
+            transcript_highlights = aphasic_result.get('highlights', [])
+        
+        # Extract speakers from diarization
+        speakers = []
+        if diarization:
+            try:
+                speakers = list(set(seg.get('speaker', '') for seg in diarization if seg.get('speaker')))
+            except:
+                pass
+        
+        return {
+            "id": row[0],
+            "title": row[1],
+            "created_at": row[2],
+            "dementia_metrics": dementia_metrics,
+            "transcript": transcript,
+            "transcript_highlights": transcript_highlights,  # For highlighting affected parts
+            "speakers": speakers,
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get dementia recording: {e}")
         return _error(500, "ERROR", str(e))

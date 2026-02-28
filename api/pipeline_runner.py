@@ -264,6 +264,9 @@ def run_pipeline(
     preset: str = None,
     modules_requested: list = None,
     known_speaker: str = None,
+    voice_health_mode: bool = False,
+    exercise_type: str = None,
+    target_duration: float = None,
 ) -> dict:
     """
     Run the speech analysis pipeline on an audio file.
@@ -277,6 +280,9 @@ def run_pipeline(
         preset: Name of preset used (for metadata only).
         modules_requested: Original module list from request (for metadata).
         known_speaker: Speaker name from metadata (used for diarization if single speaker).
+        voice_health_mode: If True, include detailed voice health analysis.
+        exercise_type: Type of voice health exercise (for specific feedback).
+        target_duration: Target duration in seconds for sustained exercises.
     """
     from . import config as api_config
 
@@ -507,7 +513,14 @@ def run_pipeline(
         if is_unusable:
             audio_analysis_result = {"skipped": "Audio quality too low"}
         else:
-            audio_analysis_result = analyze_audio(audio_path, segment_list, audio_duration)
+            audio_analysis_result = analyze_audio(
+                audio_path, 
+                segment_list, 
+                audio_duration,
+                voice_health_mode=voice_health_mode,
+                target_duration=target_duration,
+                exercise_type=exercise_type,
+            )
             if is_low:
                 audio_analysis_result["warning"] = "Low audio quality — audio metrics may be affected."
         timing["audio_analysis_sec"] = round(time.time() - tab, 2)
@@ -816,6 +829,7 @@ def persist_result(
         
         # Award XP and check achievements for gamification
         if user_id:
+            logger.info(f"Awarding gamification XP for user_id={user_id}, speech_id={speech_id}")
             try:
                 from gamification import award_xp, check_achievements
                 conn = sqlite3.connect(config.DB_PATH)
@@ -833,6 +847,8 @@ def persist_result(
                     bonus_xp=bonus_xp,
                     metadata={'speech_id': speech_id, 'profile': profile, 'score': overall_score}
                 )
+                
+                logger.info(f"XP awarded: {xp_result.get('xp_earned')} XP, total={xp_result.get('total_xp')}, streak={xp_result.get('daily_xp')}/{xp_result.get('daily_goal')}")
                 
                 # Check for newly earned achievements
                 new_achievements = check_achievements(conn, user_id)

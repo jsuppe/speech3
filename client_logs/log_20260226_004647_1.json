@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-02-26T00:46:48.949709",
+  "app_version": "1.0.33",
+  "build_number": "37",
+  "patch_number": 28,
+  "platform": "android",
+  "user_id": 1,
+  "user_email": "jon.suppe@gmail.com",
+  "api_url": "https://api.speakfit.app",
+  "preferred_accent": "en-US",
+  "default_profile": "oratory",
+  "notifications_enabled": true,
+  "tier": "premium",
+  "tts_logs": [
+    "[2026-02-26T00:46:41.693161] refreshStatus called, token present: true",
+    "[2026-02-26T00:46:41.775256] tier from API: pro, isPro=true",
+    "[2026-02-26T00:46:41.775349] tier=pro, isPro=true",
+    "[2026-02-26T00:46:41.815436] refreshStatus called, token present: true",
+    "[2026-02-26T00:46:41.853934] tier from API: pro, isPro=true",
+    "[2026-02-26T00:46:41.854084] tier=pro, isPro=true",
+    "[2026-02-26T00:46:44.918254] speak() START - text length: 56",
+    "[2026-02-26T00:46:44.918451] speak() - isPro=true, tierChecked=true, hasToken=true, tokenLen=228",
+    "[2026-02-26T00:46:44.918478] Using ElevenLabs (token present + isPro)",
+    "[2026-02-26T00:46:44.918517] Calling ElevenLabs API with token length: 228",
+    "[2026-02-26T00:46:44.991936] Response status: 403, bytes: 137",
+    "[2026-02-26T00:46:44.992088] API error: {\"error\":{\"code\":\"HTTP_ERROR\",\"message\":\"{'error': 'pro_required', 'message': 'Premium TTS requires Pro subscription', 'tier': 'free'}\"}}",
+    "[2026-02-26T00:46:44.992146] ElevenLabs TTS failed: Exception: API returned 403: {\"error\":{\"code\":\"HTTP_ERROR\",\"message\":\"{'error': 'pro_required', 'message': 'Premium TTS requires Pro subscription', 'tier': 'free'}\"}}",
+    "[2026-02-26T00:46:44.994766] speak() END"
+  ],
+  "tts_is_pro": true,
+  "tts_selected_voice": "rachel",
+  "server_received_at": "2026-02-26T05:46:47.172824"
+}

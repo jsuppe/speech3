@@ -283,6 +283,33 @@ SCORING_PROFILES = {
         ],
         "default_accent": "en-US",
     },
+    "dementia": {
+        "description": "Cognitive assessment markers — repetitive speech, word-finding, language complexity",
+        "weights": {
+            # LANGUAGE METRICS (60%) - Key cognitive indicators
+            "repetition": 0.20,             # Repetitive speech is a key marker
+            "lexical_diversity": 0.15,      # Limited vocabulary access
+            "syntactic_complexity": 0.10,   # Simpler sentences may indicate decline
+            "grade_level": 0.08,            # Language sophistication
+            "connectedness": 0.07,          # Discourse coherence
+            
+            # FLUENCY METRICS (25%) - Motor/cognitive coordination
+            "wpm": 0.12,                    # Speaking rate changes
+            "articulation_rate": 0.08,      # Articulation clarity
+            "fluency_score": 0.05,          # Overall fluency
+            
+            # VOICE QUALITY (15%) - Secondary indicators
+            "voice_quality": 0.08,          # HNR - voice steadiness
+            "pitch_variation": 0.07,        # Emotional expression changes
+        },
+        "repetition_direction": "lower_better",  # HIGH repetition = concerning
+        "inverted_scoring": True,  # Lower scores indicate MORE concern
+        "interpretation": {
+            "high_score": "Speech patterns within normal range",
+            "low_score": "Patterns warrant professional evaluation",
+            "note": "This is a screening tool, not a diagnostic instrument",
+        },
+    },
 }
 
 

@@ -1,0 +1,55 @@
+{
+  "title": "The Blue Fairy Book",
+  "source": "lit2go",
+  "url": "https://etc.usf.edu/lit2go/141/the-blue-fairy-book/",
+  "chapters": [
+    {
+      "index": 0,
+      "title": "Lit2Go",
+      "text_file": "the-blue-fairy-book/000_lit2go.txt",
+      "audio_file": "the-blue-fairy-book/000_lit2go.mp3",
+      "lexile": null,
+      "word_count": 51
+    },
+    {
+      "index": 1,
+      "title": "Lit2Go",
+      "text_file": "the-blue-fairy-book/001_lit2go.txt",
+      "audio_file": "the-blue-fairy-book/001_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 2,
+      "title": "Lit2Go",
+      "text_file": "the-blue-fairy-book/002_lit2go.txt",
+      "audio_file": "the-blue-fairy-book/002_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 3,
+      "title": "Lit2Go",
+      "text_file": "the-blue-fairy-book/003_lit2go.txt",
+      "audio_file": "the-blue-fairy-book/003_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 4,
+      "title": "Lit2Go",
+      "text_file": "the-blue-fairy-book/004_lit2go.txt",
+      "audio_file": "the-blue-fairy-book/004_lit2go.mp3",
+      "lexile": null,
+      "word_count": 70
+    },
+    {
+      "index": 5,
+      "title": "Lit2Go",
+      "text_file": "the-blue-fairy-book/005_lit2go.txt",
+      "audio_file": "the-blue-fairy-book/005_lit2go.mp3",
+      "lexile": null,
+      "word_count": 70
+    }
+  ]
+}

@@ -13,7 +13,15 @@
             <li><a href="#pipeline" class="text-indigo-400 hover:text-indigo-300">1. Analysis Pipeline</a></li>
             <li><a href="#metrics" class="text-indigo-400 hover:text-indigo-300">2. Metrics Reference</a></li>
             <li><a href="#scoring" class="text-indigo-400 hover:text-indigo-300">3. How Scores Are Calculated</a></li>
-            <li><a href="#profiles" class="text-indigo-400 hover:text-indigo-300">4. Scoring Profiles</a></li>
+            <li><a href="#profiles" class="text-indigo-400 hover:text-indigo-300">4. Scoring Profiles</a>
+                <ul class="ml-4 mt-1 space-y-0.5 text-gray-500">
+                    <li>• Pronunciation</li>
+                    <li>• Dementia Assessment</li>
+                    <li>• Reader (Adult Literacy)</li>
+                    <li>• Presentation</li>
+                    <li>• Oratory</li>
+                </ul>
+            </li>
             <li><a href="#grades" class="text-indigo-400 hover:text-indigo-300">5. Grade Scale</a></li>
             <li><a href="#limitations" class="text-indigo-400 hover:text-indigo-300">6. Limitations &amp; Caveats</a></li>
             {% if is_admin %}
@@ -27,11 +35,12 @@
         <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <span class="text-indigo-400">1.</span> Analysis Pipeline
         </h2>
-        <p class="text-gray-300 mb-4">Each uploaded audio file passes through a 10-module analysis pipeline:</p>
+        <p class="text-gray-300 mb-4">Each uploaded audio file passes through an 11-module analysis pipeline:</p>
         <div class="grid sm:grid-cols-2 gap-3">
             {% set modules = [
                 ("🎤", "Audio Quality Gate", "Estimates Signal-to-Noise Ratio (SNR) and assigns a quality level (HIGH / MEDIUM / LOW / UNUSABLE). Low-quality audio may produce unreliable metrics."),
                 ("📝", "Whisper STT", "OpenAI's Whisper large-v3 model transcribes audio to text with word-level timestamps. Runs locally on GPU (~25x realtime)."),
+                ("🗣️", "Pronunciation Analysis", "Word-level pronunciation scoring using Wav2Vec2 acoustic model with forced alignment. Identifies problematic sounds (TH, R, L, S/SH) and provides per-word confidence scores."),
                 ("📊", "Core Text Analysis", "Lexical diversity (type-token ratio), syntactic complexity (parse tree depth), fluency score, discourse connectedness."),
                 ("📖", "Advanced Text", "Readability scores (Flesch-Kincaid, Flesch Reading Ease), discourse structure, named entities, question density, perspective analysis."),
                 ("🔁", "Rhetorical Analysis", "Detects anaphora, epistrophe, repeated phrases. Computes repetition score and rhythm regularity."),
@@ -135,6 +144,139 @@
             <span class="text-indigo-400">4.</span> Scoring Profiles
         </h2>
         <p class="text-gray-300 mb-4 text-sm">Each profile weights metrics differently to assess recordings for different purposes:</p>
+
+        <!-- Special Profile: Pronunciation -->
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">🗣️</span>
+                <h3 class="text-white font-semibold">Pronunciation Profile</h3>
+                <span class="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded">NEW</span>
+            </div>
+            <p class="text-sm text-gray-300 mb-3">Uses Wav2Vec2 acoustic model with forced alignment to score each word's pronunciation clarity:</p>
+            <ul class="text-sm text-gray-400 space-y-2 mb-3">
+                <li><strong class="text-white">Pronunciation Clarity (35%)</strong> — Mean confidence score across all words (0-100%)</li>
+                <li><strong class="text-white">Pronunciation Consistency (20%)</strong> — Standard deviation of word scores (lower = more consistent)</li>
+                <li><strong class="text-white">Pronunciation Accuracy (15%)</strong> — Ratio of words below 70% confidence threshold</li>
+            </ul>
+            <p class="text-xs text-gray-500">Problematic sounds are automatically detected: TH sounds, R/L distinctions, S/SH confusion, and word-final consonants.</p>
+        </div>
+
+        <!-- Special Profile: Dementia Assessment -->
+        <div class="bg-purple-900/20 border border-purple-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">🧠</span>
+                <h3 class="text-white font-semibold">Dementia Assessment Profile</h3>
+                <span class="bg-amber-500/20 text-amber-300 text-xs px-2 py-0.5 rounded">SCREENING ONLY</span>
+            </div>
+            <p class="text-sm text-gray-300 mb-3">Analyzes speech patterns associated with cognitive decline. <strong class="text-amber-400">This is a screening tool, NOT a diagnostic instrument.</strong></p>
+            <ul class="text-sm text-gray-400 space-y-2 mb-3">
+                <li><strong class="text-white">Repetition (20%)</strong> — HIGH repetition is concerning (opposite of oratory profile)</li>
+                <li><strong class="text-white">Lexical Diversity (15%)</strong> — Limited vocabulary access may indicate word-finding difficulty</li>
+                <li><strong class="text-white">Syntactic Complexity (10%)</strong> — Simpler sentence structures may indicate decline</li>
+                <li><strong class="text-white">Speaking Rate (12%)</strong> — Changes in pacing can be an early marker</li>
+            </ul>
+            <div class="bg-gray-900/50 rounded-lg p-3 text-xs">
+                <p class="text-amber-400 font-medium mb-1">⚠️ Important Notes:</p>
+                <ul class="text-gray-400 space-y-1">
+                    <li>• <strong>Lower scores indicate more concern</strong> — this profile uses inverted scoring</li>
+                    <li>• Results should be reviewed by a healthcare professional</li>
+                    <li>• Single recordings are insufficient for assessment — track changes over time</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Special Profile: Reader (Adult Literacy) -->
+        <div class="bg-purple-900/20 border border-purple-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">📖</span>
+                <h3 class="text-white font-semibold">Reader Profile (Adult Literacy)</h3>
+                <span class="bg-purple-500/20 text-purple-300 text-xs px-2 py-0.5 rounded">NEW</span>
+            </div>
+            <p class="text-sm text-gray-300 mb-3">Specialized analysis for reading practice, focusing on fluency, accuracy, and natural expression:</p>
+            
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">📏 Fluency Metrics</h4>
+            <ul class="text-sm text-gray-400 space-y-2 mb-4">
+                <li><strong class="text-white">Reading Speed (WPM)</strong> — Words per minute. Fluent adult reading: 200-300 WPM. Developing readers: 100-150 WPM.</li>
+                <li><strong class="text-white">Hesitation Detection</strong> — Pauses before words (>500ms) that indicate reading difficulty. Identifies specific "difficult words" for focused practice.</li>
+                <li><strong class="text-white">Self-Corrections</strong> — Detects repeated words, false starts, and restarts. Some self-correction is healthy (shows comprehension monitoring).</li>
+            </ul>
+
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">✅ Accuracy Metrics</h4>
+            <ul class="text-sm text-gray-400 space-y-2 mb-4">
+                <li><strong class="text-white">Word Accuracy</strong> — When reference text is provided, compares actual reading to expected text using dynamic alignment.</li>
+                <li><strong class="text-white">Substitutions</strong> — Wrong word read (e.g., "house" instead of "horse")</li>
+                <li><strong class="text-white">Insertions</strong> — Extra words added that weren't in the text</li>
+                <li><strong class="text-white">Deletions</strong> — Words in the text that were skipped</li>
+            </ul>
+
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">🎭 Expression Metrics</h4>
+            <ul class="text-sm text-gray-400 space-y-2 mb-4">
+                <li><strong class="text-white">Pitch Variation (35%)</strong> — Natural reading has varied pitch. Monotone reading scores lower.</li>
+                <li><strong class="text-white">Pause Appropriateness (25%)</strong> — Pausing at punctuation marks (periods, commas) indicates comprehension.</li>
+                <li><strong class="text-white">Question Intonation (15%)</strong> — Rising pitch at the end of questions shows understanding of meaning.</li>
+                <li><strong class="text-white">Emphasis (25%)</strong> — Volume variation on important words shows engagement with the text.</li>
+            </ul>
+
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">🧮 Overall Reading Score</h4>
+            <p class="text-sm text-gray-400 mb-2">The composite reading score combines:</p>
+            <ul class="text-sm text-gray-400 space-y-1">
+                <li>• Expression score (25%)</li>
+                <li>• Hesitation rate — inverted (25%)</li>
+                <li>• Self-monitoring score (15%)</li>
+                <li>• Accuracy percentage (35%) — if reference text provided</li>
+            </ul>
+
+            <div class="bg-gray-900/50 rounded-lg p-3 mt-4 text-xs">
+                <p class="text-purple-400 font-medium mb-1">💜 Privacy First</p>
+                <p class="text-gray-400">Reader mode emphasizes privacy. Your practice is never shared. Progress is tracked locally.</p>
+            </div>
+        </div>
+
+        <!-- Special Profile: Presentation -->
+        <div class="bg-green-900/20 border border-green-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">📊</span>
+                <h3 class="text-white font-semibold">Presentation Profile</h3>
+                <span class="bg-green-500/20 text-green-300 text-xs px-2 py-0.5 rounded">NEW</span>
+            </div>
+            <p class="text-sm text-gray-300 mb-3">Analysis tuned for business presentations, pitches, and professional speaking:</p>
+            <ul class="text-sm text-gray-400 space-y-2 mb-3">
+                <li><strong class="text-white">Pacing Score</strong> — Target: 130-150 WPM. Too fast loses audience, too slow loses attention.</li>
+                <li><strong class="text-white">Filler Word Detection</strong> — Tracks "um", "uh", "like", "you know", "basically". Target: <2 per 100 words.</li>
+                <li><strong class="text-white">Confidence Markers</strong> — Flags hedging language ("I think", "maybe", "sort of") that undermines authority.</li>
+                <li><strong class="text-white">Strategic Pauses</strong> — Pauses for emphasis score higher than nervous rambling.</li>
+                <li><strong class="text-white">Pitch Variation</strong> — Target: 15-30% coefficient of variation. Monotone = lower score.</li>
+            </ul>
+        </div>
+
+        <!-- Special Profile: Oratory -->
+        <div class="bg-orange-900/20 border border-orange-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">🎭</span>
+                <h3 class="text-white font-semibold">Oratory Profile</h3>
+            </div>
+            <p class="text-sm text-gray-300 mb-3">Evaluates rhetorical mastery for speeches, debates, and persuasive speaking:</p>
+            
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">🔮 Rhetorical Devices Detected</h4>
+            <ul class="text-sm text-gray-400 space-y-1 mb-4">
+                <li><strong class="text-white">Anaphora</strong> — Repetition at the beginning of clauses ("We shall fight...")</li>
+                <li><strong class="text-white">Epistrophe</strong> — Repetition at the end of clauses ("...of the people, by the people, for the people")</li>
+                <li><strong class="text-white">Tricolon</strong> — Groups of three ("life, liberty, and the pursuit of happiness")</li>
+                <li><strong class="text-white">Rhetorical Questions</strong> — Questions asked for effect, not answers</li>
+                <li><strong class="text-white">Antithesis</strong> — Contrasting ideas in parallel structure</li>
+                <li><strong class="text-white">Climax</strong> — Building intensity toward a peak</li>
+            </ul>
+
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">📊 Scoring Weights</h4>
+            <ul class="text-sm text-gray-400 space-y-1">
+                <li>• Pitch Variation (22%) — Expressiveness through voice modulation</li>
+                <li>• Repetition Score (20%) — Strategic use of repeated phrases</li>
+                <li>• Pitch Range (18%) — Dynamic range from low to high</li>
+                <li>• Speaking Rate (15%) — Target: 110-140 WPM (MLK: 107, JFK: 127)</li>
+                <li>• Voice Quality/HNR (15%) — Resonance and authority</li>
+                <li>• Discourse Connectedness (10%) — Logical flow between ideas</li>
+            </ul>
+        </div>
 
         {% for name, profile in profiles.items() %}
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-4">

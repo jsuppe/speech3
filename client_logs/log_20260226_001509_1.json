@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-02-26T00:15:11.274320",
+  "app_version": "1.0.33",
+  "build_number": "37",
+  "patch_number": 24,
+  "platform": "android",
+  "user_id": 1,
+  "user_email": "jon.suppe@gmail.com",
+  "api_url": "https://api.speakfit.app",
+  "preferred_accent": "en-US",
+  "default_profile": "oratory",
+  "notifications_enabled": true,
+  "tier": "premium",
+  "server_received_at": "2026-02-26T05:15:09.558019"
+}

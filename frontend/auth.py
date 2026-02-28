@@ -1,12 +1,13 @@
 """
 Simple session-based authentication for the frontend dashboard.
-Only allows specific email addresses to access the dashboard.
+Only allows QA and Admin tier users to access the dashboard.
 """
 
 import os
 import secrets
 import hashlib
 import logging
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -15,10 +16,8 @@ from fastapi.responses import RedirectResponse
 
 logger = logging.getLogger("speechscore.frontend.auth")
 
-# Allowed email addresses (only these can log in)
-ALLOWED_EMAILS = {
-    "jon.suppe@gmail.com",
-}
+# Tiers allowed to access the dashboard
+ALLOWED_TIERS = {"qa", "admin"}
 
 # Session storage (in-memory for simplicity)
 # In production, use Redis or database
@@ -66,9 +65,33 @@ def destroy_session(token: str):
         del _sessions[token]
 
 
-def is_email_allowed(email: str) -> bool:
-    """Check if the email is in the allowed list."""
-    return email.lower() in {e.lower() for e in ALLOWED_EMAILS}
+def is_email_allowed(email: str, db_path: str = None) -> bool:
+    """Check if the user has QA or Admin tier access."""
+    if not db_path:
+        # Default path
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "speechscore.db")
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT tier FROM users WHERE LOWER(email) = LOWER(?)", (email,))
+        row = cur.fetchone()
+        conn.close()
+        
+        if not row:
+            logger.warning(f"User {email} not found in database")
+            return False
+        
+        tier = (row[0] or "free").lower()
+        allowed = tier in ALLOWED_TIERS
+        
+        if not allowed:
+            logger.info(f"User {email} denied access (tier: {tier})")
+        
+        return allowed
+    except Exception as e:
+        logger.exception(f"Error checking user tier: {e}")
+        return False
 
 
 def get_current_user(request: Request) -> Optional[dict]:

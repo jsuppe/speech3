@@ -87,6 +87,13 @@ async def google_login(body: GoogleLoginRequest):
         avatar_url=google_user.get("picture"),
     )
 
+    # Check if account is disabled
+    if user.get("enabled") == 0:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "ACCOUNT_DISABLED", "message": "Your account has been disabled. Contact support for assistance."}
+        )
+
     # Issue JWT tokens
     access_token = create_access_token(user["id"], user.get("email", ""), user.get("name", ""))
     refresh_token = create_refresh_token(user["id"])
@@ -103,6 +110,7 @@ async def google_login(body: GoogleLoginRequest):
             "name": user.get("name"),
             "avatar_url": user.get("avatar_url"),
             "provider": "google",
+            "tier": user.get("tier", "free"),
         },
     )
 
@@ -153,6 +161,13 @@ async def refresh_token(body: RefreshRequest):
             detail={"code": "USER_NOT_FOUND", "message": "User no longer exists."}
         )
 
+    # Check if account is disabled
+    if user.get("enabled") == 0:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "ACCOUNT_DISABLED", "message": "Your account has been disabled. Contact support for assistance."}
+        )
+
     access_token = create_access_token(user["id"], user.get("email", ""), user.get("name", ""))
     new_refresh = create_refresh_token(user["id"])
 
@@ -194,6 +209,7 @@ async def get_profile(user: dict = Depends(user_required)):
         "provider": full_user["provider"],
         "created_at": full_user["created_at"],
         "last_login": full_user["last_login"],
+        "tier": full_user.get("tier", "free"),
     }
 
 
@@ -281,3 +297,367 @@ async def get_user_versions(api_key: str = Query(None)):
         "users": users,
         "total": len(users),
     }
+
+
+# ---------------------------------------------------------------------------
+# Usage / Rate Limits
+# ---------------------------------------------------------------------------
+
+@auth_router.get("/usage")
+async def get_usage(user: dict = Depends(user_required)):
+    """
+    Get current usage statistics and limits for the logged-in user.
+    
+    Returns:
+    - tier: Current subscription tier (free, pro, power, admin)
+    - recordings_used: Recordings this month
+    - recordings_limit: Monthly limit (or "unlimited")
+    - recordings_remaining: Remaining recordings
+    - audio_minutes_used: Audio minutes processed this month
+    - audio_minutes_limit: Monthly limit (or "unlimited")
+    - audio_minutes_remaining: Remaining minutes
+    - resets: Date when usage resets (first of next month)
+    - features: List of features available on this tier
+    """
+    import sqlite3
+    from .usage_limits import get_usage_limiter
+    
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    
+    usage_limiter = get_usage_limiter(conn)
+    usage = usage_limiter.get_user_usage(user["id"])
+    
+    conn.close()
+    
+    return usage
+
+
+@auth_router.post("/usage/accept-eula")
+async def accept_eula(user: dict = Depends(user_required)):
+    """Record that the user accepted the EULA."""
+    import sqlite3
+    from .usage_limits import get_usage_limiter
+    
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    
+    usage_limiter = get_usage_limiter(conn)
+    usage_limiter.record_eula_acceptance(user["id"])
+    
+    conn.close()
+    
+    logger.info("EULA accepted: user_id=%d", user["id"])
+    return {"status": "ok", "message": "EULA acceptance recorded"}
+
+
+@auth_router.post("/admin/users/{user_id}/tier")
+async def set_user_tier(user_id: int, tier: str, api_key: str = Query(None)):
+    """
+    Admin endpoint: Set a user's subscription tier.
+    Requires API key for access.
+    
+    Valid tiers: free, pro, power, admin
+    """
+    from .auth import lookup_key
+    from .usage_limits import get_usage_limiter, TIER_LIMITS
+    import sqlite3
+    
+    # Verify API key
+    if not api_key:
+        raise HTTPException(status_code=401, detail="API key required")
+    
+    key_data = lookup_key(api_key)
+    if not key_data or not key_data.get("enabled"):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    # Validate tier
+    if tier not in TIER_LIMITS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid tier. Valid tiers: {', '.join(TIER_LIMITS.keys())}"
+        )
+    
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    
+    usage_limiter = get_usage_limiter(conn)
+    success = usage_limiter.set_user_tier(user_id, tier)
+    
+    conn.close()
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    logger.info("Set tier: user_id=%d, tier=%s", user_id, tier)
+    return {"status": "ok", "user_id": user_id, "tier": tier}
+
+
+# ============================================================================
+# Mobile Admin API Endpoints
+# ============================================================================
+
+def _require_admin(user: dict):
+    """Check if user has admin tier (fetches from DB)."""
+    import sqlite3
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT tier FROM users WHERE id = ?", (user["id"],))
+    row = cur.fetchone()
+    conn.close()
+    
+    if not row or row[0] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+@auth_router.get("/admin/users")
+async def admin_list_users(
+    user: dict = Depends(user_required),
+    search: str = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """
+    List all users with search and pagination.
+    Requires admin tier.
+    """
+    _require_admin(user)
+    
+    import sqlite3
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    offset = (page - 1) * limit
+    
+    # Build query
+    if search:
+        search_pattern = f"%{search}%"
+        cur.execute("""
+            SELECT id, email, name, avatar_url, provider, tier, 
+                   monthly_recordings, monthly_audio_minutes, created_at, last_login,
+                   (SELECT COUNT(*) FROM speeches WHERE user_id = users.id) as speech_count
+            FROM users 
+            WHERE email LIKE ? OR name LIKE ?
+            ORDER BY last_login DESC
+            LIMIT ? OFFSET ?
+        """, (search_pattern, search_pattern, limit, offset))
+        
+        cur2 = conn.cursor()
+        cur2.execute("""
+            SELECT COUNT(*) FROM users WHERE email LIKE ? OR name LIKE ?
+        """, (search_pattern, search_pattern))
+        total = cur2.fetchone()[0]
+    else:
+        cur.execute("""
+            SELECT id, email, name, avatar_url, provider, tier,
+                   monthly_recordings, monthly_audio_minutes, created_at, last_login,
+                   (SELECT COUNT(*) FROM speeches WHERE user_id = users.id) as speech_count
+            FROM users 
+            ORDER BY last_login DESC
+            LIMIT ? OFFSET ?
+        """, (limit, offset))
+        
+        cur2 = conn.cursor()
+        cur2.execute("SELECT COUNT(*) FROM users")
+        total = cur2.fetchone()[0]
+    
+    users = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    
+    return {
+        "users": users,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+    }
+
+
+@auth_router.get("/admin/users/{user_id}")
+async def admin_get_user(
+    user_id: int,
+    user: dict = Depends(user_required),
+):
+    """
+    Get detailed user info.
+    Requires admin tier.
+    """
+    _require_admin(user)
+    
+    import sqlite3
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, email, name, avatar_url, provider, tier,
+               monthly_recordings, monthly_audio_minutes, usage_month,
+               created_at, last_login, eula_accepted_at
+        FROM users WHERE id = ?
+    """, (user_id,))
+    row = cur.fetchone()
+    
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    target_user = dict(row)
+    
+    # Get speech stats
+    cur.execute("""
+        SELECT COUNT(*) as count, 
+               COALESCE(SUM(duration_seconds), 0) as total_duration
+        FROM speeches WHERE user_id = ?
+    """, (user_id,))
+    stats = dict(cur.fetchone())
+    target_user["speech_count"] = stats["count"]
+    target_user["total_duration_seconds"] = stats["total_duration"]
+    
+    # Get recent speeches
+    cur.execute("""
+        SELECT id, title, profile, duration_seconds, created_at
+        FROM speeches WHERE user_id = ?
+        ORDER BY created_at DESC LIMIT 10
+    """, (user_id,))
+    target_user["recent_speeches"] = [dict(r) for r in cur.fetchall()]
+    
+    conn.close()
+    return target_user
+
+
+@auth_router.post("/admin/users/{user_id}/reset-usage")
+async def admin_reset_user_usage(
+    user_id: int,
+    user: dict = Depends(user_required),
+):
+    """
+    Reset a user's monthly usage counters to zero.
+    Requires admin tier.
+    """
+    _require_admin(user)
+    
+    import sqlite3
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    cur.execute("""
+        UPDATE users 
+        SET monthly_recordings = 0, monthly_audio_minutes = 0
+        WHERE id = ?
+    """, (user_id,))
+    
+    if cur.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    conn.commit()
+    conn.close()
+    
+    logger.info("Admin reset usage: user_id=%d by admin=%d", user_id, user["id"])
+    return {"status": "ok", "message": "Usage reset to zero"}
+
+
+@auth_router.post("/admin/users/{user_id}/recalc-usage")
+async def admin_recalc_user_usage(
+    user_id: int,
+    user: dict = Depends(user_required),
+):
+    """
+    Recalculate a user's monthly usage from their actual recordings.
+    Requires admin tier.
+    """
+    _require_admin(user)
+    
+    import sqlite3
+    from datetime import datetime
+    
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    current_month = datetime.now().strftime("%Y-%m")
+    
+    # Count recordings this month
+    cur.execute("""
+        SELECT COUNT(*), COALESCE(SUM(duration_seconds) / 60.0, 0)
+        FROM speeches 
+        WHERE user_id = ? AND strftime('%Y-%m', created_at) = ?
+    """, (user_id, current_month))
+    
+    row = cur.fetchone()
+    recordings = row[0]
+    audio_minutes = row[1]
+    
+    cur.execute("""
+        UPDATE users 
+        SET monthly_recordings = ?, monthly_audio_minutes = ?, usage_month = ?
+        WHERE id = ?
+    """, (recordings, audio_minutes, current_month, user_id))
+    
+    if cur.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    conn.commit()
+    conn.close()
+    
+    logger.info("Admin recalc usage: user_id=%d recordings=%d minutes=%.1f", 
+                user_id, recordings, audio_minutes)
+    return {
+        "status": "ok", 
+        "monthly_recordings": recordings,
+        "monthly_audio_minutes": round(audio_minutes, 1),
+    }
+
+
+@auth_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(
+    user_id: int,
+    user: dict = Depends(user_required),
+):
+    """
+    Delete a user and all their data.
+    Requires admin tier. Cannot delete yourself.
+    """
+    _require_admin(user)
+    
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    import sqlite3
+    db_path = config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    # Check user exists
+    cur.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    target_email = row[0]
+    
+    # Delete speeches and analyses
+    cur.execute("SELECT id FROM speeches WHERE user_id = ?", (user_id,))
+    speech_ids = [r[0] for r in cur.fetchall()]
+    
+    for sid in speech_ids:
+        cur.execute("DELETE FROM analyses WHERE speech_id = ?", (sid,))
+    
+    cur.execute("DELETE FROM speeches WHERE user_id = ?", (user_id,))
+    cur.execute("DELETE FROM speaker_embeddings WHERE user_id = ?", (user_id,))
+    cur.execute("DELETE FROM projects WHERE user_id = ?", (user_id,))
+    cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    
+    conn.commit()
+    conn.close()
+    
+    logger.info("Admin deleted user: id=%d email=%s by admin=%d", 
+                user_id, target_email, user["id"])
+    return {"status": "ok", "message": f"Deleted user {target_email}"}

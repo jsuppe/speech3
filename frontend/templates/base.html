@@ -57,8 +57,9 @@
                             <a href="/upload" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/upload' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Upload</a>
                             <a href="/compare" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/compare' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Compare</a>
                             <a href="/methodology" class="px-3 py-2 rounded-md text-sm font-medium {% if request.url.path == '/methodology' %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Methodology</a>
+                            <a href="/users" class="px-3 py-2 rounded-md text-sm font-medium {% if '/users' in request.url.path %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">Users</a>
                             <a href="/admin" class="px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 {% if '/admin' in request.url.path %}bg-gray-800 text-white{% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">
-                                Dashboard
+                                Admin
                                 <span class="bg-indigo-500/30 text-indigo-300 text-[10px] font-semibold px-1.5 py-0.5 rounded">ADMIN</span>
                             </a>
                         </div>

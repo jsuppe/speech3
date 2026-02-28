@@ -1,0 +1,399 @@
+{
+  "title": "Black Beauty",
+  "source": "lit2go",
+  "url": "https://etc.usf.edu/lit2go/125/black-beauty/",
+  "chapters": [
+    {
+      "index": 0,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/000_lit2go.txt",
+      "audio_file": "black-beauty/000_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 1,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/001_lit2go.txt",
+      "audio_file": "black-beauty/001_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 2,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/002_lit2go.txt",
+      "audio_file": "black-beauty/002_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 3,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/003_lit2go.txt",
+      "audio_file": "black-beauty/003_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 4,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/004_lit2go.txt",
+      "audio_file": "black-beauty/004_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 5,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/005_lit2go.txt",
+      "audio_file": "black-beauty/005_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 6,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/006_lit2go.txt",
+      "audio_file": "black-beauty/006_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 7,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/007_lit2go.txt",
+      "audio_file": "black-beauty/007_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 8,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/008_lit2go.txt",
+      "audio_file": "black-beauty/008_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 9,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/009_lit2go.txt",
+      "audio_file": "black-beauty/009_lit2go.mp3",
+      "lexile": null,
+      "word_count": 58
+    },
+    {
+      "index": 10,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/010_lit2go.txt",
+      "audio_file": "black-beauty/010_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 11,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/011_lit2go.txt",
+      "audio_file": "black-beauty/011_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 12,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/012_lit2go.txt",
+      "audio_file": "black-beauty/012_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 13,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/013_lit2go.txt",
+      "audio_file": "black-beauty/013_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 14,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/014_lit2go.txt",
+      "audio_file": "black-beauty/014_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 15,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/015_lit2go.txt",
+      "audio_file": "black-beauty/015_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 16,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/016_lit2go.txt",
+      "audio_file": "black-beauty/016_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 17,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/017_lit2go.txt",
+      "audio_file": "black-beauty/017_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 18,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/018_lit2go.txt",
+      "audio_file": "black-beauty/018_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 19,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/019_lit2go.txt",
+      "audio_file": "black-beauty/019_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 20,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/020_lit2go.txt",
+      "audio_file": "black-beauty/020_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 21,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/021_lit2go.txt",
+      "audio_file": "black-beauty/021_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 22,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/022_lit2go.txt",
+      "audio_file": "black-beauty/022_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 23,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/023_lit2go.txt",
+      "audio_file": "black-beauty/023_lit2go.mp3",
+      "lexile": null,
+      "word_count": 64
+    },
+    {
+      "index": 24,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/024_lit2go.txt",
+      "audio_file": "black-beauty/024_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 25,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/025_lit2go.txt",
+      "audio_file": "black-beauty/025_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 26,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/026_lit2go.txt",
+      "audio_file": "black-beauty/026_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 27,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/027_lit2go.txt",
+      "audio_file": "black-beauty/027_lit2go.mp3",
+      "lexile": null,
+      "word_count": 61
+    },
+    {
+      "index": 28,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/028_lit2go.txt",
+      "audio_file": "black-beauty/028_lit2go.mp3",
+      "lexile": null,
+      "word_count": 46
+    },
+    {
+      "index": 29,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/029_lit2go.txt",
+      "audio_file": "black-beauty/029_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 30,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/030_lit2go.txt",
+      "audio_file": "black-beauty/030_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 31,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/031_lit2go.txt",
+      "audio_file": "black-beauty/031_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 32,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/032_lit2go.txt",
+      "audio_file": "black-beauty/032_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 33,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/033_lit2go.txt",
+      "audio_file": "black-beauty/033_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 34,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/034_lit2go.txt",
+      "audio_file": "black-beauty/034_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 35,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/035_lit2go.txt",
+      "audio_file": "black-beauty/035_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 36,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/036_lit2go.txt",
+      "audio_file": "black-beauty/036_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 37,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/037_lit2go.txt",
+      "audio_file": "black-beauty/037_lit2go.mp3",
+      "lexile": null,
+      "word_count": 58
+    },
+    {
+      "index": 38,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/038_lit2go.txt",
+      "audio_file": "black-beauty/038_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 39,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/039_lit2go.txt",
+      "audio_file": "black-beauty/039_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 40,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/040_lit2go.txt",
+      "audio_file": "black-beauty/040_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 41,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/041_lit2go.txt",
+      "audio_file": "black-beauty/041_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 42,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/042_lit2go.txt",
+      "audio_file": "black-beauty/042_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 43,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/043_lit2go.txt",
+      "audio_file": "black-beauty/043_lit2go.mp3",
+      "lexile": null,
+      "word_count": 58
+    },
+    {
+      "index": 44,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/044_lit2go.txt",
+      "audio_file": "black-beauty/044_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    },
+    {
+      "index": 45,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/045_lit2go.txt",
+      "audio_file": "black-beauty/045_lit2go.mp3",
+      "lexile": null,
+      "word_count": 55
+    },
+    {
+      "index": 46,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/046_lit2go.txt",
+      "audio_file": "black-beauty/046_lit2go.mp3",
+      "lexile": null,
+      "word_count": 49
+    },
+    {
+      "index": 47,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/047_lit2go.txt",
+      "audio_file": "black-beauty/047_lit2go.mp3",
+      "lexile": null,
+      "word_count": 67
+    },
+    {
+      "index": 48,
+      "title": "Lit2Go",
+      "text_file": "black-beauty/048_lit2go.txt",
+      "audio_file": "black-beauty/048_lit2go.mp3",
+      "lexile": null,
+      "word_count": 52
+    }
+  ]
+}

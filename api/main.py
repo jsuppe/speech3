@@ -258,6 +258,14 @@ try:
 except ImportError as e:
     logger.warning(f"Oratory endpoints not available: {e}")
 
+# Register comprehensive oratory routes
+try:
+    from .oratory_comprehensive import router as oratory_comp_router  # noqa: E402
+    app.include_router(oratory_comp_router)
+    logger.info("Comprehensive oratory routes registered.")
+except ImportError as e:
+    logger.warning(f"Comprehensive oratory endpoints not available: {e}")
+
 # Register presentation readiness routes
 try:
     from .presentation_endpoints import router as presentation_router  # noqa: E402
@@ -273,6 +281,46 @@ try:
     logger.info("Survey routes registered.")
 except ImportError as e:
     logger.warning(f"Survey endpoints not available: {e}")
+
+# Register kids mode routes
+try:
+    from .kids_endpoints import router as kids_router  # noqa: E402
+    app.include_router(kids_router)
+    logger.info("Kids mode routes registered.")
+except ImportError as e:
+    logger.warning(f"Kids endpoints not available: {e}")
+
+# Register audiobooks routes
+try:
+    from .audiobooks import router as audiobooks_router  # noqa: E402
+    app.include_router(audiobooks_router)
+    logger.info("Audiobooks routes registered.")
+except ImportError as e:
+    logger.warning(f"Audiobooks endpoints not available: {e}")
+
+# Register reference speeches routes (great speech comparison)
+try:
+    from .reference_speeches import router as reference_router  # noqa: E402
+    app.include_router(reference_router)
+    logger.info("Reference speeches routes registered.")
+except ImportError as e:
+    logger.warning(f"Reference speeches endpoints not available: {e}")
+
+# Register reader analysis routes
+try:
+    from .reader_endpoints import router as reader_router  # noqa: E402
+    app.include_router(reader_router)
+    logger.info("Reader analysis routes registered.")
+except ImportError as e:
+    logger.warning(f"Reader endpoints not available: {e}")
+
+# Register TTS routes (ElevenLabs)
+try:
+    from .tts_endpoints import router as tts_router  # noqa: E402
+    app.include_router(tts_router)
+    logger.info("TTS (ElevenLabs) routes registered.")
+except ImportError as e:
+    logger.warning(f"TTS endpoints not available: {e}")
 
 # Register frontend routes
 try:
