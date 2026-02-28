@@ -4622,21 +4622,16 @@ async def analyze_reading_practice(
     # Get pitch data if available
     pitch_data = None
     cursor = db.conn.execute(
-        "SELECT audio_analysis FROM analysis_results WHERE speech_id = ?",
+        "SELECT pitch_mean_hz, pitch_std_hz, pitch_range_hz FROM analyses WHERE speech_id = ?",
         (speech_id,)
     )
     audio_row = cursor.fetchone()
-    if audio_row and audio_row[0]:
-        import json as json_module
-        try:
-            audio_analysis = json_module.loads(audio_row[0])
-            pitch_data = {
-                'pitch_mean': audio_analysis.get('pitch_mean'),
-                'pitch_std': audio_analysis.get('pitch_std'),
-                'pitch_range': audio_analysis.get('pitch_range'),
-            }
-        except:
-            pass
+    if audio_row and audio_row[0] is not None:
+        pitch_data = {
+            'pitch_mean': audio_row[0],
+            'pitch_std': audio_row[1],
+            'pitch_range': audio_row[2],
+        }
     
     # Run reading analysis
     try:
