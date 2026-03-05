@@ -70,6 +70,19 @@ def _error(status_code: int, code: str, message: str):
     )
 
 
+def _get_max_duration(auth: Dict[str, Any]) -> int:
+    """Get max recording duration based on user tier. Pro/power/admin get 1 hour, free gets 30 min."""
+    tier = None
+    if auth.get("key_data"):
+        tier = auth["key_data"].get("tier")
+    else:
+        tier = auth.get("tier")
+    
+    if tier in ("pro", "power", "admin"):
+        return config.MAX_DURATION_SEC_PRO
+    return config.MAX_DURATION_SEC
+
+
 # ---------------------------------------------------------------------------
 # Health (NO auth required)
 # ---------------------------------------------------------------------------
@@ -125,6 +138,246 @@ async def get_metrics(key_data: dict = Depends(auth_required)):
     })
     
     return metrics_data
+
+
+@router.get("/metrics/stats/{profile}", tags=["Metrics"])
+async def get_profile_stats(
+    profile: str,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get aggregated stats for a specific profile (e.g., presentation, pronunciation).
+    Returns averages across user's recordings for that profile.
+    """
+    user_id = auth.get("user_id")
+    # For API key auth without user_id, use user 1 (Jon) as fallback for testing
+    if not user_id:
+        user_id = 1  # Admin/testing fallback
+    
+    db = pipeline_runner.get_db()
+    
+    # Get recording count and basic stats
+    stats_row = db.conn.execute("""
+        SELECT 
+            COUNT(*) as total_recordings,
+            AVG(cached_score) as avg_score
+        FROM speeches 
+        WHERE user_id = ? AND profile = ?
+    """, (user_id, profile)).fetchone()
+    
+    total_recordings = stats_row[0] if stats_row else 0
+    
+    if total_recordings == 0:
+        return {
+            "total_recordings": 0,
+            "avg_pacing_score": None,
+            "avg_filler_rate": None,
+            "avg_confidence": None,
+            "pitch_cv": None,
+            "pause_ratio": None,
+            "energy_score": None,
+            "practice_streak": 0,
+        }
+    
+    # Get analysis averages (using latest analysis per speech, excluding zero WPM)
+    analysis_row = db.conn.execute("""
+        SELECT 
+            AVG(CASE WHEN a.wpm > 0 THEN a.wpm END) as avg_wpm,
+            AVG(CASE WHEN a.pitch_mean_hz > 0 THEN a.pitch_std_hz / a.pitch_mean_hz * 100 END) as avg_pitch_cv,
+            AVG(CASE WHEN a.hnr_db > 0 THEN a.hnr_db END) as avg_hnr
+        FROM speeches s
+        JOIN (
+            SELECT speech_id, wpm, pitch_std_hz, pitch_mean_hz, hnr_db,
+                   ROW_NUMBER() OVER (PARTITION BY speech_id ORDER BY id DESC) as rn
+            FROM analyses
+        ) a ON a.speech_id = s.id AND a.rn = 1
+        WHERE s.user_id = ? AND s.profile = ?
+    """, (user_id, profile)).fetchone()
+    
+    # Get filler rate from grammar analysis (field is filler_ratio, not filler_rate)
+    filler_row = db.conn.execute("""
+        SELECT 
+            AVG(
+                CAST(json_extract(grammar_analysis_json, '$.filler_ratio') AS REAL) * 100
+            ) as avg_filler_rate
+        FROM speeches 
+        WHERE user_id = ? AND profile = ? AND grammar_analysis_json IS NOT NULL
+    """, (user_id, profile)).fetchone()
+    
+    # Get confidence score from grammar analysis (based on hedging language)
+    # Lower hedging = higher confidence
+    confidence_row = db.conn.execute("""
+        SELECT 
+            AVG(
+                100 - (CAST(json_extract(grammar_analysis_json, '$.filler_ratio') AS REAL) * 500)
+            ) as avg_confidence
+        FROM speeches 
+        WHERE user_id = ? AND profile = ? AND grammar_analysis_json IS NOT NULL
+    """, (user_id, profile)).fetchone()
+    
+    # Get pause quality from audio analysis
+    # Estimate: if WPM is lower than expected, there are more pauses
+    # Ideal speaking is ~150 WPM continuous. Lower WPM = more pauses (good for presentations)
+    pause_row = db.conn.execute("""
+        SELECT 
+            AVG(
+                CASE 
+                    WHEN a.wpm > 0 AND a.wpm < 200 THEN 
+                        -- Pause ratio = (expected time at 150 WPM - actual time) / actual time
+                        -- Higher ratio = more pauses = better for presentations (up to ~25%)
+                        CASE 
+                            WHEN a.wpm < 150 THEN (150.0 - a.wpm) / 150.0 * 100
+                            ELSE 0
+                        END
+                    ELSE NULL
+                END
+            ) as avg_pause_ratio
+        FROM speeches s
+        JOIN analyses a ON a.speech_id = s.id
+        WHERE s.user_id = ? AND s.profile = ? AND a.wpm > 0
+        GROUP BY s.id
+    """, (user_id, profile)).fetchone()
+    
+    # Calculate pacing score (how close to ideal 140 WPM)
+    avg_wpm = analysis_row[0] if analysis_row and analysis_row[0] else None
+    pacing_score = None
+    if avg_wpm:
+        # Score based on distance from ideal (130-150 WPM)
+        ideal_wpm = 140
+        deviation = abs(avg_wpm - ideal_wpm)
+        pacing_score = max(0, 100 - (deviation * 2))  # -2 points per WPM deviation
+    
+    # Get practice streak (days in a row with at least one recording)
+    streak = 0
+    streak_rows = db.conn.execute("""
+        SELECT DATE(created_at) as day
+        FROM speeches
+        WHERE user_id = ? AND profile = ?
+        GROUP BY DATE(created_at)
+        ORDER BY day DESC
+        LIMIT 30
+    """, (user_id, profile)).fetchall()
+    
+    if streak_rows:
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+        expected_day = today
+        for row in streak_rows:
+            day = datetime.strptime(row[0], '%Y-%m-%d').date()
+            if day == expected_day or day == expected_day - timedelta(days=1):
+                streak += 1
+                expected_day = day - timedelta(days=1)
+            else:
+                break
+    
+    return {
+        "total_recordings": total_recordings,
+        "avg_pacing_score": round(pacing_score, 1) if pacing_score else None,
+        "avg_filler_rate": round(filler_row[0], 2) if filler_row and filler_row[0] else None,
+        "avg_confidence": round(max(0, min(100, confidence_row[0])), 1) if confidence_row and confidence_row[0] else None,
+        "pitch_cv": round(analysis_row[1], 1) if analysis_row and analysis_row[1] else None,
+        "pause_ratio": round(max(0, min(100, pause_row[0])), 1) if pause_row and pause_row[0] else None,
+        "energy_score": round(min(100, (analysis_row[2] or 15) * 5), 1) if analysis_row else None,  # HNR-based
+        "practice_streak": streak,
+    }
+
+
+@router.get("/metrics/history/{profile}", tags=["Metrics"])
+async def get_metrics_history(
+    profile: str,
+    days: int = Query(30, description="Number of days of history to return"),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get historical metrics data for charting (last N days).
+    Returns per-recording data points for the specified profile.
+    """
+    user_id = auth.get("user_id")
+    if not user_id:
+        user_id = 1  # Admin/testing fallback
+    
+    db = pipeline_runner.get_db()
+    
+    # Get recordings with metrics for the time period
+    from datetime import datetime, timedelta
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    
+    rows = db.conn.execute("""
+        SELECT 
+            s.id,
+            s.created_at,
+            s.cached_score,
+            a.wpm,
+            a.pitch_std_hz,
+            a.pitch_mean_hz,
+            a.hnr_db,
+            json_extract(s.grammar_analysis_json, '$.filler_ratio') as filler_ratio,
+            s.pause_ratio
+        FROM speeches s
+        LEFT JOIN analyses a ON a.id = (
+            SELECT id FROM analyses WHERE speech_id = s.id ORDER BY id DESC LIMIT 1
+        )
+        WHERE s.user_id = ? AND s.profile = ? AND s.created_at >= ?
+        ORDER BY s.created_at ASC
+        LIMIT 50
+    """, (user_id, profile, cutoff)).fetchall()
+    
+    data = []
+    for row in rows:
+        # Calculate metrics for each recording
+        wpm = row[3] or 0
+        pitch_cv = (row[4] / row[5] * 100) if row[4] and row[5] and row[5] > 0 else None
+        hnr = row[6] or 0
+        filler_ratio = row[7] or 0
+        pause_quality = row[8]  # Cached pause_ratio from speeches table
+        
+        # Pacing score
+        pacing = max(0, 100 - abs((wpm or 140) - 140) * 2) if wpm and wpm > 0 else None
+        
+        # Energy from HNR
+        energy = min(100, hnr * 5) if hnr else None
+        
+        # Confidence from filler ratio (lower fillers = higher confidence)
+        confidence = max(0, min(100, 100 - (filler_ratio * 500))) if filler_ratio is not None else None
+        
+        data.append({
+            "date": row[1],
+            "score": row[2],
+            "pacing": round(pacing, 1) if pacing else None,
+            "filler_rate": round(filler_ratio * 100, 2) if filler_ratio else None,
+            "confidence": round(confidence, 1) if confidence else None,
+            "pitch_variation": round(pitch_cv, 1) if pitch_cv else None,
+            "pause_quality": round(pause_quality, 1) if pause_quality else None,
+            "energy": round(energy, 1) if energy else None,
+        })
+    
+    # Calculate aggregates with trends
+    aggregates = {}
+    for metric in ['pacing', 'filler_rate', 'confidence', 'pitch_variation', 'pause_quality', 'energy']:
+        values = [d[metric] for d in data if d[metric] is not None]
+        if len(values) >= 2:
+            first_half = values[:len(values)//2]
+            second_half = values[len(values)//2:]
+            first_avg = sum(first_half) / len(first_half) if first_half else 0
+            second_avg = sum(second_half) / len(second_half) if second_half else 0
+            
+            if metric == 'filler_rate':
+                # Lower is better for filler rate
+                trend = 'improving' if second_avg < first_avg else 'declining' if second_avg > first_avg else 'stable'
+            else:
+                trend = 'improving' if second_avg > first_avg else 'declining' if second_avg < first_avg else 'stable'
+            
+            aggregates[metric] = {
+                "average": round(sum(values) / len(values), 1),
+                "trend": trend,
+            }
+    
+    return {
+        "data": data,
+        "aggregates": aggregates,
+        "days": days,
+        "count": len(data),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +485,7 @@ async def analyze(
     exercise_type: Optional[str] = Form(None, description="Exercise type for voice_health profile (e.g. 'sustained_ah', 'humming', 'projection')"),
     target_duration: Optional[float] = Form(None, description="Target duration in seconds for sustained exercises"),
     reference_text: Optional[str] = Form(None, description="Reference text for reading practice (stored for later comparison)"),
+    coach_session_data: Optional[str] = Form(None, description="JSON object with live coaching session data (document_context, objectives, notes)"),
     auth: dict = Depends(flexible_auth),
 ):
     """
@@ -344,10 +598,11 @@ async def analyze(
         if duration <= 0:
             return _error(422, "CORRUPT_AUDIO", "Could not read audio file. It may be corrupt.")
         
-        if duration > config.MAX_DURATION_SEC:
+        max_duration = _get_max_duration(auth)
+        if duration > max_duration:
             return _error(
                 422, "AUDIO_TOO_LONG",
-                f"Audio duration {duration:.0f}s exceeds {config.MAX_DURATION_SEC}s limit."
+                f"Audio duration {duration:.0f}s exceeds {max_duration}s limit."
             )
 
         # --- USAGE LIMIT CHECK ---
@@ -443,6 +698,7 @@ async def analyze(
             title=title,
             profile=profile or "general",
             reference_text=reference_text,
+            coach_session_data=coach_session_data,
         )
         if speech_id is not None:
             result["speech_id"] = speech_id
@@ -592,8 +848,9 @@ async def analyze_stream(
                 if duration <= 0:
                     result_holder["error"] = "Could not read audio file. It may be corrupt."
                     return
-                if duration > config.MAX_DURATION_SEC:
-                    result_holder["error"] = f"Audio duration {duration:.0f}s exceeds {config.MAX_DURATION_SEC}s limit."
+                max_duration = _get_max_duration(auth)
+                if duration > max_duration:
+                    result_holder["error"] = f"Audio duration {duration:.0f}s exceeds {max_duration}s limit."
                     return
 
                 # Record usage
@@ -1079,6 +1336,72 @@ async def get_speech_full(
     if score:
         result["score"] = score
     
+    # For presentation profile, include readiness data inline to prevent score flicker
+    if profile == "presentation" and analysis and transcription:
+        try:
+            from .presentation_endpoints import get_presentation_analyzer
+            
+            # Get advanced audio from result JSON
+            advanced_audio = None
+            if analysis.get("result"):
+                try:
+                    result_json = json_module.loads(analysis["result"])
+                    advanced_audio = result_json.get('advanced_audio_analysis') or result_json.get('advanced_audio')
+                except:
+                    pass
+            
+            # Parse segments
+            segments = []
+            trans_row = db.conn.execute(
+                "SELECT segments FROM transcriptions WHERE speech_id = ?",
+                (speech_id,)
+            ).fetchone()
+            if trans_row and trans_row[0]:
+                try:
+                    segments = json_module.loads(trans_row[0])
+                except:
+                    pass
+            
+            # Build analysis data
+            analysis_data = {
+                'wpm': analysis.get('wpm') or 150,
+                'pitch_mean_hz': analysis.get('pitch_mean_hz') or 150,
+                'pitch_std_hz': analysis.get('pitch_std_hz') or 30,
+                'jitter_pct': analysis.get('jitter_pct') or 1.0,
+                'shimmer_pct': analysis.get('shimmer_pct') or 3.0,
+                'hnr_db': analysis.get('hnr_db') or 15,
+                'vocal_fry_ratio': analysis.get('vocal_fry_ratio') or 0.1,
+                'lexical_diversity': analysis.get('lexical_diversity') or 0.7,
+            }
+            
+            analyzer = get_presentation_analyzer()
+            report = analyzer.analyze(
+                transcript_text=transcription["text"],
+                segments=segments,
+                analysis_data=analysis_data,
+                advanced_audio=advanced_audio
+            )
+            
+            result["presentation_readiness"] = report.to_dict()
+            
+            # Override score with readiness score for presentation
+            if result.get("score"):
+                result["score"]["overall_score"] = report.readiness_score
+                result["score"]["letter_grade"] = report.grade if hasattr(report, 'grade') else None
+            
+            # Update cached_score in database so history list matches
+            try:
+                db.conn.execute(
+                    "UPDATE speeches SET cached_score = ?, cached_score_profile = ? WHERE id = ?",
+                    (report.readiness_score, 'presentation', speech_id)
+                )
+                db.conn.commit()
+            except Exception as cache_err:
+                logger.warning(f"Failed to update cached presentation score: {cache_err}")
+                
+        except Exception as e:
+            logger.warning(f"Inline presentation readiness failed: {e}")
+    
     # Add grammar analysis (run on demand if not stored)
     grammar_json = speech.get("grammar_analysis_json")
     if grammar_json:
@@ -1180,6 +1503,98 @@ async def delete_speech(
     }
 
 
+@router.post("/speeches/{speech_id}/reanalyze", tags=["Database"])
+async def reanalyze_speech(
+    speech_id: int,
+    profile: Optional[str] = Body(None, embed=True, description="Scoring profile to use (optional, uses existing if not provided)"),
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Re-run the analysis pipeline on an existing recording.
+    Useful when the analysis pipeline has been updated or to try a different profile.
+    """
+    db = pipeline_runner.get_db()
+    
+    # Get user_id from auth (None for API key auth = admin)
+    user_id = auth.get("user_id")
+    
+    # Check ownership if user_id provided
+    if user_id is not None:
+        existing = db.conn.execute(
+            "SELECT user_id, profile FROM speeches WHERE id = ?", (speech_id,)
+        ).fetchone()
+        if not existing or existing["user_id"] != user_id:
+            return _error(404, "NOT_FOUND", f"Speech {speech_id} not found or access denied.")
+        current_profile = existing["profile"]
+    else:
+        existing = db.conn.execute(
+            "SELECT profile FROM speeches WHERE id = ?", (speech_id,)
+        ).fetchone()
+        if not existing:
+            return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
+        current_profile = existing["profile"]
+    
+    # Use provided profile or existing one
+    use_profile = profile if profile else (current_profile or "general")
+    
+    # Get the audio data
+    audio_row = db.conn.execute(
+        "SELECT data, format FROM audio WHERE speech_id = ?", (speech_id,)
+    ).fetchone()
+    
+    if not audio_row:
+        return _error(404, "NO_AUDIO", "No audio data found for this speech.")
+    
+    # Clear existing analysis data (keep audio and transcription)
+    db.conn.execute("DELETE FROM analyses WHERE speech_id = ?", (speech_id,))
+    db.conn.execute("DELETE FROM spectrograms WHERE speech_id = ?", (speech_id,))
+    db.conn.execute("DELETE FROM oratory_cache WHERE speech_id = ?", (speech_id,))
+    db.conn.execute("DELETE FROM content_analysis_cache WHERE speech_id = ?", (speech_id,))
+    db.conn.execute("DELETE FROM speech_summaries WHERE speech_id = ?", (speech_id,))
+    
+    # Update the profile if changed
+    if profile:
+        db.conn.execute("UPDATE speeches SET profile = ? WHERE id = ?", (use_profile, speech_id))
+    
+    db.conn.commit()
+    
+    # Re-run analysis in background
+    import asyncio
+    asyncio.create_task(_run_reanalysis(speech_id, audio_row["data"], audio_row["format"], use_profile, user_id))
+    
+    return {
+        "message": "Re-analysis started.",
+        "speech_id": speech_id,
+        "profile": use_profile,
+    }
+
+
+async def _run_reanalysis(speech_id: int, audio_data: bytes, audio_format: str, profile: str, user_id: Optional[int]):
+    """Background task to re-run analysis."""
+    import tempfile
+    import os
+    
+    try:
+        # Write audio to temp file
+        with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as f:
+            f.write(audio_data)
+            temp_path = f.name
+        
+        try:
+            # Run analysis pipeline
+            result = await pipeline_runner.run_pipeline(
+                audio_path=temp_path,
+                profile=profile,
+                user_id=user_id,
+                speech_id=speech_id,  # This will update the existing speech
+            )
+            log.info(f"Re-analysis completed for speech {speech_id}: score={result.get('score', 'N/A')}")
+        finally:
+            os.unlink(temp_path)
+    except Exception as e:
+        log.error(f"Re-analysis failed for speech {speech_id}: {e}")
+
+
 @router.patch("/speeches/{speech_id}", tags=["Database"])
 async def update_speech(
     speech_id: int,
@@ -1190,16 +1605,26 @@ async def update_speech(
     notes: Optional[str] = Body(None, description="Notes about the speech"),
     profile: Optional[str] = Body(None, description="Scoring profile (general, oratory, reading_fluency, presentation, clinical, dementia)"),
     project_id: Optional[int] = Body(None, description="Project ID to assign speech to (null to unassign)"),
+    realtime_feedback: Optional[List[dict]] = Body(None, description="Realtime coaching feedback timeline for playback"),
     auth: dict = Depends(flexible_auth),
 ):
     """
-    Update speech metadata (title, speaker, category, tags, notes, profile, project_id).
+    Update speech metadata (title, speaker, category, tags, notes, profile, project_id, realtime_feedback).
     Users can only update their own speeches.
     """
     db = pipeline_runner.get_db()
     
     # Get user_id from auth (None for API key auth = admin)
     user_id = auth.get("user_id")
+    
+    # Handle realtime_feedback separately (stored as JSON in its own column)
+    if realtime_feedback is not None:
+        import json
+        db.conn.execute(
+            "UPDATE speeches SET realtime_feedback = ? WHERE id = ?",
+            (json.dumps(realtime_feedback), speech_id)
+        )
+        db.conn.commit()
     
     # Update the speech (update_speech handles ownership check)
     updated = db.update_speech(
@@ -1221,6 +1646,34 @@ async def update_speech(
         "message": "Speech updated successfully.",
         "speech": updated,
     }
+
+
+@router.get("/speeches/{speech_id}/realtime-feedback", tags=["Database"])
+async def get_realtime_feedback(speech_id: int, auth: dict = Depends(flexible_auth)):
+    """Get the realtime coaching feedback timeline for playback."""
+    import json
+    db = pipeline_runner.get_db()
+    
+    # Check ownership
+    user_id = auth.get("user_id")
+    if user_id:
+        row = db.conn.execute(
+            "SELECT realtime_feedback FROM speeches WHERE id = ? AND user_id = ?",
+            (speech_id, user_id)
+        ).fetchone()
+    else:
+        row = db.conn.execute(
+            "SELECT realtime_feedback FROM speeches WHERE id = ?",
+            (speech_id,)
+        ).fetchone()
+    
+    if not row:
+        return _error(404, "NOT_FOUND", f"Speech {speech_id} not found or access denied.")
+    
+    feedback = row[0]
+    if feedback:
+        return json.loads(feedback)
+    return []
 
 
 @router.get("/speeches/{speech_id}/analysis", tags=["Database"])
@@ -1526,6 +1979,36 @@ async def get_speech_score(
     result = score_speech(db, speech_id, profile)
     if not result:
         return _error(404, "NO_ANALYSIS", f"No analysis found for speech {speech_id}.")
+    
+    # For presentation profile, use presentation readiness score if available
+    if profile == "presentation":
+        try:
+            from presentation_analysis import get_presentation_analyzer
+            transcription = db.get_transcription(speech_id)
+            analysis = db.get_analysis(speech_id)
+            
+            if transcription and transcription.get("text"):
+                segments = transcription.get("segments") or []
+                analysis_data = {}
+                if analysis:
+                    analysis_data["wpm"] = analysis.get("wpm_articulation")
+                    analysis_data["pause_count"] = analysis.get("pause_count")
+                    analysis_data["pause_ratio"] = analysis.get("pause_ratio")
+                    analysis_data["filler_count"] = analysis.get("filler_count")
+                
+                analyzer = get_presentation_analyzer()
+                report = analyzer.analyze(
+                    transcript_text=transcription["text"],
+                    segments=segments,
+                    analysis_data=analysis_data,
+                )
+                
+                # Use presentation readiness score
+                result["composite_score"] = report.readiness_score
+                result["overall_score"] = report.readiness_score
+                result["letter_grade"] = report.grade if hasattr(report, 'grade') else result.get("letter_grade")
+        except Exception as e:
+            logger.warning(f"Presentation readiness for scoring failed: {e}")
 
     # Cache the result
     try:
@@ -2403,62 +2886,142 @@ When discussing metrics:
 
 Always end with either actionable advice OR a question to engage the user."""
 
+PRESENT_COACH_SYSTEM_PROMPT = """You are a Presentation Coach AI in SpeakFit's Present mode. You specialize in helping users master presentations, pitches, meetings, and public talks.
 
-def _build_user_context(db, user_id: int) -> str:
-    """Build comprehensive user context for the coach."""
+Your expertise areas:
+- **Pacing & Timing**: Ideal presentation pace is 130-150 WPM. Slower for key points, faster for transitions.
+- **Filler Words**: Help reduce "um", "uh", "like", "you know" - suggest pausing instead
+- **Confidence & Delivery**: Voice clarity, pitch variation, avoiding uptalk and vocal fry
+- **Structure**: Strong openings (hooks), clear 3-point structure, memorable closes with CTAs
+- **Engagement**: Eye contact cues, audience reading, interactive elements
+
+Present mode features you can reference:
+- **Live Coach**: Real-time feedback during actual presentations (pacing, fillers, reminders)
+- **Pitch Practice**: Elevator pitches, 3-minute pitches, investor Q&A scenarios
+- **Interview Practice**: AI interviewer for behavioral questions (STAR method)
+- **Meeting Practice**: Status updates, client presentations, decision requests
+- **Talk Practice**: Conference talks, webinars, lightning talks
+
+Presentation metrics you analyze:
+- **Pacing Score**: How well they maintain ideal WPM
+- **Filler Rate**: Percentage of filler words (goal: <2%)
+- **Confidence Score**: Based on hedging language and vocal steadiness
+- **Pitch Variation**: Monotone vs. dynamic delivery (CV of pitch)
+- **Pause Quality**: Strategic pauses vs. filler-filled gaps
+- **Energy Score**: Vocal intensity and engagement level
+
+Your approach:
+1. Be encouraging but direct - presenters need honest feedback
+2. Give specific, actionable tips (not vague advice)
+3. Reference their actual presentation metrics when available
+4. Suggest relevant practice scenarios based on their goals
+5. Celebrate improvements in their presentation skills
+
+Keep responses concise (2-3 paragraphs) unless they ask for detailed breakdowns.
+End with actionable advice OR a question about their upcoming presentations."""
+
+
+def _build_user_context(db, user_id: int, profile: Optional[str] = None) -> str:
+    """Build comprehensive user context for the coach. Optionally filter by profile."""
     context_parts = []
     
+    # Profile filter for SQL queries
+    profile_filter = "AND profile = ?" if profile else ""
+    profile_params = (user_id, profile) if profile else (user_id,)
+    
     try:
-        # Get user's recording stats
-        cursor = db.conn.execute("""
-            SELECT 
-                COUNT(*) as total_recordings,
-                AVG(CASE WHEN profile = 'pronunciation' THEN pronunciation_mean_confidence END) as avg_pronunciation,
-                COUNT(DISTINCT profile) as profiles_used,
-                MAX(created_at) as last_recording
-            FROM speeches 
-            WHERE user_id = ?
-        """, (user_id,))
+        # Get user's recording stats (filtered by profile if specified)
+        if profile:
+            cursor = db.conn.execute(f"""
+                SELECT 
+                    COUNT(*) as total_recordings,
+                    MAX(created_at) as last_recording,
+                    AVG(cached_score) as avg_score
+                FROM speeches 
+                WHERE user_id = ? AND profile = ?
+            """, (user_id, profile))
+        else:
+            cursor = db.conn.execute("""
+                SELECT 
+                    COUNT(*) as total_recordings,
+                    AVG(CASE WHEN profile = 'pronunciation' THEN pronunciation_mean_confidence END) as avg_pronunciation,
+                    COUNT(DISTINCT profile) as profiles_used,
+                    MAX(created_at) as last_recording
+                FROM speeches 
+                WHERE user_id = ?
+            """, (user_id,))
         stats = cursor.fetchone()
         
         if stats and stats[0] > 0:
-            context_parts.append(f"User has {stats[0]} total recordings")
-            if stats[1]:
-                context_parts.append(f"Average pronunciation clarity: {stats[1]*100:.1f}%")
-            context_parts.append(f"Uses {stats[2]} different profiles")
-            if stats[3]:
-                context_parts.append(f"Last recording: {stats[3]}")
+            if profile:
+                # Profile-specific context (e.g., presentation)
+                context_parts.append(f"User has {stats[0]} {profile} recordings")
+                if stats[2]:  # avg_score
+                    context_parts.append(f"Average {profile} score: {stats[2]:.1f}")
+                if stats[1]:  # last_recording
+                    context_parts.append(f"Last {profile} recording: {stats[1]}")
+            else:
+                # General context
+                context_parts.append(f"User has {stats[0]} total recordings")
+                if stats[1]:
+                    context_parts.append(f"Average pronunciation clarity: {stats[1]*100:.1f}%")
+                context_parts.append(f"Uses {stats[2]} different profiles")
+                if stats[3]:
+                    context_parts.append(f"Last recording: {stats[3]}")
         
-        # Get projects
-        cursor = db.conn.execute("""
-            SELECT name, type FROM projects WHERE user_id = ? LIMIT 5
-        """, (user_id,))
+        # Get projects (filter by type if profile specified)
+        if profile == 'presentation':
+            cursor = db.conn.execute("""
+                SELECT name, type FROM projects WHERE user_id = ? AND type IN ('standard', 'group_meeting') LIMIT 5
+            """, (user_id,))
+        else:
+            cursor = db.conn.execute("""
+                SELECT name, type FROM projects WHERE user_id = ? LIMIT 5
+            """, (user_id,))
         projects = cursor.fetchall()
         if projects:
             project_names = [p[0] for p in projects]
             context_parts.append(f"Projects: {', '.join(project_names)}")
         
-        # Get recent scores trend
-        cursor = db.conn.execute("""
-            SELECT cached_score, created_at 
-            FROM speeches 
-            WHERE user_id = ? AND cached_score IS NOT NULL
-            ORDER BY created_at DESC
-            LIMIT 5
-        """, (user_id,))
+        # Get recent scores trend (filtered by profile if specified)
+        if profile:
+            cursor = db.conn.execute("""
+                SELECT cached_score, created_at 
+                FROM speeches 
+                WHERE user_id = ? AND profile = ? AND cached_score IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (user_id, profile))
+        else:
+            cursor = db.conn.execute("""
+                SELECT cached_score, created_at 
+                FROM speeches 
+                WHERE user_id = ? AND cached_score IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (user_id,))
         recent_scores = cursor.fetchall()
         if len(recent_scores) >= 2:
             avg_recent = sum(s[0] for s in recent_scores) / len(recent_scores)
             context_parts.append(f"Recent average score: {avg_recent:.1f}")
         
-        # Get common problem areas
-        cursor = db.conn.execute("""
-            SELECT grammar_analysis_json 
-            FROM speeches 
-            WHERE user_id = ? AND grammar_analysis_json IS NOT NULL
-            ORDER BY created_at DESC
-            LIMIT 5
-        """, (user_id,))
+        # Get common problem areas (filtered by profile if specified)
+        if profile:
+            cursor = db.conn.execute("""
+                SELECT grammar_analysis_json 
+                FROM speeches 
+                WHERE user_id = ? AND profile = ? AND grammar_analysis_json IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (user_id, profile))
+        else:
+            cursor = db.conn.execute("""
+                SELECT grammar_analysis_json 
+                FROM speeches 
+                WHERE user_id = ? AND grammar_analysis_json IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (user_id,))
         grammar_rows = cursor.fetchall()
         total_fillers = 0
         for row in grammar_rows:
@@ -2627,6 +3190,76 @@ async def upload_coach_document(
             os.unlink(tmp_path)
 
 
+@router.post("/coach/check-objectives", tags=["Coach"])
+async def check_objectives(
+    data: dict,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Check which objectives have been covered in the transcript.
+    
+    Uses LLM to semantically match transcript content against user-defined objectives.
+    Returns list of covered objectives.
+    """
+    import requests
+    
+    transcript = data.get("transcript", "").strip()
+    objectives = data.get("objectives", [])
+    
+    if not transcript or not objectives:
+        return {"covered": [], "uncovered": objectives}
+    
+    # Build prompt for LLM
+    obj_list = "\n".join([f"{i+1}. {obj}" for i, obj in enumerate(objectives)])
+    
+    prompt = f"""You are analyzing a presentation transcript to determine which talking points have been covered.
+
+OBJECTIVES TO CHECK:
+{obj_list}
+
+TRANSCRIPT:
+{transcript}
+
+For each objective, determine if the speaker has substantively addressed that topic.
+A topic is "covered" if the speaker has meaningfully discussed it, even if they didn't use the exact same words.
+
+Return ONLY a JSON array of the objectives that have been covered (use the exact text from the objectives list).
+Example: ["Explain Q3 results", "Discuss timeline"]
+
+If none are covered, return: []
+"""
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3.1:8b",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.1}
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            result = response.json().get("response", "[]").strip()
+            # Extract JSON array from response
+            import re
+            match = re.search(r'\[.*?\]', result, re.DOTALL)
+            if match:
+                covered = json.loads(match.group())
+                # Filter to only include valid objectives
+                covered = [c for c in covered if c in objectives]
+                uncovered = [o for o in objectives if o not in covered]
+                return {"covered": covered, "uncovered": uncovered}
+        
+        return {"covered": [], "uncovered": objectives}
+        
+    except Exception as e:
+        logger.error(f"Error checking objectives: {e}")
+        return {"covered": [], "uncovered": objectives}
+
+
 @router.post("/coach/live-feedback", tags=["Coach"])
 async def get_live_coach_feedback(
     data: dict,
@@ -2714,21 +3347,47 @@ PRESENTATION MATERIALS (what they're supposed to be covering):
 
 """
     
-    prompt = f"""You are a presentation coach giving feedback during a PAUSED session.
-The presenter pressed "Coach Me" for detailed advice on their recent speaking.
+    # Analyze the transcript for specific issues
+    transcript_lower = transcript.lower()
+    hedging_phrases = ['i think', 'maybe', 'sort of', 'kind of', 'probably', 'i guess', 'like']
+    hedge_examples = [p for p in hedging_phrases if p in transcript_lower]
+    
+    filler_words = ['um', 'uh', 'er', 'ah', 'like', 'you know', 'so', 'basically']
+    filler_examples = [w for w in filler_words if w in transcript_lower.split()]
+    
+    # Build specific issues section
+    issues = []
+    if wpm > 180:
+        issues.append(f"Speaking too fast ({wpm} WPM) - aim for 130-160 WPM")
+    elif wpm < 100 and wpm > 0:
+        issues.append(f"Speaking slowly ({wpm} WPM) - try to pick up the pace slightly")
+    
+    if filler_count > 3:
+        issues.append(f"Used {filler_count} filler words ({', '.join(filler_examples[:3])})")
+    
+    if hedge_examples:
+        issues.append(f"Hedging language detected: {', '.join(hedge_examples[:3])}")
+    
+    if confidence_score < 40:
+        issues.append(f"Low confidence score ({confidence_score}/100) - try speaking with more conviction")
+    
+    issues_section = ""
+    if issues:
+        issues_section = "\n\nSPECIFIC ISSUES TO ADDRESS:\n" + "\n".join(f"- {i}" for i in issues)
+    
+    prompt = f"""You are a speech coach. The presenter paused for feedback.
 {doc_section}
-Context:
-- Current pace: {wpm} WPM (ideal: 130-160)
-- Filler words used: {filler_count}
+THEIR METRICS:
+- Pace: {wpm} WPM (ideal: 130-160)
+- Filler words: {filler_count}
 - Confidence score: {confidence_score}/100
+{issues_section}
 
-Recent transcript (last part of their speech):
-"{transcript[-1500:]}"
+WHAT THEY JUST SAID:
+"{transcript[-1000:]}"
 
-Give 2-3 sentences of specific, actionable feedback on their most recent topic/segment.
-Be encouraging but direct. Focus on what they can improve RIGHT NOW when they resume.
-{"If relevant, mention how well they're covering the presentation materials." if document_context else ""}
-Start with what they did well, then give one clear improvement."""
+Give 2-3 sentences of SPECIFIC feedback. Reference EXACT phrases from their speech.
+Tell them ONE concrete thing to fix when they resume. Be direct but encouraging."""
     
     try:
         response = requests.post(
@@ -3340,19 +3999,21 @@ async def coach_chat(
     speech_id: Optional[int] = Body(None, description="Speech ID for context"),
     message: str = Body(..., description="User message to the coach"),
     history: Optional[List[Dict[str, str]]] = Body(None, description="Previous messages [{role, content}]"),
+    profile: Optional[str] = Body(None, description="Filter context to specific profile (e.g., 'presentation')"),
     auth: dict = Depends(flexible_auth),
 ):
     """
     Chat with the AI Speech Coach. Optionally provide a speech_id for context.
+    Optionally filter to a specific profile (e.g., 'presentation' for Present mode).
     Returns coaching advice based on the speech analysis and user question.
     """
     db = pipeline_runner.get_db()
     user_id = auth.get("user_id")
     
-    # Build user context (overall stats, projects, trends)
+    # Build user context (filtered by profile if specified)
     user_context = ""
     if user_id:
-        user_context = _build_user_context(db, user_id)
+        user_context = _build_user_context(db, user_id, profile=profile)
     
     # Build context from speech analysis if provided
     context = ""
@@ -3402,11 +4063,16 @@ async def coach_chat(
             
             context = "\n".join(context_parts)
     
-    # Build the prompt
-    prompt_parts = [COACH_SYSTEM_PROMPT]
+    # Build the prompt (use profile-specific prompt if available)
+    if profile == 'presentation':
+        system_prompt = PRESENT_COACH_SYSTEM_PROMPT
+    else:
+        system_prompt = COACH_SYSTEM_PROMPT
+    prompt_parts = [system_prompt]
     
     if user_context:
-        prompt_parts.append(f"\n--- User Overview ---\n{user_context}\n---")
+        profile_label = f"{profile.title()} " if profile else ""
+        prompt_parts.append(f"\n--- User {profile_label}Overview ---\n{user_context}\n---")
     
     if context:
         prompt_parts.append(f"\n--- Current Speech Analysis ---\n{context}\n---")
@@ -6197,4 +6863,82 @@ async def get_dementia_recording(speech_id: int, user: dict = Depends(flexible_a
         
     except Exception as e:
         logger.exception(f"Failed to get dementia recording: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+# =============================================================================
+# Beta Signups
+# =============================================================================
+
+class BetaSignupRequest(BaseModel):
+    app: str
+    email: str
+    name: Optional[str] = None
+    useCases: Optional[List[str]] = None
+    experience: Optional[str] = None
+    biggestChallenge: Optional[str] = None
+    features: Optional[str] = None
+    otherDetails: Optional[str] = None
+
+@router.post("/beta-signups", tags=["Beta"])
+async def create_beta_signup(req: BetaSignupRequest):
+    """Save a beta signup to the database."""
+    try:
+        import json
+        import sqlite3
+        conn = sqlite3.connect(config.DB_PATH)
+        cur = conn.cursor()
+        
+        # Use INSERT OR REPLACE to handle duplicates
+        cur.execute('''
+            INSERT OR REPLACE INTO beta_signups 
+            (app, email, name, use_cases, experience, biggest_challenge, features, other_details)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            req.app,
+            req.email,
+            req.name,
+            json.dumps(req.useCases) if req.useCases else None,
+            req.experience,
+            req.biggestChallenge,
+            req.features,
+            req.otherDetails,
+        ))
+        conn.commit()
+        
+        logger.info(f"Beta signup: {req.email} for {req.app}")
+        return {"success": True, "message": "Signed up for beta"}
+        
+    except Exception as e:
+        logger.exception(f"Beta signup failed: {e}")
+        return _error(500, "ERROR", str(e))
+
+@router.get("/beta-signups", tags=["Beta"])
+async def list_beta_signups(app: Optional[str] = None, auth: dict = Depends(flexible_auth)):
+    """List beta signups (admin only)."""
+    # Check if admin
+    email = auth.get("email", "")
+    if email != "jon.suppe@gmail.com":
+        return _error(403, "FORBIDDEN", "Admin only")
+    
+    try:
+        import sqlite3
+        conn = sqlite3.connect(config.DB_PATH)
+        cur = conn.cursor()
+        
+        if app:
+            cur.execute('SELECT * FROM beta_signups WHERE app = ? ORDER BY created_at DESC', (app,))
+        else:
+            cur.execute('SELECT * FROM beta_signups ORDER BY created_at DESC')
+        
+        rows = cur.fetchall()
+        columns = [desc[0] for desc in cur.description]
+        
+        return {
+            "signups": [dict(zip(columns, row)) for row in rows],
+            "total": len(rows)
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to list beta signups: {e}")
         return _error(500, "ERROR", str(e))

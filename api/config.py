@@ -44,7 +44,8 @@ DEFAULT_QUALITY_GATE = "warn"
 # Limits
 MAX_FILE_SIZE_MB = 50
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-MAX_DURATION_SEC = 600  # 10 minutes
+MAX_DURATION_SEC = 1800  # 30 minutes (free tier)
+MAX_DURATION_SEC_PRO = 3600  # 1 hour (pro/power/admin)
 
 # Accepted audio formats (extension -> MIME types)
 ALLOWED_EXTENSIONS = {"mp3", "wav", "aac", "ogg", "m4a", "flac", "webm"}

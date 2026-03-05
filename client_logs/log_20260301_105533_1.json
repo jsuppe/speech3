@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-03-01T10:55:33.713923",
+  "app_version": "1.0.38",
+  "build_number": "42",
+  "patch_number": 13,
+  "platform": "android",
+  "user_id": 1,
+  "user_email": "jon.suppe@gmail.com",
+  "api_url": "https://api.speakfit.app",
+  "preferred_accent": "en-US",
+  "default_profile": "general",
+  "notifications_enabled": true,
+  "tier": "premium",
+  "tts_logs": [
+    "[2026-03-01T10:55:23.623869] refreshStatus called, token present: true",
+    "[2026-03-01T10:55:23.723778] tier from API: admin, isPro=true",
+    "[2026-03-01T10:55:23.723852] tier=admin, isPro=true",
+    "[2026-03-01T10:55:23.752503] refreshStatus called, token present: true",
+    "[2026-03-01T10:55:23.781498] tier from API: admin, isPro=true",
+    "[2026-03-01T10:55:23.781636] tier=admin, isPro=true"
+  ],
+  "tts_is_pro": true,
+  "tts_selected_voice": "bella",
+  "server_received_at": "2026-03-01T15:55:33.773169"
+}

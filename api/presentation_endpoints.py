@@ -104,6 +104,19 @@ async def analyze_presentation_readiness(
         advanced_audio=advanced_audio
     )
     
+    # Cache the readiness score for presentation profile
+    # This ensures the list view shows the correct score
+    if speech['profile'] == 'presentation':
+        try:
+            db.execute(
+                "UPDATE speeches SET cached_score = ?, cached_score_profile = ? WHERE id = ?",
+                (report.readiness_score, 'presentation', speech_id)
+            )
+            db.commit()
+            logger.info(f"Cached readiness score {report.readiness_score} for speech {speech_id}")
+        except Exception as e:
+            logger.warning(f"Failed to cache readiness score: {e}")
+    
     return report.to_dict()
 
 

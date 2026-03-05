@@ -193,7 +193,14 @@ def run_whisper_stt(audio_path: str, language: str = "en") -> dict:
         segments = list(segments_gen)
         full_text = " ".join(seg.text.strip() for seg in segments)
         
-        return {"text": full_text, "language": info.language}
+        # Calculate speech duration (sum of segment durations, excludes pauses)
+        speech_duration = sum(seg.end - seg.start for seg in segments)
+        
+        return {
+            "text": full_text, 
+            "language": info.language,
+            "speech_duration": round(speech_duration, 2),
+        }
     except Exception as e:
         logger.error(f"Whisper STT error: {e}")
         return {"text": "", "error": str(e)}
@@ -673,6 +680,7 @@ def persist_result(
     user_id: int = None,
     profile: str = "general",
     reference_text: str = None,
+    coach_session_data: str = None,
 ) -> int | None:
     """
     Persist analysis result + audio (as Opus) to SQLite.
@@ -807,6 +815,17 @@ def persist_result(
                     db.conn.commit()
                 except Exception as e:
                     logger.warning(f"Failed to save reference_text: {e}")
+            
+            # Store coach session data (documents, objectives, notes)
+            if coach_session_data and speech_id:
+                try:
+                    db.conn.execute(
+                        "UPDATE speeches SET coach_session_data = ? WHERE id = ?",
+                        (coach_session_data, speech_id)
+                    )
+                    db.conn.commit()
+                except Exception as e:
+                    logger.warning(f"Failed to save coach_session_data: {e}")
 
             # Store audio as Opus (if file still exists)
             if audio_exists:

@@ -36,10 +36,15 @@ async def transcribe_audio(
         result = run_whisper_stt(tmp_path)
         
         text = ""
+        speech_duration = 0.0
         if result and "text" in result:
             text = result["text"].strip()
+            speech_duration = result.get("speech_duration", 0.0)
         
-        response = {"text": text}
+        response = {
+            "text": text,
+            "speech_duration": speech_duration,  # Actual speaking time (excludes pauses)
+        }
         
         # Optionally analyze confidence/nervousness from audio + text
         if analyze_confidence and text:

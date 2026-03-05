@@ -22,10 +22,17 @@
                     <li>• Oratory</li>
                 </ul>
             </li>
-            <li><a href="#grades" class="text-indigo-400 hover:text-indigo-300">5. Grade Scale</a></li>
-            <li><a href="#limitations" class="text-indigo-400 hover:text-indigo-300">6. Limitations &amp; Caveats</a></li>
+            <li><a href="#live-coaching" class="text-indigo-400 hover:text-indigo-300">5. Live Coaching</a>
+                <ul class="ml-4 mt-1 space-y-0.5 text-gray-500">
+                    <li>• Real-time WPM Calculation</li>
+                    <li>• Hybrid Speech-to-Text</li>
+                    <li>• Transcript Annotation</li>
+                </ul>
+            </li>
+            <li><a href="#grades" class="text-indigo-400 hover:text-indigo-300">6. Grade Scale</a></li>
+            <li><a href="#limitations" class="text-indigo-400 hover:text-indigo-300">7. Limitations &amp; Caveats</a></li>
             {% if is_admin %}
-            <li><a href="#internals" class="text-indigo-400 hover:text-indigo-300">7. Pipeline Internals <span class="text-xs text-indigo-500">(Admin)</span></a></li>
+            <li><a href="#internals" class="text-indigo-400 hover:text-indigo-300">8. Pipeline Internals <span class="text-xs text-indigo-500">(Admin)</span></a></li>
             {% endif %}
         </ol>
     </nav>
@@ -302,10 +309,158 @@
         {% endfor %}
     </section>
 
-    <!-- 5. Grade Scale -->
+    <!-- 5. Live Coaching -->
+    <section id="live-coaching" class="mb-10">
+        <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-indigo-400">5.</span> Live Coaching
+        </h2>
+        <p class="text-gray-300 mb-6 text-sm">Real-time speech analysis for presentations, calls, and practice sessions. Available in the mobile app's Present mode.</p>
+
+        <!-- Real-time WPM -->
+        <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">⚡</span>
+                <h3 class="text-white font-semibold">Real-time WPM Calculation</h3>
+            </div>
+            <p class="text-sm text-gray-300 mb-4">Words Per Minute is calculated using a 15-second sliding window with intelligent pause detection:</p>
+            
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">📐 The Algorithm</h4>
+            <div class="bg-gray-900/50 rounded-lg p-4 font-mono text-xs text-gray-300 mb-4">
+                <p class="text-cyan-400 mb-2">// For each word in the 15-second window:</p>
+                <p>1. Track timestamp of each transcribed word</p>
+                <p>2. Calculate gaps between consecutive words</p>
+                <p>3. <span class="text-amber-400">If gap > 2 seconds → it's a PAUSE (excluded)</span></p>
+                <p>4. Sum only "speaking time" (gaps < 2s)</p>
+                <p>5. <span class="text-green-400">WPM = (word_count × 60) / speaking_seconds</span></p>
+            </div>
+
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">🎯 Why Exclude Pauses?</h4>
+            <ul class="text-sm text-gray-400 space-y-2 mb-4">
+                <li><strong class="text-white">Breathing:</strong> Natural pauses for breath shouldn't penalize your speaking rate</li>
+                <li><strong class="text-white">Thinking:</strong> Strategic pauses to gather thoughts are good presentation practice</li>
+                <li><strong class="text-white">Emphasis:</strong> Dramatic pauses for effect are a rhetorical tool</li>
+            </ul>
+            <p class="text-xs text-gray-500">Without pause exclusion, a 30-word burst followed by 10 seconds of silence would show ~60 WPM instead of the actual ~150 WPM speaking rate.</p>
+
+            <h4 class="text-white font-medium text-sm mt-4 mb-2">🎨 Pace Status Indicators</h4>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
+                <div class="bg-orange-500/20 border border-orange-500/30 rounded-lg p-2 text-center">
+                    <div class="text-orange-400 font-bold">&lt;100</div>
+                    <div class="text-xs text-gray-400">Too Slow</div>
+                </div>
+                <div class="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-2 text-center">
+                    <div class="text-yellow-400 font-bold">100-129</div>
+                    <div class="text-xs text-gray-400">Slow</div>
+                </div>
+                <div class="bg-green-500/20 border border-green-500/30 rounded-lg p-2 text-center">
+                    <div class="text-green-400 font-bold">130-160</div>
+                    <div class="text-xs text-gray-400">Good Pace ✓</div>
+                </div>
+                <div class="bg-orange-500/20 border border-orange-500/30 rounded-lg p-2 text-center">
+                    <div class="text-orange-400 font-bold">161-180</div>
+                    <div class="text-xs text-gray-400">Fast</div>
+                </div>
+                <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-2 text-center">
+                    <div class="text-red-400 font-bold">&gt;180</div>
+                    <div class="text-xs text-gray-400">Too Fast</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hybrid STT -->
+        <div class="bg-purple-900/20 border border-purple-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">🎤</span>
+                <h3 class="text-white font-semibold">Hybrid Speech-to-Text</h3>
+            </div>
+            <p class="text-sm text-gray-300 mb-4">Live coaching uses two STT systems in parallel for the best balance of speed and accuracy:</p>
+            
+            <div class="grid md:grid-cols-2 gap-4 mb-4">
+                <div class="bg-gray-900/50 rounded-lg p-4">
+                    <h4 class="text-purple-400 font-medium text-sm mb-2">⚡ On-Device STT (Instant)</h4>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li>• Native Android/iOS speech recognition</li>
+                        <li>• ~200ms latency</li>
+                        <li>• Words appear immediately</li>
+                        <li>• Shown in <em class="text-gray-300">italic</em> (provisional)</li>
+                        <li>• Good for: immediate feedback feel</li>
+                    </ul>
+                </div>
+                <div class="bg-gray-900/50 rounded-lg p-4">
+                    <h4 class="text-blue-400 font-medium text-sm mb-2">🎯 Whisper STT (Accurate)</h4>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li>• Server-side Whisper large-v3</li>
+                        <li>• ~1.5s chunks sent for processing</li>
+                        <li>• Higher accuracy, especially for names</li>
+                        <li>• Replaces provisional words (solid text)</li>
+                        <li>• Good for: final transcript, WPM counting</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500">The hybrid approach gives you instant visual feedback while maintaining accuracy for metrics and final analysis.</p>
+        </div>
+
+        <!-- Transcript Annotation -->
+        <div class="bg-green-900/20 border border-green-500/30 rounded-xl p-5 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-2xl">🏷️</span>
+                <h3 class="text-white font-semibold">Transcript Annotation</h3>
+            </div>
+            <p class="text-sm text-gray-300 mb-4">Words are color-coded in real-time based on their impact on your presentation:</p>
+            
+            <div class="space-y-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-green-400"></span>
+                    <div>
+                        <span class="text-green-400 font-medium text-sm">Positive Indicators</span>
+                        <p class="text-xs text-gray-400">"definitely", "specifically", "for example", "in fact", "evidence shows"</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                    <div>
+                        <span class="text-red-400 font-medium text-sm">Filler Words</span>
+                        <p class="text-xs text-gray-400">"um", "uh", "er", "ah", "like", "you know", "basically", "literally"</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-orange-400"></span>
+                    <div>
+                        <span class="text-orange-400 font-medium text-sm">Hedging Language</span>
+                        <p class="text-xs text-gray-400">"I think", "I guess", "maybe", "perhaps", "sort of", "kind of", "just"</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-gray-500"></span>
+                    <div>
+                        <span class="text-gray-400 font-medium text-sm">Provisional (On-Device)</span>
+                        <p class="text-xs text-gray-400">Words from on-device STT not yet confirmed by Whisper. Shown in italic.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-900/50 rounded-lg p-3 text-xs">
+                <p class="text-green-400 font-medium mb-1">💡 Live Counters</p>
+                <p class="text-gray-400">The transcript header shows running counts: <span class="text-green-400">✓ 3</span> positive indicators, <span class="text-orange-400">⚠ 2</span> hedges/fillers. Use these to self-correct in real-time.</p>
+            </div>
+        </div>
+
+        <!-- Technical Notes -->
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <h3 class="text-white font-medium mb-3">⚙️ Technical Notes</h3>
+            <ul class="text-sm text-gray-400 space-y-2">
+                <li><strong class="text-white">Audio Recording:</strong> Chunks are recorded every 1.5 seconds and sent to the server. A full session recording also runs in parallel for post-session analysis.</li>
+                <li><strong class="text-white">Audio Focus:</strong> The app uses <code class="bg-gray-800 px-1 rounded">AudioInterruptionMode.none</code> so it doesn't pause your background music or other audio apps.</li>
+                <li><strong class="text-white">Screen Wakelock:</strong> The screen stays on during live coaching sessions to prevent interruption.</li>
+                <li><strong class="text-white">Privacy:</strong> Audio chunks are processed and discarded. Only the full session recording (if you choose to save) is stored for later analysis.</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- 6. Grade Scale -->
     <section id="grades" class="mb-10">
         <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-            <span class="text-indigo-400">5.</span> Grade Scale
+            <span class="text-indigo-400">6.</span> Grade Scale
         </h2>
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
             <div class="grid grid-cols-5 sm:grid-cols-10 gap-2 text-center">
@@ -329,10 +484,10 @@
         </div>
     </section>
 
-    <!-- 6. Limitations -->
+    <!-- 7. Limitations -->
     <section id="limitations" class="mb-10">
         <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-            <span class="text-indigo-400">6.</span> Limitations &amp; Caveats
+            <span class="text-indigo-400">7.</span> Limitations &amp; Caveats
         </h2>
         <div class="space-y-3 text-sm text-gray-300">
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
@@ -359,12 +514,12 @@
     </section>
 
     {% if is_admin %}
-    <!-- 7. Pipeline Internals (Admin Only) -->
+    <!-- 8. Pipeline Internals (Admin Only) -->
     <section id="internals" class="mb-10 mt-12 border-t-2 border-indigo-500/30 pt-8">
         <div class="flex items-center gap-3 mb-6">
             <span class="bg-indigo-500/20 text-indigo-400 text-xs font-medium px-2 py-1 rounded">ADMIN ONLY</span>
             <h2 class="text-xl font-semibold text-white flex items-center gap-2">
-                <span class="text-indigo-400">7.</span> Pipeline Internals
+                <span class="text-indigo-400">8.</span> Pipeline Internals
             </h2>
         </div>
         

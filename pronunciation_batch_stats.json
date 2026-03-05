@@ -1,172 +1,7 @@
 {
-  "batches_completed": 75,
-  "total_recordings_processed": 7000,
+  "batches_completed": 90,
+  "total_recordings_processed": 8400,
   "batch_history": [
-    {
-      "timestamp": "2026-02-27T15:24:13.234715",
-      "batch_size": 100,
-      "elapsed_seconds": 7.295644283294678,
-      "load_before": {
-        "cpu_percent": 1.125,
-        "memory_percent": 24.536451651438895,
-        "gpu_memory_used_mb": 3940,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T15:54:15.347017",
-      "batch_size": 100,
-      "elapsed_seconds": 7.276301860809326,
-      "load_before": {
-        "cpu_percent": 1.625,
-        "memory_percent": 24.57996595252282,
-        "gpu_memory_used_mb": 3940,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T16:24:13.352351",
-      "batch_size": 100,
-      "elapsed_seconds": 7.334024667739868,
-      "load_before": {
-        "cpu_percent": 0.625,
-        "memory_percent": 10.43528777465893,
-        "gpu_memory_used_mb": 3940,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T16:50:37.501689",
-      "batch_size": 100,
-      "elapsed_seconds": 7.345199823379517,
-      "load_before": {
-        "cpu_percent": 2.625,
-        "memory_percent": 9.949203713836718,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T17:20:32.851235",
-      "batch_size": 100,
-      "elapsed_seconds": 7.352509260177612,
-      "load_before": {
-        "cpu_percent": 5.625,
-        "memory_percent": 10.273863950718987,
-        "gpu_memory_used_mb": 3976,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T17:50:32.575695",
-      "batch_size": 100,
-      "elapsed_seconds": 7.319765090942383,
-      "load_before": {
-        "cpu_percent": 1.25,
-        "memory_percent": 10.499275815950925,
-        "gpu_memory_used_mb": 7416,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T18:08:00.076903",
-      "batch_size": 100,
-      "elapsed_seconds": 7.214585542678833,
-      "load_before": {
-        "cpu_percent": 26.625,
-        "memory_percent": 17.47464747576909,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T18:08:18.582003",
-      "batch_size": 100,
-      "elapsed_seconds": 7.181169748306274,
-      "load_before": {
-        "cpu_percent": 19.75,
-        "memory_percent": 18.29587194411484,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T18:23:22.920403",
-      "batch_size": 100,
-      "elapsed_seconds": 7.198202610015869,
-      "load_before": {
-        "cpu_percent": 22.125,
-        "memory_percent": 25.896191446380335,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T18:23:41.314440",
-      "batch_size": 100,
-      "elapsed_seconds": 7.103728294372559,
-      "load_before": {
-        "cpu_percent": 28.000000000000004,
-        "memory_percent": 26.793167536993234,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T18:24:02.761912",
-      "batch_size": 100,
-      "elapsed_seconds": 7.162044525146484,
-      "load_before": {
-        "cpu_percent": 21.625,
-        "memory_percent": 26.865963057733033,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T18:36:58.761399",
-      "batch_size": 100,
-      "elapsed_seconds": 7.183646202087402,
-      "load_before": {
-        "cpu_percent": 8.125,
-        "memory_percent": 26.321207072357332,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-27T19:06:58.067677",
-      "batch_size": 100,
-      "elapsed_seconds": 7.246457099914551,
-      "load_before": {
-        "cpu_percent": 0.8750000000000001,
-        "memory_percent": 25.863540514283812,
-        "gpu_memory_used_mb": 3740,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-28T09:01:46.018423",
-      "batch_size": 100,
-      "elapsed_seconds": 7.2754926681518555,
-      "load_before": {
-        "cpu_percent": 28.125,
-        "memory_percent": 29.598163764271078,
-        "gpu_memory_used_mb": 3634,
-        "is_underutilized": true
-      }
-    },
-    {
-      "timestamp": "2026-02-28T09:31:28.528791",
-      "batch_size": 100,
-      "elapsed_seconds": 7.255573749542236,
-      "load_before": {
-        "cpu_percent": 26.375,
-        "memory_percent": 27.937461660185082,
-        "gpu_memory_used_mb": 3634,
-        "is_underutilized": true
-      }
-    },
     {
       "timestamp": "2026-02-28T10:01:19.622641",
       "batch_size": 100,
@@ -221,8 +56,173 @@
         "gpu_memory_used_mb": 3634,
         "is_underutilized": true
       }
+    },
+    {
+      "timestamp": "2026-03-01T09:31:46.771648",
+      "batch_size": 100,
+      "elapsed_seconds": 7.584904432296753,
+      "load_before": {
+        "cpu_percent": 22.125,
+        "memory_percent": 15.184260732334941,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T10:01:36.079271",
+      "batch_size": 100,
+      "elapsed_seconds": 7.561584234237671,
+      "load_before": {
+        "cpu_percent": 24.625,
+        "memory_percent": 8.954818248368102,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T10:31:26.493105",
+      "batch_size": 100,
+      "elapsed_seconds": 7.586436986923218,
+      "load_before": {
+        "cpu_percent": 14.499999999999998,
+        "memory_percent": 9.7952969421517,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T11:01:27.367428",
+      "batch_size": 100,
+      "elapsed_seconds": 7.57262110710144,
+      "load_before": {
+        "cpu_percent": 11.5,
+        "memory_percent": 9.799664297568967,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T11:31:46.395677",
+      "batch_size": 100,
+      "elapsed_seconds": 7.6459739208221436,
+      "load_before": {
+        "cpu_percent": 12.25,
+        "memory_percent": 9.408719078378514,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T12:01:26.791236",
+      "batch_size": 100,
+      "elapsed_seconds": 7.596912384033203,
+      "load_before": {
+        "cpu_percent": 15.0,
+        "memory_percent": 9.268179040891035,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T12:31:26.075671",
+      "batch_size": 100,
+      "elapsed_seconds": 7.6428258419036865,
+      "load_before": {
+        "cpu_percent": 18.25,
+        "memory_percent": 8.859673160015824,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T13:01:25.212553",
+      "batch_size": 100,
+      "elapsed_seconds": 7.649147987365723,
+      "load_before": {
+        "cpu_percent": 11.5,
+        "memory_percent": 9.171531533613885,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T13:31:26.000605",
+      "batch_size": 100,
+      "elapsed_seconds": 7.567957878112793,
+      "load_before": {
+        "cpu_percent": 25.0,
+        "memory_percent": 8.899149673467189,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T13:31:42.700971",
+      "batch_size": 100,
+      "elapsed_seconds": 7.286731243133545,
+      "load_before": {
+        "cpu_percent": 26.125,
+        "memory_percent": 11.804140532738284,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T13:57:20.530857",
+      "batch_size": 100,
+      "elapsed_seconds": 7.462520599365234,
+      "load_before": {
+        "cpu_percent": 50.375,
+        "memory_percent": 16.356761843182134,
+        "gpu_memory_used_mb": 4014,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T15:11:53.591947",
+      "batch_size": 100,
+      "elapsed_seconds": 7.501386880874634,
+      "load_before": {
+        "cpu_percent": 24.375,
+        "memory_percent": 20.61100397167789,
+        "gpu_memory_used_mb": 9311,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-01T21:14:55.211536",
+      "batch_size": 50,
+      "elapsed_seconds": 7.507162809371948,
+      "load_before": {
+        "cpu_percent": 28.499999999999996,
+        "memory_percent": 22.6369398585354,
+        "gpu_memory_used_mb": 10427,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-02T16:23:42.427086",
+      "batch_size": 50,
+      "elapsed_seconds": 7.329357385635376,
+      "load_before": {
+        "cpu_percent": 23.375,
+        "memory_percent": 29.99137781851814,
+        "gpu_memory_used_mb": 10839,
+        "is_underutilized": true
+      }
+    },
+    {
+      "timestamp": "2026-03-02T16:23:55.162769",
+      "batch_size": 100,
+      "elapsed_seconds": 7.5109405517578125,
+      "load_before": {
+        "cpu_percent": 21.625,
+        "memory_percent": 30.158900569976378,
+        "gpu_memory_used_mb": 10839,
+        "is_underutilized": true
+      }
     }
   ],
-  "average_batch_time_seconds": 7.322736394405365,
-  "last_check": "2026-02-28T12:01:11.725332"
+  "average_batch_time_seconds": 7.535842335224151,
+  "last_check": "2026-03-02T16:23:47.612296"
 }

@@ -306,6 +306,12 @@ class SpeechDB:
             d = dict(row)
             d["products"] = json.loads(d["products"]) if d["products"] else []
             d["tags"] = json.loads(d["tags"]) if d["tags"] else []
+            # Parse coach session data (objectives, documents, notes from live coaching)
+            if d.get("coach_session_data"):
+                try:
+                    d["coach_session_data"] = json.loads(d["coach_session_data"])
+                except:
+                    pass
             return d
         return None
 
@@ -400,10 +406,17 @@ class SpeechDB:
             return False
         
         # Delete from all related tables (CASCADE should handle this, but be explicit)
+        # Core tables
         self.conn.execute("DELETE FROM spectrograms WHERE speech_id = ?", (speech_id,))
         self.conn.execute("DELETE FROM analyses WHERE speech_id = ?", (speech_id,))
         self.conn.execute("DELETE FROM transcriptions WHERE speech_id = ?", (speech_id,))
         self.conn.execute("DELETE FROM audio WHERE speech_id = ?", (speech_id,))
+        # Cache and annotation tables
+        self.conn.execute("DELETE FROM oratory_cache WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM content_analysis_cache WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM speech_summaries WHERE speech_id = ?", (speech_id,))
+        self.conn.execute("DELETE FROM dementia_annotations WHERE speech_id = ?", (speech_id,))
+        # Finally delete the speech itself
         self.conn.execute("DELETE FROM speeches WHERE id = ?", (speech_id,))
         self.conn.commit()
         

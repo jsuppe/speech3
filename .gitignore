@@ -37,3 +37,4 @@ run_all_samples.py
 # Large datasets (stored externally)
 datasets/
 audio/
+frontend/static/downloads/*-debug.apk

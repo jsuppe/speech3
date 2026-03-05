@@ -552,5 +552,6 @@ async def flexible_auth(
         "user_id": user_id,
         "email": payload.get("email"),
         "name": payload.get("name"),
+        "tier": user_tier,
         "key_data": None,
     }

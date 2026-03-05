@@ -36,6 +36,12 @@
             font-size: 3rem;
             line-height: 1;
         }
+        .future-card {
+            opacity: 0.85;
+        }
+        .future-card:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="text-gray-100 min-h-screen">
@@ -47,8 +53,8 @@
                     <span class="text-indigo-400">Speak</span>Fit
                 </a>
                 <div class="flex items-center gap-6">
-                    <a href="#apps" class="text-sm text-gray-400 hover:text-white transition-colors">Apps</a>
-                    <a href="#about" class="text-sm text-gray-400 hover:text-white transition-colors">About</a>
+                    <a href="#present" class="text-sm text-gray-400 hover:text-white transition-colors">Present</a>
+                    <a href="#future" class="text-sm text-gray-400 hover:text-white transition-colors">Coming Soon</a>
                     <a href="/docs" class="text-sm text-gray-400 hover:text-white transition-colors">API</a>
                     <a href="/login" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
                         Dashboard
@@ -59,7 +65,7 @@
     </nav>
 
     <!-- Hero -->
-    <section class="pt-32 pb-20 px-4">
+    <section class="pt-32 pb-12 px-4">
         <div class="mx-auto max-w-4xl text-center fade-in">
             <h1 class="text-5xl sm:text-6xl font-extrabold text-white mb-6 leading-tight">
                 Speech & Language Apps<br>
@@ -71,102 +77,50 @@
         </div>
     </section>
 
-    <!-- Apps Grid -->
-    <section id="apps" class="py-16 px-4">
-        <div class="mx-auto max-w-6xl">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                <!-- SpeakFit (Main) -->
-                <div class="app-card bg-gradient-to-br from-indigo-900/50 to-indigo-950/50 border border-indigo-500/30 rounded-2xl p-8 fade-in-delay">
-                    <div class="app-icon mb-4">🎯</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">SpeakFit</h3>
-                    <p class="text-indigo-300 text-sm font-medium mb-4">Complete Speech Analysis</p>
-                    <p class="text-gray-400 leading-relaxed mb-6">
-                        The full platform — analyze any recording for voice quality, pacing, clarity, and rhetorical patterns. Get detailed scores and AI coaching.
-                    </p>
-                    <div class="pt-4 border-t border-indigo-500/20">
-                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
-                        <p class="text-sm text-gray-300">Professionals, students, anyone wanting comprehensive speech feedback</p>
-                    </div>
-                </div>
-
-                <!-- Pronounce -->
-                <div class="app-card bg-gradient-to-br from-emerald-900/50 to-emerald-950/50 border border-emerald-500/30 rounded-2xl p-8 fade-in-delay">
-                    <div class="app-icon mb-4">🗣️</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">Pronounce</h3>
-                    <p class="text-emerald-300 text-sm font-medium mb-4">Pronunciation Training</p>
-                    <p class="text-gray-400 leading-relaxed mb-6">
-                        Master difficult sounds with word-by-word feedback. Practice tongue twisters, get tips for TH, R, L, and more. Perfect your accent.
-                    </p>
-                    <div class="pt-4 border-t border-emerald-500/20">
-                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
-                        <p class="text-sm text-gray-300">ESL learners, accent reduction, speech therapy support</p>
-                    </div>
-                </div>
-
-                <!-- Present -->
-                <a href="/present" class="app-card bg-gradient-to-br from-amber-900/50 to-amber-950/50 border border-amber-500/30 rounded-2xl p-8 fade-in-delay block">
-                    <div class="app-icon mb-4">🎤</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">Present</h3>
-                    <p class="text-amber-300 text-sm font-medium mb-4">Public Speaking & Interview Coach</p>
-                    <p class="text-gray-400 leading-relaxed mb-6">
-                        Practice presentations and job interviews with AI feedback on pacing, filler words, pitch variation, and confidence.
-                    </p>
-                    <div class="pt-4 border-t border-amber-500/20">
-                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Features</p>
-                        <p class="text-sm text-gray-300">AI Interview Practice • Live Coaching • Delivery Analysis</p>
-                    </div>
-                </a>
-
-                <!-- Reading -->
-                <div class="app-card bg-gradient-to-br from-sky-900/50 to-sky-950/50 border border-sky-500/30 rounded-2xl p-8 fade-in-delay-2">
-                    <div class="app-icon mb-4">📖</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">Reading</h3>
-                    <p class="text-sky-300 text-sm font-medium mb-4">Adult Literacy</p>
-                    <p class="text-gray-400 leading-relaxed mb-6">
-                        Build reading fluency with guided practice. Track words per minute, accuracy, and comprehension. Supportive, judgment-free learning.
-                    </p>
-                    <div class="pt-4 border-t border-sky-500/20">
-                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
-                        <p class="text-sm text-gray-300">Adult literacy learners, GED prep, reading improvement programs</p>
-                    </div>
-                </div>
-
-                <!-- Memory -->
-                <div class="app-card bg-gradient-to-br from-purple-900/50 to-purple-950/50 border border-purple-500/30 rounded-2xl p-8 fade-in-delay-2">
-                    <div class="app-icon mb-4">🧠</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">Memory</h3>
-                    <p class="text-purple-300 text-sm font-medium mb-4">Cognitive Assessment</p>
-                    <p class="text-gray-400 leading-relaxed mb-6">
-                        Track speech patterns that may indicate cognitive changes — word-finding, repetition, language complexity. For home monitoring between checkups.
-                    </p>
-                    <div class="pt-4 border-t border-purple-500/20">
-                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
-                        <p class="text-sm text-gray-300">Seniors, caregivers, families monitoring cognitive health</p>
-                    </div>
-                </div>
-
-                <!-- Phonics -->
-                <div class="app-card bg-gradient-to-br from-pink-900/50 to-pink-950/50 border border-pink-500/30 rounded-2xl p-8 fade-in-delay-2">
-                    <div class="app-icon mb-4">🦉</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">Phonics</h3>
-                    <p class="text-pink-300 text-sm font-medium mb-4">Kids Learning to Read</p>
-                    <p class="text-gray-400 leading-relaxed mb-6">
-                        Fun reading practice with Ollie the Owl! Earn stars and badges, explore stories, and build phonics skills from Pre-K through 5th grade.
-                    </p>
-                    <div class="pt-4 border-t border-pink-500/20">
-                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">For</p>
-                        <p class="text-sm text-gray-300">Children ages 4-11, parents, teachers, homeschool families</p>
-                    </div>
-                </div>
-
+    <!-- Featured: Present -->
+    <section id="present" class="py-12 px-4">
+        <div class="mx-auto max-w-4xl">
+            <div class="text-center mb-8 fade-in">
+                <span class="inline-block px-4 py-1 bg-amber-500/20 text-amber-300 text-sm font-semibold rounded-full mb-4">
+                    🚀 Available Now
+                </span>
+                <h2 class="text-3xl font-bold text-white">Our First Release</h2>
             </div>
+            
+            <a href="/present" class="app-card block bg-gradient-to-br from-amber-900/60 to-amber-950/60 border-2 border-amber-500/50 rounded-3xl p-10 fade-in-delay hover:border-amber-400/70">
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <div class="text-7xl">🎤</div>
+                    <div class="flex-1 text-center md:text-left">
+                        <h3 class="text-3xl font-bold text-white mb-2">Present</h3>
+                        <p class="text-amber-300 text-lg font-medium mb-4">Public Speaking & Interview Coach</p>
+                        <p class="text-gray-300 leading-relaxed mb-6 text-lg">
+                            Practice presentations and job interviews with real-time AI feedback on pacing, filler words, pitch variation, and confidence. Get a floating overlay that coaches you while you present.
+                        </p>
+                        <div class="flex flex-wrap gap-3 justify-center md:justify-start">
+                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">AI Interview Practice</span>
+                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">Live Coaching Overlay</span>
+                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">Delivery Analysis</span>
+                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">Confidence Scoring</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t border-amber-500/30 flex flex-col sm:flex-row gap-4 justify-center">
+                    <span class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl transition-all">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.523 2H6.477C5.66 2 5 2.66 5 3.477v17.046C5 21.34 5.66 22 6.477 22h11.046c.817 0 1.477-.66 1.477-1.477V3.477C19 2.66 18.34 2 17.523 2zM12 20.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm4-5H8v-11h8v11z"/></svg>
+                        Download for Android
+                    </span>
+                    <span class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-all">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                        iOS Coming Soon
+                    </span>
+                </div>
+            </a>
         </div>
     </section>
 
     <!-- About Section -->
-    <section id="about" class="py-20 px-4 border-t border-gray-800/50">
-        <div class="mx-auto max-w-3xl text-center fade-in-delay-3">
+    <section id="about" class="py-16 px-4 border-t border-gray-800/50">
+        <div class="mx-auto max-w-3xl text-center fade-in-delay-2">
             <h2 class="text-3xl font-bold text-white mb-6">Built on Science</h2>
             <p class="text-gray-400 leading-relaxed mb-8">
                 All SpeakFit apps are powered by the same advanced speech analysis engine — 
@@ -184,8 +138,111 @@
         </div>
     </section>
 
+    <!-- Future Apps -->
+    <section id="future" class="py-16 px-4 border-t border-gray-800/50 bg-gray-900/30">
+        <div class="mx-auto max-w-6xl">
+            <div class="text-center mb-12 fade-in-delay-2">
+                <span class="inline-block px-4 py-1 bg-gray-700/50 text-gray-400 text-sm font-semibold rounded-full mb-4">
+                    🔮 Coming Soon
+                </span>
+                <h2 class="text-3xl font-bold text-white mb-4">Our Future</h2>
+                <p class="text-gray-500 max-w-xl mx-auto">
+                    We're building a complete family of speech and language apps. Here's what's on the roadmap.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Pronounce -->
+                <div class="future-card app-card bg-gradient-to-br from-emerald-900/40 to-emerald-950/40 border border-emerald-500/20 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4 opacity-80">🗣️</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Pronounce</h3>
+                    <p class="text-emerald-300/80 text-sm font-medium mb-4">Pronunciation Training</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        Master difficult sounds with word-by-word feedback. Practice tongue twisters, get tips for TH, R, L, and more.
+                    </p>
+                    <div class="pt-4 border-t border-emerald-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">ESL learners, accent reduction, speech therapy</p>
+                    </div>
+                </div>
+
+                <!-- Reading -->
+                <div class="future-card app-card bg-gradient-to-br from-sky-900/40 to-sky-950/40 border border-sky-500/20 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4 opacity-80">📖</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Reading</h3>
+                    <p class="text-sky-300/80 text-sm font-medium mb-4">Adult Literacy</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        Build reading fluency with guided practice. Track words per minute, accuracy, and comprehension.
+                    </p>
+                    <div class="pt-4 border-t border-sky-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">Adult literacy learners, GED prep, reading programs</p>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div class="future-card app-card bg-gradient-to-br from-purple-900/40 to-purple-950/40 border border-purple-500/20 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4 opacity-80">🧠</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Memory</h3>
+                    <p class="text-purple-300/80 text-sm font-medium mb-4">Cognitive Assessment</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        Track speech patterns that may indicate cognitive changes — word-finding, repetition, language complexity.
+                    </p>
+                    <div class="pt-4 border-t border-purple-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">Seniors, caregivers, families</p>
+                    </div>
+                </div>
+
+                <!-- Phonics -->
+                <div class="future-card app-card bg-gradient-to-br from-pink-900/40 to-pink-950/40 border border-pink-500/20 rounded-2xl p-8 fade-in-delay-3">
+                    <div class="app-icon mb-4 opacity-80">🦉</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Phonics</h3>
+                    <p class="text-pink-300/80 text-sm font-medium mb-4">Kids Learning to Read</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        Fun reading practice with Ollie the Owl! Earn stars and badges, explore stories, and build phonics skills.
+                    </p>
+                    <div class="pt-4 border-t border-pink-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">Children ages 4-11, parents, teachers</p>
+                    </div>
+                </div>
+
+                <!-- Oratory -->
+                <div class="future-card app-card bg-gradient-to-br from-orange-900/40 to-orange-950/40 border border-orange-500/20 rounded-2xl p-8 fade-in-delay-3">
+                    <div class="app-icon mb-4 opacity-80">🏛️</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Oratory</h3>
+                    <p class="text-orange-300/80 text-sm font-medium mb-4">Rhetorical Excellence</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        Master the art of persuasion. Analyze rhetorical devices, compare yourself to great speakers, and refine your style.
+                    </p>
+                    <div class="pt-4 border-t border-orange-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">Debate teams, politicians, public figures</p>
+                    </div>
+                </div>
+
+                <!-- SpeakFit Core -->
+                <div class="future-card app-card bg-gradient-to-br from-indigo-900/40 to-indigo-950/40 border border-indigo-500/20 rounded-2xl p-8 fade-in-delay-3">
+                    <div class="app-icon mb-4 opacity-80">🎯</div>
+                    <h3 class="text-xl font-bold text-white mb-2">SpeakFit Core</h3>
+                    <p class="text-indigo-300/80 text-sm font-medium mb-4">Complete Analysis Platform</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        The full platform — analyze any recording for voice quality, pacing, clarity, and rhetorical patterns.
+                    </p>
+                    <div class="pt-4 border-t border-indigo-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">Professionals, students, researchers</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
     <!-- Footer -->
-    <footer class="py-12 px-4 border-t border-gray-800/50 bg-gray-900/30">
+    <footer class="py-12 px-4 border-t border-gray-800/50 bg-gray-950">
         <div class="mx-auto max-w-6xl">
             <div class="flex flex-col md:flex-row justify-between items-center gap-6">
                 <div class="text-center md:text-left">

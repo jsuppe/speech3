@@ -218,7 +218,39 @@ async def global_exception_handler(request, exc):
     )
 
 
+# ============================================================
+# Health & Version Endpoints (no auth required)
+# ============================================================
+
+from .versioning import API_VERSION, version_info, check_client_version  # noqa: E402
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint for load balancers and monitoring."""
+    return {
+        "status": "ok",
+        "api_version": API_VERSION,
+    }
+
+
+@app.get("/v1/version", tags=["Health"])
+async def get_version(client_version: str = None):
+    """
+    Get API version info and check client compatibility.
+    
+    Pass `client_version` query param to check if your client is compatible.
+    """
+    info = version_info()
+    if client_version:
+        info["compatibility"] = check_client_version(client_version)
+    return info
+
+
+# ============================================================
 # Register API routes
+# ============================================================
+
 from .router import router  # noqa: E402
 app.include_router(router)
 
@@ -241,6 +273,78 @@ try:
     logger.info("Real-time pronunciation WebSocket registered at /ws/pronunciation-stream")
 except ImportError as e:
     logger.warning(f"Real-time pronunciation not available: {e}")
+
+# Register pronunciation comparison routes
+try:
+    from .pronunciation_comparison import router as comparison_router  # noqa: E402
+    app.include_router(comparison_router)
+    logger.info("Pronunciation comparison registered at /v1/pronunciation/compare")
+except ImportError as e:
+    logger.warning(f"Pronunciation comparison not available: {e}")
+
+# Register real-time live coach WebSocket
+try:
+    from .realtime_coach import router as realtime_coach_router  # noqa: E402
+    app.include_router(realtime_coach_router)
+    logger.info("Real-time live coach WebSocket registered at /ws/live-coach")
+except ImportError as e:
+    logger.warning(f"Real-time live coach not available: {e}")
+
+# Register Vosk low-latency streaming STT
+try:
+    from .realtime_vosk import router as realtime_vosk_router  # noqa: E402
+    app.include_router(realtime_vosk_router)
+    logger.info("Vosk streaming STT registered at /ws/live-vosk")
+except ImportError as e:
+    logger.warning(f"Vosk streaming not available: {e}")
+
+# Register NVIDIA Riva GPU-accelerated streaming STT
+try:
+    from .realtime_riva import router as realtime_riva_router  # noqa: E402
+    app.include_router(realtime_riva_router)
+    logger.info("Riva streaming STT registered at /ws/live-riva")
+except ImportError as e:
+    logger.warning(f"Riva streaming not available: {e}")
+
+# Register RTP/UDP low-latency streaming
+try:
+    from .rtp_endpoints import router as rtp_router  # noqa: E402
+    app.include_router(rtp_router)
+    logger.info("RTP/UDP streaming registered at /v1/rtp (port 5004)")
+except ImportError as e:
+    logger.warning(f"RTP streaming not available: {e}")
+
+# Register RTP-over-WebSocket streaming (works through Cloudflare)
+try:
+    from .rtp_websocket import router as rtp_ws_router  # noqa: E402
+    app.include_router(rtp_ws_router)
+    logger.info("RTP-over-WebSocket registered at /ws/live-rtp")
+except ImportError as e:
+    logger.warning(f"RTP WebSocket not available: {e}")
+
+# Register TRUE streaming RTP (lowest latency, uses Riva streaming API)
+try:
+    from .rtp_streaming import router as rtp_stream_router  # noqa: E402
+    app.include_router(rtp_stream_router)
+    logger.info("True streaming RTP registered at /ws/live-stream (Riva streaming)")
+except ImportError as e:
+    logger.warning(f"RTP streaming not available: {e}")
+
+# Register audio storage routes (Opus storage/replay)
+try:
+    from .audio_routes import router as audio_router  # noqa: E402
+    app.include_router(audio_router)
+    logger.info("Audio storage routes registered at /v1/audio")
+except ImportError as e:
+    logger.warning(f"Audio routes not available: {e}")
+
+# Register chunked upload routes (for long recordings)
+try:
+    from .chunk_upload import router as chunk_router  # noqa: E402
+    app.include_router(chunk_router)
+    logger.info("Chunked upload routes registered at /v1/audio/chunked")
+except ImportError as e:
+    logger.warning(f"Chunked upload routes not available: {e}")
 
 # Register gamification routes
 try:
@@ -374,6 +478,26 @@ try:
         logger.info(f"Flutter web app mounted at /flutter from {flutter_dir}")
 except Exception as e:
     logger.warning(f"Could not mount Flutter web app: {e}")
+
+# Serve Memory Care web app at /memory
+try:
+    from fastapi.staticfiles import StaticFiles
+    memory_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "static", "memory")
+    if os.path.exists(memory_dir):
+        app.mount("/memory", StaticFiles(directory=memory_dir, html=True), name="memory")
+        logger.info(f"Memory Care web app mounted at /memory from {memory_dir}")
+except Exception as e:
+    logger.warning(f"Could not mount Memory Care web app: {e}")
+
+# Serve SpeakFit Present web app
+try:
+    from fastapi.staticfiles import StaticFiles
+    present_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "static", "present")
+    if os.path.exists(present_dir):
+        app.mount("/present", StaticFiles(directory=present_dir, html=True), name="present")
+        logger.info(f"Present Coach web app mounted at /present from {present_dir}")
+except Exception as e:
+    logger.warning(f"Could not mount Present Coach web app: {e}")
 
 # Serve C23 WASM Compiler
 try:
