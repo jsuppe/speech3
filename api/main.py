@@ -3,6 +3,11 @@ SpeechScore API — FastAPI entry point.
 Loads ML models at startup, serves speech analysis endpoints.
 """
 
+# Load .env file before any other imports
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 import os
 import sys
 import time

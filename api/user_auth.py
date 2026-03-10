@@ -25,6 +25,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 
+# Import Supabase client for cloud database
+from . import supabase_client as supabase
+
+# Flag to use Supabase for user data (set via env var)
+USE_SUPABASE = os.getenv("USE_SUPABASE", "true").lower() in ("true", "1", "yes")
+
 logger = logging.getLogger("speechscore.user_auth")
 
 # ---------------------------------------------------------------------------
@@ -263,6 +269,43 @@ def get_or_create_user(db_path: str, provider: str, provider_id: str,
     Find existing user by provider+provider_id, or create a new one.
     Returns user dict with id, provider, email, name, etc.
     """
+    if USE_SUPABASE:
+        return _get_or_create_user_supabase(provider, provider_id, email, name, avatar_url)
+    else:
+        return _get_or_create_user_sqlite(db_path, provider, provider_id, email, name, avatar_url)
+
+
+def _get_or_create_user_supabase(provider: str, provider_id: str,
+                                  email: str = None, name: str = None,
+                                  avatar_url: str = None) -> Dict[str, Any]:
+    """Supabase implementation of get_or_create_user."""
+    # Try to find existing user
+    user = supabase.get_user_by_provider(provider, provider_id)
+    
+    if user:
+        # Update last_login and any changed fields
+        updates = {}
+        if email and email != user.get("email"):
+            updates["email"] = email
+        if name and name != user.get("name"):
+            updates["name"] = name
+        if avatar_url and avatar_url != user.get("avatar_url"):
+            updates["avatar_url"] = avatar_url
+        
+        user = supabase.update_user(user["id"], **updates)
+    else:
+        # Create new user
+        user = supabase.create_user(provider, provider_id, email, name, avatar_url)
+        logger.info("Created new user (Supabase): id=%d, provider=%s, email=%s", 
+                    user["id"], provider, email)
+    
+    return user
+
+
+def _get_or_create_user_sqlite(db_path: str, provider: str, provider_id: str,
+                                email: str = None, name: str = None,
+                                avatar_url: str = None) -> Dict[str, Any]:
+    """SQLite implementation of get_or_create_user (legacy)."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -314,6 +357,9 @@ def get_or_create_user(db_path: str, provider: str, provider_id: str,
 
 def get_user_by_id(db_path: str, user_id: int) -> Optional[Dict[str, Any]]:
     """Get a user by ID."""
+    if USE_SUPABASE:
+        return supabase.get_user_by_id(user_id)
+    
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -325,6 +371,10 @@ def get_user_by_id(db_path: str, user_id: int) -> Optional[Dict[str, Any]]:
 
 def update_user_app_version(db_path: str, user_id: int, app_version: str, patch_number: int = None):
     """Update user's app version and last_seen timestamp."""
+    if USE_SUPABASE:
+        supabase.update_user(user_id, app_version=app_version, patch_number=patch_number)
+        return
+    
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     now = datetime.now(timezone.utc).isoformat()
@@ -339,6 +389,16 @@ def update_user_app_version(db_path: str, user_id: int, app_version: str, patch_
 
 def get_all_users_with_versions(db_path: str) -> list:
     """Get all users with their app version info."""
+    if USE_SUPABASE:
+        with supabase.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, email, name, app_version, patch_number, last_seen, last_login, created_at
+                FROM users
+                ORDER BY last_seen DESC NULLS LAST
+            """)
+            return [dict(row) for row in cur.fetchall()]
+    
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -508,13 +568,18 @@ async def flexible_auth(
     # Get user's tier from database for rate limit calculation
     user_tier = "free"  # Default
     try:
-        conn = sqlite3.connect(config.DB_PATH)
-        cur = conn.cursor()
-        cur.execute("SELECT tier FROM users WHERE id = ?", (user_id,))
-        row = cur.fetchone()
-        if row and row[0]:
-            user_tier = row[0]
-        conn.close()
+        if USE_SUPABASE:
+            user_data = supabase.get_user_by_id(user_id)
+            if user_data and user_data.get("tier"):
+                user_tier = user_data["tier"]
+        else:
+            conn = sqlite3.connect(config.DB_PATH)
+            cur = conn.cursor()
+            cur.execute("SELECT tier FROM users WHERE id = ?", (user_id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                user_tier = row[0]
+            conn.close()
     except Exception:
         pass  # Default to free tier on error
     

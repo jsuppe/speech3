@@ -49,6 +49,69 @@ def get_user_tier(request: Request) -> str:
         return "none"
     return (row[0] or "free").lower()
 
+
+def _generate_alerts(
+    dau: int = 0,
+    error_rate: float = 0,
+    cpu: float = 0,
+    memory: float = 0,
+    gpu: float = 0,
+    disk: float = 0,
+    r2_connected: bool = True,
+    supabase_connected: bool = True,
+    churn_rate: float = 0,
+    error_cards: int = 0,
+) -> list:
+    """Generate alerts based on metric thresholds."""
+    alerts = []
+    
+    # Critical alerts (red)
+    if not r2_connected:
+        alerts.append({"level": "critical", "icon": "🚨", "title": "R2 Storage Disconnected", 
+                       "message": "Cloudflare R2 is unavailable. New uploads will fail."})
+    if not supabase_connected:
+        alerts.append({"level": "critical", "icon": "🚨", "title": "Supabase Disconnected", 
+                       "message": "PostgreSQL database is unavailable."})
+    if error_rate > 10:
+        alerts.append({"level": "critical", "icon": "🚨", "title": f"High Error Rate: {error_rate:.1f}%", 
+                       "message": "API error rate is critically high. Check logs."})
+    if disk > 95:
+        alerts.append({"level": "critical", "icon": "🚨", "title": f"Disk Almost Full: {disk:.0f}%", 
+                       "message": "Server disk space is critically low."})
+    if memory > 95:
+        alerts.append({"level": "critical", "icon": "🚨", "title": f"Memory Critical: {memory:.0f}%", 
+                       "message": "Server memory is critically low."})
+    
+    # Warning alerts (yellow)
+    if error_rate > 5 and error_rate <= 10:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"Elevated Error Rate: {error_rate:.1f}%", 
+                       "message": "API error rate is elevated. Monitor closely."})
+    if cpu > 90:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"High CPU Usage: {cpu:.0f}%", 
+                       "message": "Server CPU usage is high."})
+    if memory > 85 and memory <= 95:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"High Memory Usage: {memory:.0f}%", 
+                       "message": "Server memory usage is high."})
+    if gpu > 90:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"High GPU Usage: {gpu:.0f}%", 
+                       "message": "GPU utilization is high."})
+    if disk > 85 and disk <= 95:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"Disk Space Low: {disk:.0f}%", 
+                       "message": "Server disk space is running low."})
+    if churn_rate > 20:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"High Churn Rate: {churn_rate:.1f}%", 
+                       "message": "Monthly churn rate is high. Review user feedback."})
+    if error_cards >= 5:
+        alerts.append({"level": "warning", "icon": "⚠️", "title": f"{error_cards} Open Error Cards", 
+                       "message": "Multiple app errors pending resolution."})
+    
+    # Info alerts (blue)
+    if dau == 0:
+        alerts.append({"level": "info", "icon": "ℹ️", "title": "No Active Users Today", 
+                       "message": "No recordings have been made today."})
+    
+    return alerts
+
 # Google OAuth client ID (same as API)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "819724788424-r7p1tr8l7k2b2glsdn1ktj0o6k7cspb0.apps.googleusercontent.com")
 
@@ -225,6 +288,25 @@ async def landing_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     return RedirectResponse(url="/dashboard", status_code=302)
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    """Privacy Policy page — public, no auth required."""
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms_of_service(request: Request):
+    """Terms of Service page — public, no auth required."""
+    # For now, redirect to privacy until we create a terms page
+    return RedirectResponse(url="/privacy", status_code=302)
+
+
+@router.get("/downloads", response_class=HTMLResponse)
+async def downloads_page(request: Request):
+    """Downloads page — public, lists all SpeakFit app APKs."""
+    return templates.TemplateResponse("downloads.html", {"request": request})
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -469,34 +551,50 @@ async def recording_list(
         return RedirectResponse(url="/", status_code=302)
     
     db = get_db()
-    speeches = db.list_speeches(limit=500, category=category, product=product)
-
-    # Text search filter
+    
+    # Single optimized query with JOIN to get speeches + analysis in one shot
+    query = """
+        SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
+               s.language, s.category, s.products, s.tags, s.notes, s.description, s.audio_hash,
+               s.created_at, s.updated_at, s.user_id, s.profile, s.project_id,
+               a.wpm, a.pitch_mean_hz, a.vocal_fry_ratio, a.lexical_diversity, 
+               a.quality_level, a.sentiment
+        FROM speeches s
+        LEFT JOIN analyses a ON a.speech_id = s.id
+        WHERE s.user_id IS NOT NULL
+    """
+    params = []
+    if category:
+        query += " AND s.category = ?"
+        params.append(category)
+    if product:
+        query += " AND s.products LIKE ?"
+        params.append(f'%"{product}"%')
     if q:
-        q_lower = q.lower()
-        speeches = [
-            s for s in speeches
-            if q_lower in (s["title"] or "").lower()
-            or q_lower in (s["speaker"] or "").lower()
-            or q_lower in (s.get("description") or "").lower()
-        ]
+        query += " AND (LOWER(s.title) LIKE ? OR LOWER(s.speaker) LIKE ? OR LOWER(s.description) LIKE ?)"
+        q_param = f"%{q.lower()}%"
+        params.extend([q_param, q_param, q_param])
+    query += " ORDER BY s.created_at DESC LIMIT 500"
+    
+    rows = db.conn.execute(query, params).fetchall()
+    speeches = []
+    for row in rows:
+        d = dict(row)
+        d["products"] = json.loads(d["products"]) if d.get("products") else []
+        d["metrics"] = {
+            k: d.pop(k) for k in ["wpm", "pitch_mean_hz", "vocal_fry_ratio", 
+                                   "lexical_diversity", "quality_level", "sentiment"]
+            if d.get(k) is not None
+        }
+        speeches.append(d)
 
-    # Get metrics for each speech
-    for s in speeches:
-        analysis = db.get_analysis(s["id"])
-        s["metrics"] = {}
-        if analysis:
-            s["metrics"] = {
-                k: analysis[k] for k in [
-                    "wpm", "pitch_mean_hz", "vocal_fry_ratio",
-                    "lexical_diversity", "quality_level", "sentiment",
-                ] if analysis.get(k) is not None
-            }
-
-    # Get all categories and products for filter dropdowns
-    all_categories = sorted(set(
-        s["category"] for s in db.list_speeches(limit=500) if s.get("category")
-    ))
+    # Get categories efficiently (single query, cached in future)
+    cat_rows = db.conn.execute(
+        "SELECT DISTINCT category FROM speeches WHERE user_id IS NOT NULL AND category IS NOT NULL"
+    ).fetchall()
+    all_categories = sorted([r[0] for r in cat_rows])
+    
+    # Get products
     all_products = sorted(db.stats().get("products", {}).keys())
 
     return templates.TemplateResponse("speeches.html", {
@@ -784,22 +882,32 @@ async def admin_dashboard(request: Request):
         ORDER BY count DESC
     """).fetchall()
     tier_stats = {row[0]: row[1] for row in tier_counts}
-    paid_users = sum(v for k, v in tier_stats.items() if k not in ('free', 'none', None))
+    # Count paid users (exclude free, none, admin, and beta testers)
+    paid_users_row = db.conn.execute("""
+        SELECT COUNT(*) FROM users 
+        WHERE tier NOT IN ('free', 'none', 'admin') 
+        AND tier IS NOT NULL 
+        AND COALESCE(is_beta, 0) = 0
+    """).fetchone()
+    paid_users = paid_users_row[0] if paid_users_row else 0
     
     # New paid subscriptions (today, this week, this month)
     paid_today = db.conn.execute("""
         SELECT COUNT(*) FROM users 
-        WHERE tier NOT IN ('free', 'none') AND tier IS NOT NULL AND created_at >= ?
+        WHERE tier NOT IN ('free', 'none', 'admin') AND tier IS NOT NULL 
+        AND COALESCE(is_beta, 0) = 0 AND created_at >= ?
     """, (today_start,)).fetchone()[0]
     
     paid_week = db.conn.execute("""
         SELECT COUNT(*) FROM users 
-        WHERE tier NOT IN ('free', 'none') AND tier IS NOT NULL AND created_at >= ?
+        WHERE tier NOT IN ('free', 'none', 'admin') AND tier IS NOT NULL 
+        AND COALESCE(is_beta, 0) = 0 AND created_at >= ?
     """, (week_start,)).fetchone()[0]
     
     paid_month = db.conn.execute("""
         SELECT COUNT(*) FROM users 
-        WHERE tier NOT IN ('free', 'none') AND tier IS NOT NULL AND created_at >= ?
+        WHERE tier NOT IN ('free', 'none', 'admin') AND tier IS NOT NULL 
+        AND COALESCE(is_beta, 0) = 0 AND created_at >= ?
     """, (month_ago,)).fetchone()[0]
     
     # DAU trend (last 14 days)
@@ -821,7 +929,7 @@ async def admin_dashboard(request: Request):
     """, (week_start,)).fetchone()[0]
     
     # Storage (audio files)
-    audio_dir = Path("/home/jsuppe/speech3/audio")
+    audio_dir = Path("/home/melchior/speech3/audio")
     try:
         storage_bytes = sum(f.stat().st_size for f in audio_dir.rglob("*") if f.is_file()) if audio_dir.exists() else 0
     except:
@@ -985,6 +1093,241 @@ async def admin_dashboard(request: Request):
     """).fetchall()
     all_users = [dict(r) for r in all_users_rows]
     
+    # System Health (CPU, Memory, GPU)
+    system_health = {
+        "cpu_percent": 0,
+        "memory_percent": 0,
+        "memory_used_gb": 0,
+        "memory_total_gb": 0,
+        "gpu_memory_used_gb": 0,
+        "gpu_memory_total_gb": 0,
+        "gpu_utilization": 0,
+        "disk_percent": 0,
+        "disk_used_gb": 0,
+        "disk_total_gb": 0,
+    }
+    try:
+        import psutil
+        import subprocess
+        
+        # CPU and Memory (interval=None for instant value, no blocking)
+        system_health["cpu_percent"] = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        system_health["memory_percent"] = mem.percent
+        system_health["memory_used_gb"] = mem.used / (1024**3)
+        system_health["memory_total_gb"] = mem.total / (1024**3)
+        
+        # Disk
+        disk = psutil.disk_usage('/')
+        system_health["disk_percent"] = disk.percent
+        system_health["disk_used_gb"] = disk.used / (1024**3)
+        system_health["disk_total_gb"] = disk.total / (1024**3)
+        
+        # GPU (nvidia-smi)
+        try:
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=memory.used,memory.total,utilization.gpu', '--format=csv,noheader,nounits'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                parts = result.stdout.strip().split(',')
+                if len(parts) >= 3:
+                    system_health["gpu_memory_used_gb"] = float(parts[0].strip()) / 1024
+                    system_health["gpu_memory_total_gb"] = float(parts[1].strip()) / 1024
+                    system_health["gpu_utilization"] = float(parts[2].strip())
+        except:
+            pass
+    except Exception as e:
+        pass
+    
+    # API Metrics
+    api_metrics = {
+        "requests": {"total": 0, "avg_latency_ms": 0, "p95_latency_ms": 0, "error_rate_pct": 0},
+        "pipeline": {"total_processed": 0, "error_rate_pct": 0, "avg_duration_sec": 0},
+        "queue": {"current_depth": 0, "max_depth": 20}
+    }
+    try:
+        from api.metrics import metrics
+        api_metrics = metrics.get_metrics()
+    except Exception as e:
+        pass
+    
+    # Retention metrics (D1, D7, D30)
+    # D1: users who came back day after signup
+    # D7: users who came back within 7 days of signup
+    # D30: users who came back within 30 days of signup
+    
+    # Get users who signed up 1+ days ago and made recordings after signup date
+    d1_eligible = db.conn.execute("""
+        SELECT COUNT(DISTINCT u.id) FROM users u
+        WHERE DATE(u.created_at) < DATE('now', '-1 day')
+    """).fetchone()[0]
+    
+    d1_retained = db.conn.execute("""
+        SELECT COUNT(DISTINCT u.id) FROM users u
+        WHERE DATE(u.created_at) < DATE('now', '-1 day')
+        AND EXISTS (
+            SELECT 1 FROM speeches s 
+            WHERE s.user_id = u.id 
+            AND DATE(s.created_at) = DATE(u.created_at, '+1 day')
+        )
+    """).fetchone()[0]
+    
+    d7_eligible = db.conn.execute("""
+        SELECT COUNT(DISTINCT u.id) FROM users u
+        WHERE DATE(u.created_at) < DATE('now', '-7 day')
+    """).fetchone()[0]
+    
+    d7_retained = db.conn.execute("""
+        SELECT COUNT(DISTINCT u.id) FROM users u
+        WHERE DATE(u.created_at) < DATE('now', '-7 day')
+        AND EXISTS (
+            SELECT 1 FROM speeches s 
+            WHERE s.user_id = u.id 
+            AND DATE(s.created_at) BETWEEN DATE(u.created_at, '+1 day') AND DATE(u.created_at, '+7 day')
+        )
+    """).fetchone()[0]
+    
+    d30_eligible = db.conn.execute("""
+        SELECT COUNT(DISTINCT u.id) FROM users u
+        WHERE DATE(u.created_at) < DATE('now', '-30 day')
+    """).fetchone()[0]
+    
+    d30_retained = db.conn.execute("""
+        SELECT COUNT(DISTINCT u.id) FROM users u
+        WHERE DATE(u.created_at) < DATE('now', '-30 day')
+        AND EXISTS (
+            SELECT 1 FROM speeches s 
+            WHERE s.user_id = u.id 
+            AND DATE(s.created_at) BETWEEN DATE(u.created_at, '+1 day') AND DATE(u.created_at, '+30 day')
+        )
+    """).fetchone()[0]
+    
+    d1_rate = (d1_retained / d1_eligible * 100) if d1_eligible > 0 else 0
+    d7_rate = (d7_retained / d7_eligible * 100) if d7_eligible > 0 else 0
+    d30_rate = (d30_retained / d30_eligible * 100) if d30_eligible > 0 else 0
+    
+    # Churn metrics
+    # Active last month = users who made recordings 30-60 days ago
+    # Churned = those who didn't make recordings in the last 30 days
+    active_last_month = db.conn.execute("""
+        SELECT COUNT(DISTINCT user_id) FROM speeches
+        WHERE user_id IS NOT NULL
+        AND created_at >= DATE('now', '-60 day')
+        AND created_at < DATE('now', '-30 day')
+    """).fetchone()[0]
+    
+    churned_users = db.conn.execute("""
+        SELECT COUNT(DISTINCT s1.user_id) FROM speeches s1
+        WHERE s1.user_id IS NOT NULL
+        AND s1.created_at >= DATE('now', '-60 day')
+        AND s1.created_at < DATE('now', '-30 day')
+        AND NOT EXISTS (
+            SELECT 1 FROM speeches s2 
+            WHERE s2.user_id = s1.user_id 
+            AND s2.created_at >= DATE('now', '-30 day')
+        )
+    """).fetchone()[0]
+    
+    churn_rate = (churned_users / active_last_month * 100) if active_last_month > 0 else 0
+    
+    # Inactive users (no recordings in 30 days but account exists)
+    inactive_users = db.conn.execute("""
+        SELECT COUNT(*) FROM users u
+        WHERE NOT EXISTS (
+            SELECT 1 FROM speeches s 
+            WHERE s.user_id = u.id 
+            AND s.created_at >= DATE('now', '-30 day')
+        )
+    """).fetchone()[0]
+    
+    # Revenue metrics (MRR/ARR)
+    TIER_PRICING = {
+        "free": 0,
+        "pro": 9.99,
+        "enterprise": 49.99,
+        "admin": 0,
+        "none": 0,
+    }
+    
+    # Calculate MRR from tier counts
+    mrr = sum(TIER_PRICING.get(tier, 0) * count for tier, count in tier_stats.items())
+    arr = mrr * 12
+    
+    # Revenue by tier breakdown
+    revenue_by_tier = [
+        {"tier": tier, "users": count, "price": TIER_PRICING.get(tier, 0), "mrr": TIER_PRICING.get(tier, 0) * count}
+        for tier, count in tier_stats.items()
+        if TIER_PRICING.get(tier, 0) > 0
+    ]
+    
+    # Error cards from Trello
+    error_cards = []
+    error_count = 0
+    try:
+        import requests
+        TRELLO_KEY = "94dbc1af84f0abce181fd9433f69d727"
+        TRELLO_TOKEN = "ATTA5e7ac0ff9877573186a0a8979f4b5525c0f3c68efdf77514ad640ac653de267aAF589D6A"
+        BACKLOG_LIST = "6980f79bb30707574404f57a"
+        
+        resp = requests.get(
+            f"https://api.trello.com/1/lists/{BACKLOG_LIST}/cards",
+            params={"key": TRELLO_KEY, "token": TRELLO_TOKEN},
+            timeout=2  # Short timeout to avoid blocking
+        )
+        if resp.status_code == 200:
+            cards = resp.json()
+            error_cards = [c for c in cards if c.get("name", "").startswith("🐛")]
+            error_count = len(error_cards)
+    except Exception as e:
+        pass
+    
+    # Cloud status (R2 + Supabase)
+    cloud_status = {"status": "unknown", "supabase": {"connected": False}, "r2": {"connected": False}}
+    try:
+        from api.r2_storage import get_r2_storage
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        import os
+        
+        # Check Supabase
+        supabase_url = os.getenv("DATABASE_URL")
+        if supabase_url and os.getenv("USE_SUPABASE", "").lower() in ("true", "1", "yes"):
+            try:
+                conn = psycopg2.connect(supabase_url, cursor_factory=RealDictCursor, connect_timeout=5)
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) as c FROM users")
+                cloud_status["supabase"] = {"connected": True, "users": cur.fetchone()["c"]}
+                conn.close()
+            except Exception as e:
+                cloud_status["supabase"] = {"connected": False, "error": str(e)[:100]}
+        
+        # Check R2
+        try:
+            r2 = get_r2_storage()
+            # Quick test - list with limit 1
+            r2.client.list_objects_v2(Bucket=r2.bucket, MaxKeys=1)
+            cloud_status["r2"] = {"connected": True, "bucket": r2.bucket}
+        except Exception as e:
+            cloud_status["r2"] = {"connected": False, "error": str(e)[:100]}
+        
+        cloud_status["status"] = "ok" if cloud_status["supabase"].get("connected") and cloud_status["r2"].get("connected") else "degraded"
+    except Exception as e:
+        cloud_status["status"] = "error"
+        cloud_status["error"] = str(e)[:100]
+    
+    # Profile usage breakdown
+    profile_usage = db.conn.execute("""
+        SELECT COALESCE(profile, 'general') as profile, COUNT(*) as count
+        FROM speeches
+        WHERE user_id IS NOT NULL
+        GROUP BY profile
+        ORDER BY count DESC
+    """).fetchall()
+    
+    # Average recordings per user
+    avg_recordings_per_user = total_recordings / total_users if total_users > 0 else 0
+    
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "stats": {
@@ -1008,7 +1351,39 @@ async def admin_dashboard(request: Request):
             "avg_score": avg_score,
             "survey_total": survey_total,
             "survey_completion_rate": survey_completion_rate,
+            "avg_recordings_per_user": avg_recordings_per_user,
+            "mrr": mrr,
+            "arr": arr,
+            "d1_rate": d1_rate,
+            "d7_rate": d7_rate,
+            "d30_rate": d30_rate,
+            "d1_eligible": d1_eligible,
+            "d7_eligible": d7_eligible,
+            "d30_eligible": d30_eligible,
+            "churn_rate": churn_rate,
+            "churned_users": churned_users,
+            "active_last_month": active_last_month,
+            "inactive_users": inactive_users,
         },
+        "revenue_by_tier": revenue_by_tier,
+        "alerts": _generate_alerts(
+            dau=dau,
+            error_rate=api_metrics.get("requests", {}).get("error_rate_pct", 0),
+            cpu=system_health.get("cpu_percent", 0),
+            memory=system_health.get("memory_percent", 0),
+            gpu=system_health.get("gpu_utilization", 0),
+            disk=system_health.get("disk_percent", 0),
+            r2_connected=cloud_status.get("r2", {}).get("connected", False),
+            supabase_connected=cloud_status.get("supabase", {}).get("connected", False),
+            churn_rate=churn_rate,
+            error_cards=error_count,
+        ),
+        "cloud_status": cloud_status,
+        "system_health": system_health,
+        "api_metrics": api_metrics,
+        "error_cards": error_cards[:10],  # Limit to 10 most recent
+        "error_count": error_count,
+        "profile_usage": [{"profile": p[0], "count": p[1]} for p in profile_usage],
         "top_users": top_users,
         "all_users": all_users,
         "recent_recordings": recent_recordings,
@@ -1240,6 +1615,23 @@ async def admin_toggle_user_enabled(request: Request, user_id: int):
     return RedirectResponse(url=f"/admin/users/{user_id}", status_code=302)
 
 
+@router.post("/admin/users/{user_id}/toggle-beta")
+async def admin_toggle_user_beta(request: Request, user_id: int):
+    """Toggle a user's beta tester status (admin only)."""
+    current_user = get_current_user(request)
+    if not current_user or not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    db = get_db()
+    row = db.conn.execute("SELECT is_beta FROM users WHERE id = ?", (user_id,)).fetchone()
+    current_beta = row[0] if row and row[0] is not None else 0
+    new_beta = 0 if current_beta else 1
+    db.conn.execute("UPDATE users SET is_beta = ? WHERE id = ?", (new_beta, user_id))
+    db.conn.commit()
+    
+    return RedirectResponse(url=f"/admin/users/{user_id}", status_code=302)
+
+
 @router.post("/admin/users/{user_id}/delete")
 async def admin_delete_user(request: Request, user_id: int):
     """Delete a user and all their data (admin only)."""
@@ -1338,3 +1730,134 @@ async def frontend_update_speech(
         "title": title,
         "speaker": speaker,
     })
+
+
+# ============================================================================
+# CSV Export Endpoints
+# ============================================================================
+
+from fastapi.responses import StreamingResponse
+import csv
+import io
+
+@router.get("/admin/export/users", tags=["Admin Export"])
+async def export_users_csv(request: Request):
+    """Export all users to CSV."""
+    if not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    db = get_db()
+    rows = db.conn.execute("""
+        SELECT u.id, u.name, u.email, u.tier, u.provider, u.created_at, u.last_login,
+               COUNT(s.id) as recording_count,
+               COALESCE(SUM(s.duration_sec), 0) as total_duration_sec
+        FROM users u
+        LEFT JOIN speeches s ON s.user_id = u.id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+    """).fetchall()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Email', 'Tier', 'Provider', 'Created', 'Last Login', 'Recordings', 'Total Duration (sec)'])
+    for row in rows:
+        writer.writerow(row)
+    
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=speakfit_users.csv"}
+    )
+
+
+@router.get("/admin/export/recordings", tags=["Admin Export"])
+async def export_recordings_csv(
+    request: Request,
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)"),
+):
+    """Export recordings to CSV with optional date range."""
+    if not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    db = get_db()
+    
+    query = """
+        SELECT s.id, s.title, s.speaker, s.profile, s.category, s.duration_sec,
+               s.created_at, u.name as user_name, u.email as user_email,
+               a.wpm, a.filler_ratio, a.lexical_diversity, a.quality_level
+        FROM speeches s
+        LEFT JOIN users u ON u.id = s.user_id
+        LEFT JOIN analyses a ON a.speech_id = s.id
+        WHERE s.user_id IS NOT NULL
+    """
+    params = []
+    
+    if start_date:
+        query += " AND DATE(s.created_at) >= ?"
+        params.append(start_date)
+    if end_date:
+        query += " AND DATE(s.created_at) <= ?"
+        params.append(end_date)
+    
+    query += " ORDER BY s.created_at DESC"
+    
+    rows = db.conn.execute(query, params).fetchall()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Title', 'Speaker', 'Profile', 'Category', 'Duration (sec)', 
+                     'Created', 'User Name', 'User Email', 'WPM', 'Filler Ratio', 
+                     'Lexical Diversity', 'Quality Level'])
+    for row in rows:
+        writer.writerow(row)
+    
+    output.seek(0)
+    filename = f"speakfit_recordings_{start_date or 'all'}_{end_date or 'now'}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/admin/export/metrics", tags=["Admin Export"])
+async def export_metrics_csv(
+    request: Request,
+    days: int = Query(30, description="Number of days to export"),
+):
+    """Export daily metrics to CSV."""
+    if not is_admin_user(request):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+    
+    db = get_db()
+    
+    # Daily aggregates
+    rows = db.conn.execute("""
+        SELECT 
+            DATE(s.created_at) as date,
+            COUNT(DISTINCT s.user_id) as active_users,
+            COUNT(*) as recordings,
+            AVG(s.duration_sec) as avg_duration,
+            COUNT(DISTINCT CASE WHEN u.tier NOT IN ('free', 'none', 'admin') AND COALESCE(u.is_beta, 0) = 0 THEN u.id END) as paid_users
+        FROM speeches s
+        LEFT JOIN users u ON u.id = s.user_id
+        WHERE s.user_id IS NOT NULL
+        AND s.created_at >= DATE('now', ? || ' days')
+        GROUP BY DATE(s.created_at)
+        ORDER BY date
+    """, (f"-{days}",)).fetchall()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Date', 'Active Users', 'Recordings', 'Avg Duration (sec)', 'Paid Users'])
+    for row in rows:
+        writer.writerow(row)
+    
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=speakfit_metrics_{days}d.csv"}
+    )

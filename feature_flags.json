@@ -1,0 +1,24 @@
+{
+  "flags": {
+    "maintenance_mode": false,
+    "force_update": false,
+    "min_app_version": "1.0.0",
+    
+    "speech_coach_ai": true,
+    "kids_mode": false,
+    "present_live_coaching": true,
+    "offline_mode": true,
+    "speaker_diarization": true,
+    
+    "pro_features": true,
+    "extended_duration": true,
+    "unlimited_recordings": false,
+    
+    "analytics_enabled": true
+  },
+  "messages": {
+    "maintenance": "SpeakFit is undergoing maintenance. Please check back soon!",
+    "force_update": "Please update SpeakFit to continue using the app."
+  },
+  "updated_at": "2026-03-08T23:10:00Z"
+}

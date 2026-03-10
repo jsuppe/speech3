@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpeakFit — Speech & Language Apps for Every Stage of Life</title>
-    <meta name="description" content="A family of AI-powered speech apps: pronunciation training, public speaking, literacy, cognitive assessment, and phonics for kids.">
+    <title>SpeakFit Memory — AI-Powered Cognitive Health Monitoring</title>
+    <meta name="description" content="Track speech patterns for early detection of cognitive changes. AI-powered analysis of word-finding, repetition, and language complexity.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
             to { opacity: 1; transform: translateY(0); } 
         }
         .gradient-text { 
-            background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%); 
+            background: linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f472b6 100%); 
             -webkit-background-clip: text; 
             -webkit-text-fill-color: transparent; 
             background-clip: text; 
@@ -42,6 +42,13 @@
         .future-card:hover {
             opacity: 1;
         }
+        .pulse-glow {
+            animation: pulseGlow 2s infinite;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.5); }
+        }
     </style>
 </head>
 <body class="text-gray-100 min-h-screen">
@@ -50,13 +57,13 @@
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="flex h-16 items-center justify-between">
                 <a href="/" class="text-xl font-bold text-white tracking-tight">
-                    <span class="text-indigo-400">Speak</span>Fit
+                    <span class="text-purple-400">Speak</span>Fit
                 </a>
                 <div class="flex items-center gap-6">
-                    <a href="#present" class="text-sm text-gray-400 hover:text-white transition-colors">Present</a>
+                    <a href="#memory" class="text-sm text-gray-400 hover:text-white transition-colors">Memory</a>
                     <a href="#future" class="text-sm text-gray-400 hover:text-white transition-colors">Coming Soon</a>
-                    <a href="/docs" class="text-sm text-gray-400 hover:text-white transition-colors">API</a>
-                    <a href="/login" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+                    <a href="/downloads" class="text-sm text-gray-400 hover:text-white transition-colors">Downloads</a>
+                    <a href="/login" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors">
                         Dashboard
                     </a>
                 </div>
@@ -67,73 +74,109 @@
     <!-- Hero -->
     <section class="pt-32 pb-12 px-4">
         <div class="mx-auto max-w-4xl text-center fade-in">
+            <div class="inline-block px-4 py-1 bg-purple-500/20 text-purple-300 text-sm font-semibold rounded-full mb-6">
+                🧠 Now in Beta
+            </div>
             <h1 class="text-5xl sm:text-6xl font-extrabold text-white mb-6 leading-tight">
-                Speech & Language Apps<br>
-                <span class="gradient-text">For Every Stage of Life</span>
+                Early Detection Through<br>
+                <span class="gradient-text">Speech Analysis</span>
             </h1>
             <p class="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-                AI-powered tools to help you speak clearly, present confidently, read fluently, and monitor cognitive health — from childhood through adulthood.
+                Monitor cognitive health through everyday conversations. Track word-finding difficulties, repetition patterns, and language changes over time.
             </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="/static/downloads/speakfit-memory-1.0.3.apk" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all text-lg">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.523 2H6.477C5.66 2 5 2.66 5 3.477v17.046C5 21.34 5.66 22 6.477 22h11.046c.817 0 1.477-.66 1.477-1.477V3.477C19 2.66 18.34 2 17.523 2zM12 20.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm4-5H8v-11h8v11z"/></svg>
+                    Download Beta (Android)
+                </a>
+                <a href="#memory" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-all text-lg border border-gray-700">
+                    Learn More
+                </a>
+            </div>
         </div>
     </section>
 
-    <!-- Featured: Present -->
-    <section id="present" class="py-12 px-4">
+    <!-- Featured: Memory -->
+    <section id="memory" class="py-16 px-4">
         <div class="mx-auto max-w-4xl">
-            <div class="text-center mb-8 fade-in">
-                <span class="inline-block px-4 py-1 bg-amber-500/20 text-amber-300 text-sm font-semibold rounded-full mb-4">
-                    🚀 Available Now
-                </span>
-                <h2 class="text-3xl font-bold text-white">Our First Release</h2>
-            </div>
-            
-            <a href="/present" class="app-card block bg-gradient-to-br from-amber-900/60 to-amber-950/60 border-2 border-amber-500/50 rounded-3xl p-10 fade-in-delay hover:border-amber-400/70">
+            <div class="app-card pulse-glow bg-gradient-to-br from-purple-900/60 to-purple-950/60 border-2 border-purple-500/50 rounded-3xl p-10 fade-in-delay hover:border-purple-400/70">
                 <div class="flex flex-col md:flex-row gap-8 items-center">
-                    <div class="text-7xl">🎤</div>
+                    <div class="text-8xl">🧠</div>
                     <div class="flex-1 text-center md:text-left">
-                        <h3 class="text-3xl font-bold text-white mb-2">Present</h3>
-                        <p class="text-amber-300 text-lg font-medium mb-4">Public Speaking & Interview Coach</p>
+                        <div class="flex items-center gap-3 justify-center md:justify-start mb-2">
+                            <h3 class="text-3xl font-bold text-white">SpeakFit Memory</h3>
+                            <span class="px-3 py-1 bg-purple-500/30 text-purple-200 text-sm font-semibold rounded-full">Beta</span>
+                        </div>
+                        <p class="text-purple-300 text-lg font-medium mb-4">Cognitive Health Monitoring</p>
                         <p class="text-gray-300 leading-relaxed mb-6 text-lg">
-                            Practice presentations and job interviews with real-time AI feedback on pacing, filler words, pitch variation, and confidence. Get a floating overlay that coaches you while you present.
+                            Record conversations and get AI-powered analysis of speech patterns that may indicate cognitive changes. Track word-finding difficulties, repeated stories and questions, and language complexity over time.
                         </p>
-                        <div class="flex flex-wrap gap-3 justify-center md:justify-start">
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">AI Interview Practice</span>
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">Live Coaching Overlay</span>
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">Delivery Analysis</span>
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-200 text-sm rounded-full">Confidence Scoring</span>
+                        <div class="flex flex-wrap gap-3 justify-center md:justify-start mb-6">
+                            <span class="px-3 py-1 bg-purple-500/20 text-purple-200 text-sm rounded-full">Repetition Detection</span>
+                            <span class="px-3 py-1 bg-purple-500/20 text-purple-200 text-sm rounded-full">Word-Finding Analysis</span>
+                            <span class="px-3 py-1 bg-purple-500/20 text-purple-200 text-sm rounded-full">Cross-Session Tracking</span>
+                            <span class="px-3 py-1 bg-purple-500/20 text-purple-200 text-sm rounded-full">Trend Monitoring</span>
                         </div>
                     </div>
                 </div>
-                <div class="mt-8 pt-6 border-t border-amber-500/30 flex flex-col sm:flex-row gap-4 justify-center">
-                    <span class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl transition-all">
+                
+                <!-- Key Features -->
+                <div class="mt-8 pt-8 border-t border-purple-500/30 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="text-center md:text-left">
+                        <div class="text-2xl mb-2">🔄</div>
+                        <h4 class="font-semibold text-white mb-1">Cross-Session Tracking</h4>
+                        <p class="text-sm text-gray-400">Detects when the same stories or questions are repeated across different conversations.</p>
+                    </div>
+                    <div class="text-center md:text-left">
+                        <div class="text-2xl mb-2">⏱️</div>
+                        <h4 class="font-semibold text-white mb-1">Time-Aware Analysis</h4>
+                        <p class="text-sm text-gray-400">Repetitions after longer gaps are flagged as more significant for early detection.</p>
+                    </div>
+                    <div class="text-center md:text-left">
+                        <div class="text-2xl mb-2">📊</div>
+                        <h4 class="font-semibold text-white mb-1">Pattern Dashboard</h4>
+                        <p class="text-sm text-gray-400">Track trends over days, weeks, and months to share with healthcare providers.</p>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-purple-500/30 flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="/static/downloads/speakfit-memory-1.0.3.apk" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-500 hover:bg-purple-400 text-white font-semibold rounded-xl transition-all">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.523 2H6.477C5.66 2 5 2.66 5 3.477v17.046C5 21.34 5.66 22 6.477 22h11.046c.817 0 1.477-.66 1.477-1.477V3.477C19 2.66 18.34 2 17.523 2zM12 20.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm4-5H8v-11h8v11z"/></svg>
                         Download for Android
-                    </span>
-                    <span class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-all">
+                    </a>
+                    <span class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-700/50 text-gray-400 font-semibold rounded-xl">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
                         iOS Coming Soon
                     </span>
                 </div>
-            </a>
+            </div>
         </div>
     </section>
 
-    <!-- About Section -->
-    <section id="about" class="py-16 px-4 border-t border-gray-800/50">
+    <!-- Why It Matters -->
+    <section class="py-16 px-4 border-t border-gray-800/50">
         <div class="mx-auto max-w-3xl text-center fade-in-delay-2">
-            <h2 class="text-3xl font-bold text-white mb-6">Built on Science</h2>
-            <p class="text-gray-400 leading-relaxed mb-8">
-                All SpeakFit apps are powered by the same advanced speech analysis engine — 
-                combining state-of-the-art speech recognition, acoustic analysis, and natural language processing 
-                to give you actionable, personalized feedback.
+            <h2 class="text-3xl font-bold text-white mb-6">Why Early Detection Matters</h2>
+            <p class="text-gray-400 leading-relaxed mb-8 text-lg">
+                Speech changes can appear <strong class="text-white">years before</strong> other symptoms of cognitive decline. 
+                Regular monitoring through everyday conversations provides valuable data for you and your healthcare team.
             </p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/docs" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-all border border-gray-700">
-                    API Documentation
-                </a>
-                <a href="/methodology" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-all border border-gray-700">
-                    Our Methodology
-                </a>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                <div class="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                    <div class="text-3xl mb-3">👨‍👩‍👧‍👦</div>
+                    <h3 class="font-semibold text-white mb-2">For Families</h3>
+                    <p class="text-sm text-gray-400">Track a loved one's speech patterns over time. Get objective data to share with doctors.</p>
+                </div>
+                <div class="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                    <div class="text-3xl mb-3">🏥</div>
+                    <h3 class="font-semibold text-white mb-2">For Caregivers</h3>
+                    <p class="text-sm text-gray-400">Document changes between visits. Flag concerning patterns for medical review.</p>
+                </div>
+                <div class="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                    <div class="text-3xl mb-3">🔬</div>
+                    <h3 class="font-semibold text-white mb-2">Research-Backed</h3>
+                    <p class="text-sm text-gray-400">Based on peer-reviewed studies linking speech patterns to cognitive health markers.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -145,14 +188,28 @@
                 <span class="inline-block px-4 py-1 bg-gray-700/50 text-gray-400 text-sm font-semibold rounded-full mb-4">
                     🔮 Coming Soon
                 </span>
-                <h2 class="text-3xl font-bold text-white mb-4">Our Future</h2>
+                <h2 class="text-3xl font-bold text-white mb-4">More SpeakFit Apps</h2>
                 <p class="text-gray-500 max-w-xl mx-auto">
-                    We're building a complete family of speech and language apps. Here's what's on the roadmap.
+                    We're building a complete family of speech and language apps for every stage of life.
                 </p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
+                <!-- Present -->
+                <div class="future-card app-card bg-gradient-to-br from-amber-900/40 to-amber-950/40 border border-amber-500/20 rounded-2xl p-8 fade-in-delay-2">
+                    <div class="app-icon mb-4 opacity-80">🎤</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Present</h3>
+                    <p class="text-amber-300/80 text-sm font-medium mb-4">Public Speaking Coach</p>
+                    <p class="text-gray-500 leading-relaxed mb-4">
+                        Practice presentations with real-time AI feedback. Get a floating overlay that coaches you while you speak.
+                    </p>
+                    <div class="pt-4 border-t border-amber-500/10">
+                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
+                        <p class="text-sm text-gray-500">Professionals, job seekers, students</p>
+                    </div>
+                </div>
+
                 <!-- Pronounce -->
                 <div class="future-card app-card bg-gradient-to-br from-emerald-900/40 to-emerald-950/40 border border-emerald-500/20 rounded-2xl p-8 fade-in-delay-2">
                     <div class="app-icon mb-4 opacity-80">🗣️</div>
@@ -178,34 +235,6 @@
                     <div class="pt-4 border-t border-sky-500/10">
                         <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
                         <p class="text-sm text-gray-500">Adult literacy learners, GED prep, reading programs</p>
-                    </div>
-                </div>
-
-                <!-- Memory -->
-                <div class="future-card app-card bg-gradient-to-br from-purple-900/40 to-purple-950/40 border border-purple-500/20 rounded-2xl p-8 fade-in-delay-2">
-                    <div class="app-icon mb-4 opacity-80">🧠</div>
-                    <h3 class="text-xl font-bold text-white mb-2">Memory</h3>
-                    <p class="text-purple-300/80 text-sm font-medium mb-4">Cognitive Assessment</p>
-                    <p class="text-gray-500 leading-relaxed mb-4">
-                        Track speech patterns that may indicate cognitive changes — word-finding, repetition, language complexity.
-                    </p>
-                    <div class="pt-4 border-t border-purple-500/10">
-                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
-                        <p class="text-sm text-gray-500">Seniors, caregivers, families</p>
-                    </div>
-                </div>
-
-                <!-- Phonics -->
-                <div class="future-card app-card bg-gradient-to-br from-pink-900/40 to-pink-950/40 border border-pink-500/20 rounded-2xl p-8 fade-in-delay-3">
-                    <div class="app-icon mb-4 opacity-80">🦉</div>
-                    <h3 class="text-xl font-bold text-white mb-2">Phonics</h3>
-                    <p class="text-pink-300/80 text-sm font-medium mb-4">Kids Learning to Read</p>
-                    <p class="text-gray-500 leading-relaxed mb-4">
-                        Fun reading practice with Ollie the Owl! Earn stars and badges, explore stories, and build phonics skills.
-                    </p>
-                    <div class="pt-4 border-t border-pink-500/10">
-                        <p class="text-xs text-gray-600 uppercase tracking-wider mb-1">For</p>
-                        <p class="text-sm text-gray-500">Children ages 4-11, parents, teachers</p>
                     </div>
                 </div>
 
@@ -241,19 +270,33 @@
         </div>
     </section>
 
+    <!-- Disclaimer -->
+    <section class="py-12 px-4 border-t border-gray-800/50">
+        <div class="mx-auto max-w-3xl text-center">
+            <div class="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                <p class="text-sm text-gray-500">
+                    <strong class="text-gray-400">Medical Disclaimer:</strong> SpeakFit Memory is a screening tool only and is not intended to diagnose any medical condition. 
+                    Results should be discussed with a qualified healthcare professional. 
+                    This app is not a substitute for professional medical advice, diagnosis, or treatment.
+                </p>
+            </div>
+        </div>
+    </section>
+
     <!-- Footer -->
     <footer class="py-12 px-4 border-t border-gray-800/50 bg-gray-950">
         <div class="mx-auto max-w-6xl">
             <div class="flex flex-col md:flex-row justify-between items-center gap-6">
                 <div class="text-center md:text-left">
                     <span class="text-xl font-bold text-white">
-                        <span class="text-indigo-400">Speak</span>Fit
+                        <span class="text-purple-400">Speak</span>Fit
                     </span>
-                    <p class="text-sm text-gray-500 mt-2">AI-powered speech analysis for everyone</p>
+                    <p class="text-sm text-gray-500 mt-2">AI-powered speech analysis for cognitive health</p>
                 </div>
                 <div class="flex gap-8 text-sm text-gray-400">
-                    <a href="/legal/privacy" class="hover:text-white transition-colors">Privacy</a>
-                    <a href="/legal/terms" class="hover:text-white transition-colors">Terms</a>
+                    <a href="/privacy" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="/terms" class="hover:text-white transition-colors">Terms</a>
+                    <a href="/downloads" class="hover:text-white transition-colors">Downloads</a>
                     <a href="/docs" class="hover:text-white transition-colors">API</a>
                 </div>
             </div>

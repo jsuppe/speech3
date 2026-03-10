@@ -4,9 +4,251 @@
 {% block content %}
 <div class="fade-in">
     <!-- Header -->
-    <div class="mb-8">
-        <h1 class="text-2xl font-bold text-white">Dashboard</h1>
-        <p class="text-sm text-gray-400 mt-1">Platform analytics and user statistics</p>
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+            <p class="text-sm text-gray-400 mt-1">Platform analytics and user statistics</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- Export Dropdown -->
+            <div class="relative" id="exportDropdown">
+                <button onclick="document.getElementById('exportMenu').classList.toggle('hidden')" 
+                        class="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-white border border-gray-700">
+                    <span>📥</span> Export
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="exportMenu" class="hidden absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50">
+                    <a href="/admin/export/users" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-t-lg">
+                        👥 Export Users (CSV)
+                    </a>
+                    <a href="/admin/export/recordings" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">
+                        🎙️ Export Recordings (CSV)
+                    </a>
+                    <a href="/admin/export/metrics?days=30" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-b-lg">
+                        📊 Export Metrics (30d)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    {% if alerts %}
+    <div class="space-y-3 mb-6">
+        {% for alert in alerts %}
+        <div class="flex items-start gap-3 p-4 rounded-xl border 
+            {% if alert.level == 'critical' %}bg-red-900/30 border-red-700/50
+            {% elif alert.level == 'warning' %}bg-yellow-900/30 border-yellow-700/50
+            {% else %}bg-blue-900/30 border-blue-700/50{% endif %}">
+            <span class="text-xl mt-0.5">{{ alert.icon }}</span>
+            <div class="flex-1">
+                <div class="font-semibold 
+                    {% if alert.level == 'critical' %}text-red-400
+                    {% elif alert.level == 'warning' %}text-yellow-400
+                    {% else %}text-blue-400{% endif %}">
+                    {{ alert.title }}
+                </div>
+                <div class="text-sm text-gray-400">{{ alert.message }}</div>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-white">✕</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- System Health: Cloud Status + Errors -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <!-- Overall Status -->
+        <div class="metric-card rounded-xl border p-4 {% if cloud_status.status == 'ok' %}bg-green-900/20 border-green-700/50{% elif cloud_status.status == 'degraded' %}bg-yellow-900/20 border-yellow-700/50{% else %}bg-red-900/20 border-red-700/50{% endif %}">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center {% if cloud_status.status == 'ok' %}bg-green-500/20{% elif cloud_status.status == 'degraded' %}bg-yellow-500/20{% else %}bg-red-500/20{% endif %}">
+                    {% if cloud_status.status == 'ok' %}
+                        <span class="text-green-400 text-xl">✓</span>
+                    {% elif cloud_status.status == 'degraded' %}
+                        <span class="text-yellow-400 text-xl">⚠</span>
+                    {% else %}
+                        <span class="text-red-400 text-xl">✕</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="text-sm text-gray-400">System Status</div>
+                    <div class="text-lg font-semibold {% if cloud_status.status == 'ok' %}text-green-400{% elif cloud_status.status == 'degraded' %}text-yellow-400{% else %}text-red-400{% endif %}">
+                        {{ cloud_status.status | capitalize }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Supabase Status -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center {% if cloud_status.supabase.connected %}bg-green-500/20{% else %}bg-red-500/20{% endif %}">
+                    <span class="{% if cloud_status.supabase.connected %}text-green-400{% else %}text-red-400{% endif %}">🐘</span>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-400">Supabase (PostgreSQL)</div>
+                    <div class="text-sm {% if cloud_status.supabase.connected %}text-green-400{% else %}text-red-400{% endif %}">
+                        {% if cloud_status.supabase.connected %}
+                            Connected {% if cloud_status.supabase.users %}({{ cloud_status.supabase.users }} users){% endif %}
+                        {% else %}
+                            Disconnected
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- R2 Status -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center {% if cloud_status.r2.connected %}bg-green-500/20{% else %}bg-red-500/20{% endif %}">
+                    <span class="{% if cloud_status.r2.connected %}text-green-400{% else %}text-red-400{% endif %}">☁️</span>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-400">Cloudflare R2</div>
+                    <div class="text-sm {% if cloud_status.r2.connected %}text-green-400{% else %}text-red-400{% endif %}">
+                        {% if cloud_status.r2.connected %}
+                            Connected ({{ cloud_status.r2.bucket }})
+                        {% else %}
+                            Disconnected
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Error Cards -->
+        <div class="metric-card rounded-xl border p-4 {% if error_count == 0 %}bg-green-900/20 border-green-700/50{% elif error_count < 5 %}bg-yellow-900/20 border-yellow-700/50{% else %}bg-red-900/20 border-red-700/50{% endif %}">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center {% if error_count == 0 %}bg-green-500/20{% elif error_count < 5 %}bg-yellow-500/20{% else %}bg-red-500/20{% endif %}">
+                    <span class="text-xl">🐛</span>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-400">Error Cards</div>
+                    <div class="text-lg font-semibold {% if error_count == 0 %}text-green-400{% elif error_count < 5 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                        {{ error_count }} open
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Resources -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <!-- CPU -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400">🖥️ CPU</span>
+                <span class="text-lg font-bold {% if system_health.cpu_percent < 50 %}text-green-400{% elif system_health.cpu_percent < 80 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.0f"|format(system_health.cpu_percent) }}%
+                </span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2">
+                <div class="h-2 rounded-full {% if system_health.cpu_percent < 50 %}bg-green-500{% elif system_health.cpu_percent < 80 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [system_health.cpu_percent, 100] | min }}%"></div>
+            </div>
+        </div>
+        
+        <!-- Memory -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400">🧠 RAM</span>
+                <span class="text-lg font-bold {% if system_health.memory_percent < 60 %}text-green-400{% elif system_health.memory_percent < 85 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.0f"|format(system_health.memory_percent) }}%
+                </span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2">
+                <div class="h-2 rounded-full {% if system_health.memory_percent < 60 %}bg-green-500{% elif system_health.memory_percent < 85 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [system_health.memory_percent, 100] | min }}%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">{{ "%.1f"|format(system_health.memory_used_gb) }} / {{ "%.0f"|format(system_health.memory_total_gb) }} GB</div>
+        </div>
+        
+        <!-- GPU -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400">🎮 GPU</span>
+                <span class="text-lg font-bold {% if system_health.gpu_utilization < 50 %}text-green-400{% elif system_health.gpu_utilization < 80 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.0f"|format(system_health.gpu_utilization) }}%
+                </span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2">
+                <div class="h-2 rounded-full {% if system_health.gpu_utilization < 50 %}bg-green-500{% elif system_health.gpu_utilization < 80 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [system_health.gpu_utilization, 100] | min }}%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">{{ "%.1f"|format(system_health.gpu_memory_used_gb) }} / {{ "%.0f"|format(system_health.gpu_memory_total_gb) }} GB VRAM</div>
+        </div>
+        
+        <!-- Disk -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400">💾 Disk</span>
+                <span class="text-lg font-bold {% if system_health.disk_percent < 70 %}text-green-400{% elif system_health.disk_percent < 90 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.0f"|format(system_health.disk_percent) }}%
+                </span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2">
+                <div class="h-2 rounded-full {% if system_health.disk_percent < 70 %}bg-green-500{% elif system_health.disk_percent < 90 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [system_health.disk_percent, 100] | min }}%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">{{ "%.0f"|format(system_health.disk_used_gb) }} / {{ "%.0f"|format(system_health.disk_total_gb) }} GB</div>
+        </div>
+    </div>
+
+    <!-- API Performance Metrics -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-white">{{ api_metrics.requests.total }}</div>
+            <div class="text-xs text-gray-400">Requests (15m)</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold {% if api_metrics.requests.avg_latency_ms < 500 %}text-green-400{% elif api_metrics.requests.avg_latency_ms < 2000 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                {{ "%.0f"|format(api_metrics.requests.avg_latency_ms) }}ms
+            </div>
+            <div class="text-xs text-gray-400">Avg Latency</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold {% if api_metrics.requests.p95_latency_ms < 1000 %}text-green-400{% elif api_metrics.requests.p95_latency_ms < 5000 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                {{ "%.0f"|format(api_metrics.requests.p95_latency_ms) }}ms
+            </div>
+            <div class="text-xs text-gray-400">P95 Latency</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold {% if api_metrics.requests.error_rate_pct < 1 %}text-green-400{% elif api_metrics.requests.error_rate_pct < 5 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                {{ "%.1f"|format(api_metrics.requests.error_rate_pct) }}%
+            </div>
+            <div class="text-xs text-gray-400">Error Rate</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold {% if (api_metrics.queue.peak_depth|default(0)) < 10 %}text-green-400{% elif (api_metrics.queue.peak_depth|default(0)) < 20 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                {{ api_metrics.queue.peak_depth|default(0) }}
+            </div>
+            <div class="text-xs text-gray-400">Peak Queue (15m)</div>
+        </div>
+    </div>
+
+    <!-- Pipeline Metrics -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-indigo-400">{{ api_metrics.pipeline.total_processed }}</div>
+            <div class="text-xs text-gray-400">Analyses (15m)</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold {% if api_metrics.pipeline.error_rate_pct < 1 %}text-green-400{% elif api_metrics.pipeline.error_rate_pct < 5 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                {{ "%.1f"|format(api_metrics.pipeline.error_rate_pct) }}%
+            </div>
+            <div class="text-xs text-gray-400">Pipeline Errors</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-white">{{ "%.1f"|format(api_metrics.pipeline.avg_duration_sec) }}s</div>
+            <div class="text-xs text-gray-400">Avg Analysis Time</div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-white">{{ "%.1f"|format(api_metrics.pipeline.p95_duration_sec|default(0)) }}s</div>
+            <div class="text-xs text-gray-400">P95 Analysis Time</div>
+        </div>
     </div>
 
     <!-- Key Metrics: DAU, MAU, MoM Growth -->
@@ -50,7 +292,7 @@
     </div>
 
     <!-- Subscription Growth -->
-    <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
             <div class="text-2xl font-bold text-white">{{ stats.paid_today }}</div>
             <div class="text-sm text-gray-400 mt-1">New Paid Today</div>
@@ -62,6 +304,94 @@
         <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
             <div class="text-2xl font-bold text-white">{{ stats.paid_month }}</div>
             <div class="text-sm text-gray-400 mt-1">New Paid This Month</div>
+        </div>
+    </div>
+
+    <!-- Revenue Metrics -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="metric-card bg-gradient-to-br from-emerald-900/40 to-emerald-800/20 rounded-xl border border-emerald-700/50 p-5">
+            <div class="text-3xl font-bold text-emerald-400">${{ "%.2f"|format(stats.mrr) }}</div>
+            <div class="text-sm text-gray-400 mt-1">💵 Monthly Recurring Revenue</div>
+        </div>
+        <div class="metric-card bg-gradient-to-br from-emerald-900/40 to-emerald-800/20 rounded-xl border border-emerald-700/50 p-5">
+            <div class="text-3xl font-bold text-emerald-400">${{ "%.2f"|format(stats.arr) }}</div>
+            <div class="text-sm text-gray-400 mt-1">📈 Annual Run Rate</div>
+        </div>
+        {% for rev in revenue_by_tier %}
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-white">${{ "%.2f"|format(rev.mrr) }}</span>
+                <span class="text-sm text-gray-500">/mo</span>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">{{ rev.tier | capitalize }} ({{ rev.users }} × ${{ rev.price }})</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Retention & Churn Metrics -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold {% if stats.d1_rate >= 30 %}text-green-400{% elif stats.d1_rate >= 15 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.1f"|format(stats.d1_rate) }}%
+                </span>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">📅 D1 Retention</div>
+            <div class="text-xs text-gray-500">{{ stats.d1_eligible }} eligible users</div>
+            <div class="w-full bg-gray-800 rounded-full h-2 mt-2">
+                <div class="h-2 rounded-full {% if stats.d1_rate >= 30 %}bg-green-500{% elif stats.d1_rate >= 15 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [stats.d1_rate, 100] | min }}%"></div>
+            </div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold {% if stats.d7_rate >= 20 %}text-green-400{% elif stats.d7_rate >= 10 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.1f"|format(stats.d7_rate) }}%
+                </span>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">📆 D7 Retention</div>
+            <div class="text-xs text-gray-500">{{ stats.d7_eligible }} eligible users</div>
+            <div class="w-full bg-gray-800 rounded-full h-2 mt-2">
+                <div class="h-2 rounded-full {% if stats.d7_rate >= 20 %}bg-green-500{% elif stats.d7_rate >= 10 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [stats.d7_rate, 100] | min }}%"></div>
+            </div>
+        </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold {% if stats.d30_rate >= 15 %}text-green-400{% elif stats.d30_rate >= 5 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.1f"|format(stats.d30_rate) }}%
+                </span>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">🗓️ D30 Retention</div>
+            <div class="text-xs text-gray-500">{{ stats.d30_eligible }} eligible users</div>
+            <div class="w-full bg-gray-800 rounded-full h-2 mt-2">
+                <div class="h-2 rounded-full {% if stats.d30_rate >= 15 %}bg-green-500{% elif stats.d30_rate >= 5 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [stats.d30_rate, 100] | min }}%"></div>
+            </div>
+        </div>
+        
+        <!-- Churn Rate -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5 col-span-3 md:col-span-1">
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold {% if stats.churn_rate < 5 %}text-green-400{% elif stats.churn_rate < 15 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ "%.1f"|format(stats.churn_rate) }}%
+                </span>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">📉 Monthly Churn</div>
+            <div class="text-xs text-gray-500">{{ stats.churned_users }} of {{ stats.active_last_month }} churned</div>
+            <div class="w-full bg-gray-800 rounded-full h-2 mt-2">
+                <div class="h-2 rounded-full {% if stats.churn_rate < 5 %}bg-green-500{% elif stats.churn_rate < 15 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                     style="width: {{ [stats.churn_rate, 100] | min }}%"></div>
+            </div>
+        </div>
+        
+        <!-- Inactive Users -->
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5 col-span-3 md:col-span-1">
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-gray-400">{{ stats.inactive_users }}</span>
+            </div>
+            <div class="text-sm text-gray-400 mt-1">😴 Inactive (30d)</div>
+            <div class="text-xs text-gray-500">No recordings in 30 days</div>
         </div>
     </div>
 
@@ -103,6 +433,10 @@
             <div class="text-2xl font-bold text-white">{{ stats.survey_total }}</div>
             <div class="text-sm text-gray-400 mt-1">Survey Responses</div>
         </div>
+        <div class="metric-card bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <div class="text-2xl font-bold text-cyan-400">{{ "%.1f"|format(stats.avg_recordings_per_user) }}</div>
+            <div class="text-sm text-gray-400 mt-1">Avg Rec/User</div>
+        </div>
     </div>
 
     <!-- DAU Trend Chart -->
@@ -138,6 +472,76 @@
         <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
             <h2 class="text-lg font-semibold text-white mb-4">Recordings by Category</h2>
             <canvas id="categoryChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Error Cards Section -->
+    {% if error_cards %}
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-white">🐛 Open Error Cards</h2>
+            <a href="https://trello.com/b/Maaazpz3/speechscore" target="_blank" class="text-sm text-indigo-400 hover:text-indigo-300">View in Trello →</a>
+        </div>
+        <div class="space-y-3">
+            {% for card in error_cards %}
+            <div class="flex items-start gap-3 p-3 bg-red-900/20 rounded-lg border border-red-800/50">
+                <span class="text-red-400 mt-0.5">⚠️</span>
+                <div class="flex-1 min-w-0">
+                    <a href="{{ card.shortUrl }}" target="_blank" class="text-white hover:text-indigo-300 font-medium truncate block">
+                        {{ card.name | replace('🐛 ', '') | replace('App Error: ', '') }}
+                    </a>
+                    {% if card.desc %}
+                    <p class="text-gray-400 text-sm mt-1 line-clamp-2">{{ card.desc[:150] }}{% if card.desc|length > 150 %}...{% endif %}</p>
+                    {% endif %}
+                </div>
+                <span class="text-gray-500 text-xs whitespace-nowrap">{{ card.dateLastActivity[:10] if card.dateLastActivity else '' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Profile Usage -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+        <!-- Profile Usage Chart -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">📱 Usage by Profile</h2>
+            <canvas id="profileChart" height="200"></canvas>
+        </div>
+
+        <!-- Profile Usage Table -->
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">Profile Breakdown</h2>
+            <div class="space-y-3">
+                {% for p in profile_usage %}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full 
+                            {% if p.profile == 'pronunciation' %}bg-blue-500
+                            {% elif p.profile == 'present' %}bg-green-500
+                            {% elif p.profile == 'memory' or p.profile == 'dementia' %}bg-purple-500
+                            {% elif p.profile == 'voice_health' %}bg-pink-500
+                            {% elif p.profile == 'interview' %}bg-yellow-500
+                            {% else %}bg-gray-500{% endif %}"></span>
+                        <span class="text-white capitalize">{{ p.profile | replace('_', ' ') }}</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-32 bg-gray-800 rounded-full h-2">
+                            {% set max_count = profile_usage[0].count if profile_usage else 1 %}
+                            <div class="h-2 rounded-full 
+                                {% if p.profile == 'pronunciation' %}bg-blue-500
+                                {% elif p.profile == 'present' %}bg-green-500
+                                {% elif p.profile == 'memory' or p.profile == 'dementia' %}bg-purple-500
+                                {% elif p.profile == 'voice_health' %}bg-pink-500
+                                {% elif p.profile == 'interview' %}bg-yellow-500
+                                {% else %}bg-gray-500{% endif %}"
+                                style="width: {{ (p.count / max_count * 100) | int }}%"></div>
+                        </div>
+                        <span class="text-gray-400 text-sm font-mono w-12 text-right">{{ p.count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
@@ -461,6 +865,38 @@ new Chart(document.getElementById('categoryChart'), {
     }
 });
 
+// Profile Usage Chart
+const profileData = {{ profile_usage | tojson | safe }};
+const profileColors = {
+    'pronunciation': '#3b82f6',
+    'present': '#22c55e', 
+    'memory': '#a855f7',
+    'dementia': '#a855f7',
+    'voice_health': '#ec4899',
+    'interview': '#eab308',
+    'general': '#6b7280'
+};
+new Chart(document.getElementById('profileChart'), {
+    type: 'bar',
+    data: {
+        labels: profileData.map(p => (p.profile || 'general').replace('_', ' ')),
+        datasets: [{
+            label: 'Recordings',
+            data: profileData.map(p => p.count),
+            backgroundColor: profileData.map(p => profileColors[p.profile] || '#6b7280'),
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: '#374151' } },
+            y: { grid: { display: false } }
+        }
+    }
+});
+
 // Survey Charts
 const surveyColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
@@ -536,5 +972,14 @@ if (chartData.survey_focus_areas && chartData.survey_focus_areas.length > 0) {
         }
     });
 }
+
+// Export dropdown click-outside handler
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('exportDropdown');
+    const menu = document.getElementById('exportMenu');
+    if (dropdown && menu && !dropdown.contains(e.target)) {
+        menu.classList.add('hidden');
+    }
+});
 </script>
 {% endblock %}

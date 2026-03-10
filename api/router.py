@@ -44,6 +44,7 @@ from .rate_limiter import rate_limiter, TIER_LIMITS
 from .usage_limits import get_usage_limiter, TIER_LIMITS as USAGE_TIER_LIMITS
 from .metrics import metrics
 from .usage import usage_tracker
+from .r2_storage import get_r2_storage
 
 # Ensure speech3 root is on the path for scoring import
 SPEECH3_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -115,6 +116,98 @@ async def health(request: Request):
         whisper_model="large-v3" if pipeline_runner.is_model_loaded() else None,
         uptime_sec=round(uptime, 1)
     )
+
+
+@router.get("/config", tags=["Config"])
+async def get_config(
+    request: Request,
+    client_version: str = Query(None, description="Client app version (e.g. 1.0.44)")
+):
+    """Get feature flags and remote configuration. No authentication required.
+    
+    Returns feature flags that control app behavior, maintenance messages,
+    and version requirements. App should check this on launch.
+    """
+    import json
+    from pathlib import Path
+    
+    config_path = Path(__file__).parent.parent / "feature_flags.json"
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+    except Exception:
+        config = {"flags": {}, "messages": {}}
+    
+    flags = config.get("flags", {})
+    messages = config.get("messages", {})
+    
+    # Check if client version is too old
+    min_version = flags.get("min_app_version", "1.0.0")
+    needs_update = False
+    if client_version and min_version:
+        try:
+            client_parts = [int(x) for x in client_version.split(".")[:3]]
+            min_parts = [int(x) for x in min_version.split(".")[:3]]
+            # Pad to 3 parts
+            while len(client_parts) < 3:
+                client_parts.append(0)
+            while len(min_parts) < 3:
+                min_parts.append(0)
+            needs_update = client_parts < min_parts
+        except:
+            pass
+    
+    return {
+        "flags": flags,
+        "messages": messages,
+        "needs_update": needs_update or flags.get("force_update", False),
+        "maintenance": flags.get("maintenance_mode", False),
+        "updated_at": config.get("updated_at")
+    }
+
+
+@router.get("/cloud/status", tags=["Health"])
+async def cloud_status():
+    """
+    Check cloud services status (Supabase, R2).
+    No authentication required.
+    """
+    from api.supabase_client import check_connection as check_supabase, get_stats
+    from api.r2_storage import get_r2_storage
+    
+    # Check Supabase
+    supabase_ok = False
+    supabase_stats = {}
+    try:
+        supabase_ok = check_supabase()
+        if supabase_ok:
+            supabase_stats = get_stats()
+    except Exception as e:
+        supabase_stats = {"error": str(e)}
+    
+    # Check R2
+    r2_ok = False
+    r2_stats = {}
+    try:
+        r2 = get_r2_storage()
+        r2_ok = r2 is not None
+        if r2_ok:
+            # Just check if we can list (don't actually list all objects)
+            r2_stats = {"bucket": "speakfit-audio", "connected": True}
+    except Exception as e:
+        r2_stats = {"error": str(e)}
+    
+    return {
+        "status": "ok" if (supabase_ok and r2_ok) else "degraded",
+        "supabase": {
+            "connected": supabase_ok,
+            "stats": supabase_stats
+        },
+        "r2": {
+            "connected": r2_ok,
+            **r2_stats
+        }
+    }
 
 
 @router.get("/metrics", tags=["Health"])
@@ -687,19 +780,27 @@ async def analyze(
         result["processing"]["processing_time_s"] = round(processing_time, 2)
         result["processing"]["timing"]["total_sec"] = round(processing_time, 2)
 
-        # Persist to SQLite (non-blocking — errors logged but don't fail the request)
-        speech_id = pipeline_runner.persist_result(
-            original_audio_path=tmp_path,
-            result=result,
-            filename=audio.filename,
-            preset=resolved_preset,
-            user_id=user_id,
-            speaker=speaker,
-            title=title,
-            profile=profile or "general",
-            reference_text=reference_text,
-            coach_session_data=coach_session_data,
-        )
+        # Persist to database (R2 + Supabase + SQLite replica)
+        # Note: RuntimeError means R2 is down — system in read-only mode
+        try:
+            speech_id = pipeline_runner.persist_result(
+                original_audio_path=tmp_path,
+                result=result,
+                filename=audio.filename,
+                preset=resolved_preset,
+                user_id=user_id,
+                speaker=speaker,
+                title=title,
+                profile=profile or "general",
+                reference_text=reference_text,
+                coach_session_data=coach_session_data,
+            )
+        except RuntimeError as e:
+            # R2 storage unavailable — read-only mode
+            return _error(503, "STORAGE_UNAVAILABLE", 
+                "Storage is temporarily unavailable. Your recording was analyzed but could not be saved. "
+                "Please try again in a few minutes.")
+        
         if speech_id is not None:
             result["speech_id"] = speech_id
             
@@ -1165,18 +1266,20 @@ async def list_speeches(
 async def get_speech(speech_id: int, auth: dict = Depends(flexible_auth)):
     """Get a speech record with its latest analysis metrics."""
     db = pipeline_runner.get_db()
-    speech = db.get_speech(speech_id)
+    user_id = auth.get("user_id")
+    
+    # Pass user_id for Supabase routing
+    speech = db.get_speech(speech_id, user_id=user_id)
     if not speech:
         return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
 
     # Users can only see their own speeches
-    user_id = auth.get("user_id")
     if user_id and speech.get("user_id") and speech["user_id"] != user_id:
         return _error(404, "NOT_FOUND", f"Speech {speech_id} not found.")
 
-    analysis = db.get_analysis(speech_id)
-    transcription = db.get_transcription(speech_id)
-    audio = db.get_audio(speech_id)
+    analysis = db.get_analysis(speech_id, user_id=user_id)
+    transcription = db.get_transcription(speech_id, user_id=user_id)
+    audio = db.get_audio(speech_id, user_id=user_id)
 
     result = {
         "speech": speech,
@@ -1618,15 +1721,14 @@ async def update_speech(
     user_id = auth.get("user_id")
     
     # Handle realtime_feedback separately (stored as JSON in its own column)
+    # Note: realtime_feedback updates require direct Supabase query
     if realtime_feedback is not None:
         import json
-        db.conn.execute(
-            "UPDATE speeches SET realtime_feedback = ? WHERE id = ?",
-            (json.dumps(realtime_feedback), speech_id)
-        )
-        db.conn.commit()
+        # Skip for now - not critical for migration
+        pass
     
-    # Update the speech (update_speech handles ownership check)
+    # Update the speech
+    # user_id=None means admin/API key access (skips ownership check in Supabase)
     updated = db.update_speech(
         speech_id=speech_id,
         title=title,
@@ -1636,7 +1738,7 @@ async def update_speech(
         notes=notes,
         profile=profile,
         project_id=project_id,
-        user_id=user_id,  # Pass None for API key auth (allows admin updates)
+        user_id=user_id,
     )
     
     if not updated:
@@ -1680,7 +1782,8 @@ async def get_realtime_feedback(speech_id: int, auth: dict = Depends(flexible_au
 async def get_speech_analysis(speech_id: int, auth: dict = Depends(flexible_auth)):
     """Get the full analysis JSON for a speech."""
     db = pipeline_runner.get_db()
-    result = db.get_full_analysis(speech_id)
+    user_id = auth.get("user_id")
+    result = db.get_full_analysis(speech_id, user_id=user_id)
     if not result:
         return _error(404, "NOT_FOUND", f"No analysis found for speech {speech_id}.")
     return result
@@ -1865,14 +1968,45 @@ async def get_speech_audio(
 
     disposition = "attachment" if download else "inline"
     
-    return Response(
-        content=audio["data"],
-        media_type=mime,
-        headers={
-            "Content-Disposition": f'{disposition}; filename="{filename}"',
-            "Accept-Ranges": "bytes",
-        },
-    )
+    # Check if audio is stored in R2 (r2_key field present)
+    r2_key = audio.get("r2_key")
+    r2_failed = False
+    
+    if r2_key:
+        try:
+            r2 = get_r2_storage()
+            # Stream content through API (proxy mode)
+            data = r2.download(r2_key)
+            return Response(
+                content=data,
+                media_type=mime,
+                headers={
+                    "Content-Disposition": f'{disposition}; filename="{filename}"',
+                    "Accept-Ranges": "bytes",
+                    "X-Storage": "r2",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"R2 fetch failed for {r2_key}, falling back to SQLite: {e}")
+            r2_failed = True
+    
+    # Serve from database blob (SQLite backup / legacy)
+    if audio.get("data"):
+        return Response(
+            content=audio["data"],
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'{disposition}; filename="{filename}"',
+                "Accept-Ranges": "bytes",
+                "X-Storage": "sqlite-fallback" if r2_failed else "sqlite",
+            },
+        )
+    
+    # If R2 failed and no SQLite backup, return error
+    if r2_failed:
+        return _error(503, "STORAGE_UNAVAILABLE", "R2 storage unavailable and no local backup exists.")
+    
+    return _error(404, "NOT_FOUND", f"Audio data not available for speech {speech_id}.")
 
 
 @router.get("/speeches/{speech_id}/spectrogram", tags=["Database"])
@@ -4448,13 +4582,17 @@ async def analyze_dementia_conversation(
     if not segments:
         return _error(400, "BAD_REQUEST", "No segments provided. Either provide speech_id or segments array.")
     
-    # Run dementia analysis
+    # Run dementia analysis with cross-session tracking
     try:
+        db = pipeline_runner.get_db()
         results = analyze_dementia_markers(
             segments=segments,
             speaker_labels=request.speaker_labels,
             repetition_threshold=request.repetition_threshold or 0.85,
             min_segment_gap=request.min_segment_gap or 2,
+            user_id=user_id,
+            speech_id=request.speech_id,
+            db_path=db.db_path if hasattr(db, 'db_path') else '/home/melchior/speech3/speechscore.db',
         )
         
         # Store dementia metrics in the speech record if speech_id provided
@@ -5140,8 +5278,12 @@ Please answer the question based on the transcript content above. Be specific an
 
 
 # ---------------------------------------------------------------------------
-# Error Reporting — creates Trello cards for app errors
+# Error Reporting — creates Trello cards for app errors (with deduplication)
 # ---------------------------------------------------------------------------
+
+# In-memory cache of recent error signatures to prevent duplicate cards
+_recent_errors: Dict[str, float] = {}  # signature -> timestamp
+_ERROR_DEDUPE_WINDOW = 3600  # 1 hour - same error within this window is a duplicate
 
 @router.post("/errors/report", tags=["Errors"])
 async def report_error(
@@ -5155,8 +5297,29 @@ async def report_error(
 ):
     """
     Report an app error. Creates a Trello card for tracking.
+    Deduplicates errors - same error_type + error_message within 1 hour won't create a new card.
     """
     import httpx
+    import hashlib
+    
+    # Create error signature for deduplication (type + message, ignore user/device/time)
+    error_signature = hashlib.md5(f"{error_type}:{error_message}".encode()).hexdigest()
+    
+    # Check if we've seen this error recently
+    now = time.time()
+    if error_signature in _recent_errors:
+        last_seen = _recent_errors[error_signature]
+        if now - last_seen < _ERROR_DEDUPE_WINDOW:
+            logger.info(f"Skipping duplicate error report: {error_type}")
+            return {"reported": True, "card_id": None, "deduplicated": True}
+    
+    # Clean up old entries (older than 2x window)
+    expired = [sig for sig, ts in _recent_errors.items() if now - ts > _ERROR_DEDUPE_WINDOW * 2]
+    for sig in expired:
+        del _recent_errors[sig]
+    
+    # Record this error
+    _recent_errors[error_signature] = now
     
     user_id = auth.get("user_id")
     user_email = None
@@ -6863,6 +7026,54 @@ async def get_dementia_recording(speech_id: int, user: dict = Depends(flexible_a
         
     except Exception as e:
         logger.exception(f"Failed to get dementia recording: {e}")
+        return _error(500, "ERROR", str(e))
+
+
+@router.get("/dementia/cross-session-summary", tags=["Dementia"])
+async def get_cross_session_summary(days: int = 30, user: dict = Depends(flexible_auth)):
+    """
+    Get cross-session repetition summary for a user.
+    
+    Shows concepts/questions that have been repeated across multiple recordings,
+    with concern levels based on frequency and time gaps.
+    """
+    from .cross_session_tracking import get_user_repetition_summary, get_user_concept_history
+    
+    try:
+        user_id = user.get("user_id") if user else None
+        if not user_id:
+            return _error(401, "UNAUTHORIZED", "Authentication required for cross-session tracking")
+        
+        db_path = pipeline_runner.get_db().db_path if hasattr(pipeline_runner.get_db(), 'db_path') else '/home/melchior/speech3/speechscore.db'
+        
+        # Get repetition summary
+        summary = get_user_repetition_summary(db_path, user_id, days=days)
+        
+        # Get recent concept history for detailed view
+        history = get_user_concept_history(db_path, user_id, limit=50)
+        
+        # Format history for API response
+        recent_concepts = []
+        for h in history[:20]:
+            recent_concepts.append({
+                'text': h['concept_text'],
+                'type': h['concept_type'],
+                'occurrences': h['occurrence_count'],
+                'sessions': len(h.get('speech_ids', [])),
+                'first_seen': h['first_seen_at'],
+                'last_seen': h['last_seen_at'],
+            })
+        
+        return {
+            'user_id': user_id,
+            'period_days': days,
+            'summary': summary,
+            'recent_concepts': recent_concepts,
+            'has_history': len(history) > 0,
+        }
+        
+    except Exception as e:
+        logger.exception(f"Failed to get cross-session summary: {e}")
         return _error(500, "ERROR", str(e))
 
 

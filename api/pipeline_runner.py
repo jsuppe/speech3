@@ -830,7 +830,11 @@ def persist_result(
             # Store audio as Opus (if file still exists)
             if audio_exists:
                 try:
-                    db.store_audio(speech_id, original_audio_path)
+                    db.store_audio(speech_id, original_audio_path, user_id=user_id)
+                except RuntimeError as e:
+                    # R2 unavailable — re-raise to put system in read-only mode
+                    logger.error(f"Storage unavailable (read-only mode): {e}")
+                    raise
                 except Exception as e:
                     logger.warning(f"Failed to encode audio to Opus: {e}")
             else:
@@ -845,11 +849,12 @@ def persist_result(
                 text=transcript_text,
                 segments=segments,
                 language=result.get("language"),
+                user_id=user_id,
             )
 
         # Store analysis (remap to expected structure for indexed extraction)
         # The result from run_pipeline uses top-level keys that store_analysis expects
-        db.store_analysis(speech_id, result, preset=preset)
+        db.store_analysis(speech_id, result, preset=preset, user_id=user_id)
 
         # Auto-run phoneme analysis for pronunciation profile or if audio exists
         if audio_exists and (profile == "pronunciation" or True):  # Always run for now
@@ -942,9 +947,18 @@ def persist_result(
         
         return speech_id
 
+    except RuntimeError as e:
+        # Storage unavailable (R2 down) — re-raise to trigger read-only mode
+        logger.error(f"Storage unavailable, cannot persist: {e}")
+        raise
     except Exception as e:
         logger.exception(f"Failed to persist analysis result: {e}")
         return None
+
+
+class StorageUnavailableError(Exception):
+    """Raised when R2 storage is unavailable (system in read-only mode)."""
+    pass
 
 
 class QualityGateError(Exception):

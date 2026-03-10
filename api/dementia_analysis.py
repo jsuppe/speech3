@@ -11,10 +11,80 @@ References:
 """
 
 import re
+import logging
 from collections import Counter
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
+import numpy as np
 import spacy
 from difflib import SequenceMatcher
+
+logger = logging.getLogger("speechscore.dementia")
+
+# Sentence transformer for semantic similarity (lazy loaded)
+_semantic_model = None
+
+def get_semantic_model():
+    """Lazy load sentence transformer model."""
+    global _semantic_model
+    if _semantic_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            _semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Loaded semantic similarity model: all-MiniLM-L6-v2")
+        except Exception as e:
+            logger.warning(f"Failed to load semantic model: {e}")
+            _semantic_model = False  # Mark as failed, don't retry
+    return _semantic_model if _semantic_model else None
+
+
+def semantic_similarity(text1: str, text2: str) -> float:
+    """
+    Calculate semantic similarity between two texts using sentence embeddings.
+    Falls back to string similarity if model unavailable.
+    
+    Returns: similarity score 0.0-1.0
+    """
+    model = get_semantic_model()
+    if model is None:
+        # Fallback to string similarity
+        return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
+    
+    try:
+        embeddings = model.encode([text1, text2], convert_to_numpy=True)
+        # Cosine similarity
+        similarity = np.dot(embeddings[0], embeddings[1]) / (
+            np.linalg.norm(embeddings[0]) * np.linalg.norm(embeddings[1])
+        )
+        return float(similarity)
+    except Exception as e:
+        logger.warning(f"Semantic similarity failed: {e}")
+        return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
+
+
+def batch_semantic_similarity(texts: List[str]) -> np.ndarray:
+    """
+    Compute pairwise semantic similarity matrix for a list of texts.
+    Much faster than calling semantic_similarity() in nested loops.
+    
+    Returns: NxN similarity matrix
+    """
+    model = get_semantic_model()
+    if model is None or len(texts) == 0:
+        return np.zeros((len(texts), len(texts)))
+    
+    try:
+        embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+        # Normalize embeddings
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0] = 1  # Avoid division by zero
+        normalized = embeddings / norms
+        # Compute cosine similarity matrix
+        similarity_matrix = np.dot(normalized, normalized.T)
+        return similarity_matrix
+    except Exception as e:
+        logger.warning(f"Batch semantic similarity failed: {e}")
+        return np.zeros((len(texts), len(texts)))
+
 
 # Load spaCy model for POS tagging
 try:
@@ -107,28 +177,98 @@ def extract_concepts(text: str) -> List[str]:
     return concepts, sentences
 
 
-def similarity_score(s1: str, s2: str) -> float:
-    """Calculate similarity between two strings."""
+def similarity_score(s1: str, s2: str, use_semantic: bool = True) -> float:
+    """
+    Calculate similarity between two strings.
+    
+    Args:
+        s1, s2: Strings to compare
+        use_semantic: If True, use semantic similarity (embeddings). 
+                      If False, use string matching (faster but less accurate).
+    """
+    if use_semantic:
+        return semantic_similarity(s1, s2)
     return SequenceMatcher(None, s1.lower(), s2.lower()).ratio()
 
 
-def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, min_segment_gap: int = 1) -> Dict[str, Any]:
+def time_decay_score(time_gap_seconds: float) -> float:
+    """
+    Calculate a concern score based on time gap between repetitions.
+    
+    Longer gaps are MORE concerning for dementia screening:
+    - < 10 seconds: likely self-correction (0.1)
+    - 10-30 seconds: minor concern (0.3)
+    - 30-60 seconds: moderate concern (0.5)
+    - 1-5 minutes: significant concern (0.7)
+    - 5-15 minutes: high concern (0.85)
+    - > 15 minutes: very high concern (1.0)
+    
+    Returns: score 0.0-1.0 (higher = more concerning)
+    """
+    if time_gap_seconds < 10:
+        return 0.1  # Likely self-correction
+    elif time_gap_seconds < 30:
+        return 0.3  # Minor
+    elif time_gap_seconds < 60:
+        return 0.5  # Moderate
+    elif time_gap_seconds < 300:  # 5 minutes
+        return 0.7  # Significant
+    elif time_gap_seconds < 900:  # 15 minutes
+        return 0.85  # High
+    else:
+        return 1.0  # Very high - repeating after 15+ minutes
+
+
+def calculate_concern_score(similarity: float, time_gap_seconds: float) -> float:
+    """
+    Calculate overall concern score combining similarity and time decay.
+    
+    Formula: concern = similarity * (0.5 + 0.5 * time_decay)
+    
+    This means:
+    - High similarity + long gap = high concern
+    - High similarity + short gap = moderate concern (might be self-correction)
+    - Low similarity isn't flagged regardless of time
+    
+    Returns: score 0.0-1.0
+    """
+    time_weight = time_decay_score(time_gap_seconds)
+    # Weight: 50% base similarity + 50% time-adjusted
+    concern = similarity * (0.5 + 0.5 * time_weight)
+    return round(concern, 3)
+
+
+def detect_repetitions(
+    segments: List[Dict[str, Any]], 
+    threshold: float = 0.70,  # Lowered for semantic matching
+    min_segment_gap: int = 1,
+    use_semantic: bool = True,
+    min_concern_score: float = 0.0  # Filter by concern score (0 = show all)
+) -> Dict[str, Any]:
     """
     Detect repeated concepts and questions - SAME SPEAKER ONLY.
+    
+    Uses semantic similarity (sentence embeddings) to catch paraphrased repetitions:
+    - "I went to the store" ≈ "I visited the shop" 
+    - "What time is it?" ≈ "Do you know the time?"
+    
+    Time decay weighting: repetitions after longer gaps are MORE concerning.
+    - < 10s: likely self-correction (low concern)
+    - 1-5 min: significant concern
+    - > 15 min: very high concern
     
     For dementia screening, we only care about a person repeating themselves,
     not normal conversational echoing between speakers.
     
-    NOTE: Even adjacent repetitions are significant for dementia screening!
-    Repeating "I went to the store" multiple times is a red flag.
-    
     Args:
-        segments: List of dicts with 'text' and optionally 'speaker'
-        threshold: Similarity threshold (0.80 = 80% similar)
+        segments: List of dicts with 'text', 'start' (seconds), and optionally 'speaker'
+        threshold: Similarity threshold (0.70 for semantic, 0.80 for string)
         min_segment_gap: Minimum segments apart to count as repetition (1 = adjacent OK)
+        use_semantic: Use semantic similarity (True) or string matching (False)
+        min_concern_score: Minimum concern score to include (0.0-1.0)
     
     Returns:
-        Dict with repetition analysis per speaker
+        Dict with repetition analysis including concern scores
     """
     all_concepts = []
     all_sentences = []
@@ -139,7 +279,7 @@ def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, 
         concepts, sentences = extract_concepts(text)
         
         for c in concepts:
-            if len(c) > 5:  # Skip short phrases (was 3, now 5)
+            if len(c) > 5:  # Skip short phrases
                 all_concepts.append({
                     'concept': c,
                     'segment_index': i,
@@ -148,7 +288,7 @@ def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, 
                 })
         
         for s in sentences:
-            if len(s) > 15:  # Skip short sentences (was 10, now 15)
+            if len(s) > 15:  # Skip short sentences
                 is_question = s.strip().endswith('?')
                 all_sentences.append({
                     'sentence': s,
@@ -157,6 +297,13 @@ def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, 
                     'speaker': seg.get('speaker', 'unknown'),
                     'is_question': is_question
                 })
+    
+    # Use batch semantic similarity for efficiency
+    concept_texts = [c['concept'] for c in all_concepts]
+    if use_semantic and len(concept_texts) > 0:
+        concept_sim_matrix = batch_semantic_similarity(concept_texts)
+    else:
+        concept_sim_matrix = None
     
     # Find repeated concepts - SAME SPEAKER ONLY
     repeated_concepts = []
@@ -176,23 +323,42 @@ def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, 
             # MINIMUM GAP CHECK - not immediate self-correction
             if abs(c1['segment_index'] - c2['segment_index']) < min_segment_gap:
                 continue
-                
-            sim = similarity_score(c1['concept'], c2['concept'])
+            
+            # Get similarity from precomputed matrix or compute on-the-fly
+            if concept_sim_matrix is not None:
+                sim = float(concept_sim_matrix[i, j])
+            else:
+                sim = similarity_score(c1['concept'], c2['concept'], use_semantic=False)
+            
             if sim >= threshold:
                 seen_pairs.add((i, j))
-                repeated_concepts.append({
-                    'concept_1': c1['concept'],
-                    'concept_2': c2['concept'],
-                    'similarity': round(sim, 2),
-                    'speaker': c1['speaker'],
-                    'segments': [c1['segment_index'], c2['segment_index']]
-                })
+                time_gap = abs(c1['start_time'] - c2['start_time'])
+                concern = calculate_concern_score(sim, time_gap)
+                
+                # Filter by minimum concern score
+                if concern >= min_concern_score:
+                    repeated_concepts.append({
+                        'concept_1': c1['concept'],
+                        'concept_2': c2['concept'],
+                        'similarity': round(sim, 2),
+                        'time_gap_seconds': round(time_gap, 1),
+                        'time_decay_weight': time_decay_score(time_gap),
+                        'concern_score': concern,
+                        'speaker': c1['speaker'],
+                        'segments': [c1['segment_index'], c2['segment_index']]
+                    })
+    
+    # Batch compute question similarities
+    questions = [s for s in all_sentences if s['is_question']]
+    question_texts = [q['sentence'] for q in questions]
+    if use_semantic and len(question_texts) > 0:
+        question_sim_matrix = batch_semantic_similarity(question_texts)
+    else:
+        question_sim_matrix = None
     
     # Find repeated questions - SAME SPEAKER ONLY
     repeated_questions = []
     question_pairs = set()
-    
-    questions = [s for s in all_sentences if s['is_question']]
     for i, q1 in enumerate(questions):
         for j, q2 in enumerate(questions):
             if i >= j:
@@ -207,17 +373,39 @@ def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, 
             # MINIMUM GAP CHECK
             if abs(q1['segment_index'] - q2['segment_index']) < min_segment_gap:
                 continue
-                
-            sim = similarity_score(q1['sentence'], q2['sentence'])
+            
+            # Get similarity from precomputed matrix or compute on-the-fly
+            if question_sim_matrix is not None:
+                sim = float(question_sim_matrix[i, j])
+            else:
+                sim = similarity_score(q1['sentence'], q2['sentence'], use_semantic=False)
+            
             if sim >= threshold:
                 question_pairs.add((i, j))
-                repeated_questions.append({
-                    'question_1': q1['sentence'],
-                    'question_2': q2['sentence'],
-                    'similarity': round(sim, 2),
-                    'speaker': q1['speaker'],
-                    'segments': [q1['segment_index'], q2['segment_index']]
-                })
+                time_gap = abs(q1['start_time'] - q2['start_time'])
+                concern = calculate_concern_score(sim, time_gap)
+                
+                # Filter by minimum concern score
+                if concern >= min_concern_score:
+                    repeated_questions.append({
+                        'question_1': q1['sentence'],
+                        'question_2': q2['sentence'],
+                        'similarity': round(sim, 2),
+                        'time_gap_seconds': round(time_gap, 1),
+                        'time_decay_weight': time_decay_score(time_gap),
+                        'concern_score': concern,
+                        'speaker': q1['speaker'],
+                        'segments': [q1['segment_index'], q2['segment_index']]
+                    })
+    
+    # Sort by concern score (most concerning first)
+    repeated_concepts.sort(key=lambda x: x['concern_score'], reverse=True)
+    repeated_questions.sort(key=lambda x: x['concern_score'], reverse=True)
+    
+    # Calculate weighted concern - average of top concerns
+    all_concerns = [c['concern_score'] for c in repeated_concepts + repeated_questions]
+    avg_concern = sum(all_concerns) / len(all_concerns) if all_concerns else 0.0
+    max_concern = max(all_concerns) if all_concerns else 0.0
     
     # Calculate total repetition count for storage
     total_repetition_count = len(repeated_concepts) + len(repeated_questions)
@@ -226,10 +414,13 @@ def detect_repetitions(segments: List[Dict[str, Any]], threshold: float = 0.80, 
         'repeated_concepts_count': len(repeated_concepts),
         'repeated_questions_count': len(repeated_questions),
         'total_repetition_count': total_repetition_count,
+        'average_concern_score': round(avg_concern, 3),
+        'max_concern_score': round(max_concern, 3),
         'repeated_concepts': repeated_concepts[:20],  # Limit to top 20
         'repeated_questions': repeated_questions[:20],
         'total_concepts_analyzed': len(all_concepts),
-        'total_questions_analyzed': len(questions)
+        'total_questions_analyzed': len(questions),
+        'semantic_matching': use_semantic
     }
 
 
@@ -407,6 +598,9 @@ def analyze_dementia_markers(
     speaker_labels: List[str] = None,
     repetition_threshold: float = 0.85,
     min_segment_gap: int = 2,
+    user_id: Optional[int] = None,
+    speech_id: Optional[int] = None,
+    db_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Full dementia marker analysis for a conversation.
@@ -416,9 +610,12 @@ def analyze_dementia_markers(
         speaker_labels: Optional friendly names for speakers
         repetition_threshold: Similarity threshold for repetition detection (0.5-1.0)
         min_segment_gap: Minimum segments apart to count as repetition
+        user_id: User ID for cross-session tracking (optional)
+        speech_id: Current speech ID for cross-session tracking (optional)
+        db_path: Path to database for cross-session tracking (optional)
     
     Returns:
-        Complete analysis with per-speaker metrics
+        Complete analysis with per-speaker metrics and cross-session data
     """
     if not speaker_labels:
         # Auto-detect speakers from segments
@@ -511,13 +708,81 @@ def analyze_dementia_markers(
                 'concern': f'Frequent hesitations/word-searching ({aphasic_count} events)'
             })
     
+    # Cross-session tracking (if user_id provided)
+    cross_session_analysis = None
+    if user_id is not None and db_path is not None:
+        try:
+            from .cross_session_tracking import (
+                detect_cross_session_repetitions,
+                store_concepts,
+                get_embedding
+            )
+            
+            # Extract all concepts and questions from segments
+            all_concepts = []
+            all_questions = []
+            concepts_to_store = []
+            
+            for seg in segments:
+                text = seg.get('text', '')
+                concepts, sentences = extract_concepts(text)
+                all_concepts.extend([c for c in concepts if len(c) > 10])
+                
+                # Identify questions
+                for sent in sentences:
+                    if sent.strip().endswith('?'):
+                        all_questions.append(sent)
+                        concepts_to_store.append({
+                            'text': sent,
+                            'type': 'question'
+                        })
+                    elif len(sent) > 15:
+                        concepts_to_store.append({
+                            'text': sent,
+                            'type': 'statement'
+                        })
+            
+            # Detect cross-session repetitions
+            cross_session_analysis = detect_cross_session_repetitions(
+                db_path=db_path,
+                user_id=user_id,
+                current_concepts=all_concepts[:50],  # Limit to avoid overload
+                current_questions=all_questions[:20],
+                similarity_threshold=0.70
+            )
+            
+            # Store concepts for future tracking (if speech_id provided)
+            if speech_id is not None and concepts_to_store:
+                store_result = store_concepts(
+                    db_path=db_path,
+                    user_id=user_id,
+                    speech_id=speech_id,
+                    concepts=concepts_to_store[:100]  # Limit storage
+                )
+                cross_session_analysis['storage'] = store_result
+            
+            # Add cross-session risk flags
+            if cross_session_analysis.get('max_concern_level', 0) >= 0.7:
+                risk_flags.append({
+                    'speaker': 'cross_session',
+                    'flag': 'cross_session_repetition',
+                    'value': cross_session_analysis['total_cross_session_matches'],
+                    'concern': f"Repeating concepts from previous sessions ({cross_session_analysis['total_cross_session_matches']} matches, max concern: {cross_session_analysis['max_concern_level']:.0%})"
+                })
+            
+        except Exception as e:
+            logger.warning(f"Cross-session tracking failed: {e}")
+            cross_session_analysis = {'enabled': False, 'error': str(e)}
+    
     return {
         'speakers': speaker_results,
         'cross_speaker_repetition': cross_repetition,
+        'cross_session_analysis': cross_session_analysis,
         'risk_flags': risk_flags,
         'summary': {
             'total_speakers': len(speaker_results),
             'total_segments': len(segments),
-            'flags_detected': len(risk_flags)
+            'flags_detected': len(risk_flags),
+            'cross_session_enabled': cross_session_analysis is not None
         }
     }

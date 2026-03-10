@@ -1,12 +1,24 @@
 """
-SpeechScore SQLite Database Module
+SpeechScore Database Module
 
 Stores all speech analysis data persistently:
 - Speech metadata (title, speaker, source, products)
-- Audio files (as Opus blobs)
+- Audio files (as Opus blobs or R2 references)
 - Full analysis results (JSON + indexed key metrics)
 - Transcriptions (text + segments)
 - Spectrograms (PNG blobs)
+
+Supports both SQLite (local/research) and Supabase (cloud/user data).
+
+ARCHITECTURE: R2 Primary + SQLite Read Replica
+==============================================
+Audio is stored in Cloudflare R2 (required) with SQLite as a local read replica:
+- WRITES: R2 is required — uploads fail if R2 is unavailable (read-only mode)
+- After R2 success, data is replicated to local SQLite for fallback reads
+- READS: Try R2 first, fall back to SQLite if Cloudflare is unavailable
+- If R2 is down: existing audio readable (SQLite), new uploads blocked
+
+WARNING: Do NOT run VACUUM on the SQLite database - it serves as the local replica!
 """
 
 import sqlite3
@@ -19,6 +31,23 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, Union, List
 
+# Supabase support
+USE_SUPABASE = os.getenv("USE_SUPABASE", "false").lower() in ("true", "1", "yes")
+
+if USE_SUPABASE:
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor, Json
+        SUPABASE_URL = os.getenv(
+            "DATABASE_URL",
+            "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+        )
+        SUPABASE_AVAILABLE = True
+    except ImportError:
+        SUPABASE_AVAILABLE = False
+        USE_SUPABASE = False
+else:
+    SUPABASE_AVAILABLE = False
 
 DB_PATH = Path(__file__).parent / "speechscore.db"
 
@@ -281,6 +310,15 @@ class SpeechDB:
         profile: str = "general",
     ) -> int:
         """Insert a new speech record. Returns speech_id."""
+        # Use Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._add_speech_supabase(
+                title, speaker, year, source_url, source_file, duration_sec,
+                language, category, products, tags, notes, description,
+                audio_hash, user_id, profile
+            )
+        
+        # SQLite for research/local data
         cur = self.conn.execute(
             """INSERT INTO speeches
                (title, speaker, year, source_url, source_file, duration_sec,
@@ -297,8 +335,44 @@ class SpeechDB:
         self.conn.commit()
         return cur.lastrowid
 
-    def get_speech(self, speech_id: int) -> Optional[dict]:
-        """Get speech by ID."""
+    def _add_speech_supabase(
+        self, title, speaker, year, source_url, source_file, duration_sec,
+        language, category, products, tags, notes, description,
+        audio_hash, user_id, profile
+    ) -> int:
+        """Insert speech into Supabase. Returns speech_id."""
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO speeches
+                (title, speaker, year, source_url, source_file, duration_sec,
+                 language, category, products, tags, notes, description, 
+                 audio_hash, user_id, profile)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                title, speaker, year, source_url, source_file, duration_sec,
+                language, category,
+                json.dumps(products) if products else None,
+                json.dumps(tags) if tags else None,
+                notes, description, audio_hash, user_id, profile,
+            ))
+            speech_id = cur.fetchone()['id']
+            conn.commit()
+            return speech_id
+        finally:
+            conn.close()
+
+    def get_speech(self, speech_id: int, user_id: int = None) -> Optional[dict]:
+        """Get speech by ID. If user_id provided and USE_SUPABASE, queries Supabase."""
+        # Try Supabase first for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            result = self._get_speech_supabase(speech_id, user_id)
+            if result:
+                return result
+        
+        # Fall back to SQLite
         row = self.conn.execute(
             "SELECT * FROM speeches WHERE id = ?", (speech_id,)
         ).fetchone()
@@ -314,6 +388,28 @@ class SpeechDB:
                     pass
             return d
         return None
+
+    def _get_speech_supabase(self, speech_id: int, user_id: int = None) -> Optional[dict]:
+        """Get speech from Supabase."""
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            if user_id:
+                cur.execute(
+                    "SELECT * FROM speeches WHERE id = %s AND user_id = %s",
+                    (speech_id, user_id)
+                )
+            else:
+                cur.execute("SELECT * FROM speeches WHERE id = %s", (speech_id,))
+            row = cur.fetchone()
+            if row:
+                d = dict(row)
+                d["products"] = json.loads(d["products"]) if d.get("products") else []
+                d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
+                return d
+            return None
+        finally:
+            conn.close()
 
     def update_speech(
         self,
@@ -334,6 +430,13 @@ class SpeechDB:
         Use project_id=0 or _unset_project=True to unassign from project.
         Returns updated speech or None if not found/unauthorized.
         """
+        # Use Supabase when enabled (for both user and admin access)
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._update_speech_supabase(
+                speech_id, title, speaker, category, tags, notes, 
+                profile, project_id, user_id, _unset_project
+            )
+        
         # Check ownership if user_id provided
         if user_id is not None:
             existing = self.conn.execute(
@@ -384,12 +487,88 @@ class SpeechDB:
         
         return self.get_speech(speech_id)
 
+    def _update_speech_supabase(
+        self, speech_id, title, speaker, category, tags, notes,
+        profile, project_id, user_id, _unset_project
+    ) -> Optional[dict]:
+        """Update speech in Supabase."""
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            
+            # Check ownership (skip if user_id is None = admin)
+            if user_id:
+                cur.execute(
+                    "SELECT * FROM speeches WHERE id = %s AND user_id = %s",
+                    (speech_id, user_id)
+                )
+            else:
+                cur.execute("SELECT * FROM speeches WHERE id = %s", (speech_id,))
+            
+            if not cur.fetchone():
+                return None
+            
+            # Build dynamic UPDATE query
+            updates = []
+            params = []
+            
+            if title is not None:
+                updates.append("title = %s")
+                params.append(title)
+            if speaker is not None:
+                updates.append("speaker = %s")
+                params.append(speaker)
+            if category is not None:
+                updates.append("category = %s")
+                params.append(category)
+            if tags is not None:
+                updates.append("tags = %s")
+                params.append(json.dumps(tags))
+            if notes is not None:
+                updates.append("notes = %s")
+                params.append(notes)
+            if profile is not None:
+                updates.append("profile = %s")
+                params.append(profile)
+            if project_id is not None or _unset_project:
+                updates.append("project_id = %s")
+                params.append(project_id if project_id and project_id > 0 else None)
+            
+            if not updates:
+                return self._get_speech_supabase(speech_id, user_id)
+            
+            updates.append("updated_at = NOW()")
+            
+            if user_id:
+                query = f"UPDATE speeches SET {', '.join(updates)} WHERE id = %s AND user_id = %s RETURNING *"
+                params.extend([speech_id, user_id])
+            else:
+                query = f"UPDATE speeches SET {', '.join(updates)} WHERE id = %s RETURNING *"
+                params.append(speech_id)
+            
+            cur.execute(query, params)
+            row = cur.fetchone()
+            conn.commit()
+            
+            if row:
+                d = dict(row)
+                d["products"] = json.loads(d["products"]) if d.get("products") else []
+                d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
+                return d
+            return None
+        finally:
+            conn.close()
+
     def delete_speech(self, speech_id: int, user_id: int = None) -> bool:
         """
         Delete a speech and all associated data (audio, transcription, analysis, spectrogram).
         If user_id is provided, ensures the speech belongs to that user.
         Returns True if deleted, False if not found or unauthorized.
         """
+        # Use Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._delete_speech_supabase(speech_id, user_id)
+        
         # Check ownership if user_id provided
         if user_id is not None:
             existing = self.conn.execute(
@@ -422,6 +601,26 @@ class SpeechDB:
         
         return True
 
+    def _delete_speech_supabase(self, speech_id: int, user_id: int) -> bool:
+        """Delete speech from Supabase."""
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            # Check ownership
+            cur.execute(
+                "SELECT user_id FROM speeches WHERE id = %s AND user_id = %s",
+                (speech_id, user_id)
+            )
+            if not cur.fetchone():
+                return False
+            
+            # Delete (CASCADE will handle related tables)
+            cur.execute("DELETE FROM speeches WHERE id = %s AND user_id = %s", (speech_id, user_id))
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
     def find_speech_by_hash(self, audio_hash: str) -> Optional[dict]:
         """Find speech by audio hash (dedup)."""
         row = self.conn.execute(
@@ -446,6 +645,13 @@ class SpeechDB:
     ) -> list:
         """List speeches with optional filters. If user_id is set, only return that user's speeches.
         If unassigned=True, only return speeches not assigned to any project."""
+        
+        # Use Supabase for user data queries
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._list_speeches_supabase(
+                category, product, limit, offset, user_id, unassigned
+            )
+        
         # Explicitly select columns, excluding heavy cached_score_json (3.5KB avg)
         # Join transcriptions to get word_count for WPM calculation
         query = """SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
@@ -481,8 +687,65 @@ class SpeechDB:
             results.append(d)
         return results
 
+    def _list_speeches_supabase(
+        self, category, product, limit, offset, user_id, unassigned
+    ) -> list:
+        """List speeches from Supabase."""
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            query = """
+                SELECT s.*, t.word_count
+                FROM speeches s
+                LEFT JOIN transcriptions t ON t.speech_id = s.id
+                WHERE 1=1
+            """
+            params = []
+            
+            # Filter by user_id if provided (None = admin, sees all)
+            if user_id:
+                query += " AND s.user_id = %s"
+                params.append(user_id)
+            
+            if unassigned:
+                query += " AND s.project_id IS NULL"
+            if category:
+                query += " AND s.category = %s"
+                params.append(category)
+            if product:
+                query += " AND s.products LIKE %s"
+                params.append(f'%"{product}"%')
+            
+            query += " ORDER BY s.created_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cur.execute(query, params)
+            results = []
+            for row in cur.fetchall():
+                d = dict(row)
+                d["products"] = json.loads(d["products"]) if d.get("products") else []
+                d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
+                results.append(d)
+            return results
+        finally:
+            conn.close()
+
     def count_speeches(self, user_id: int = None, include_unowned: bool = False, unassigned: bool = False) -> int:
         """Total speech count, optionally filtered by user. If unassigned=True, only count unassigned."""
+        # Use Supabase for user counts
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+            try:
+                cur = conn.cursor()
+                query = "SELECT COUNT(*) FROM speeches WHERE user_id = %s"
+                params = [user_id]
+                if unassigned:
+                    query += " AND project_id IS NULL"
+                cur.execute(query, params)
+                return cur.fetchone()['count']
+            finally:
+                conn.close()
+        
         query = "SELECT COUNT(*) FROM speeches WHERE 1=1"
         params = []
         if user_id is not None:
@@ -807,6 +1070,7 @@ class SpeechDB:
         audio_path: str,
         encode_to_opus: bool = True,
         bitrate_kbps: int = 48,
+        user_id: int = None,
     ) -> int:
         """Store audio file (converted to Opus by default). Returns audio row id."""
         if encode_to_opus:
@@ -818,6 +1082,14 @@ class SpeechDB:
             fmt = Path(audio_path).suffix.lstrip(".")
 
         duration = self.get_audio_duration(audio_path)
+        
+        # Use Supabase + R2 for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._store_audio_supabase(
+                speech_id, data, fmt, Path(audio_path).name,
+                duration, bitrate_kbps if encode_to_opus else None, user_id
+            )
+        
         cur = self.conn.execute(
             """INSERT INTO audio
                (speech_id, format, data, original_filename, sample_rate,
@@ -833,8 +1105,110 @@ class SpeechDB:
         self.conn.commit()
         return cur.lastrowid
 
-    def get_audio(self, speech_id: int) -> Optional[dict]:
-        """Get audio blob for a speech."""
+    def _store_audio_supabase(
+        self, speech_id: int, data: bytes, fmt: str, filename: str,
+        duration: float, bitrate: int, user_id: int
+    ) -> int:
+        """
+        Store audio to R2 (required) and Supabase, with SQLite as local read replica.
+        
+        Architecture: R2 (primary, required) + SQLite (local read replica)
+        - Uploads REQUIRE R2 to be available — fails if R2 is down (read-only mode)
+        - After R2 success, write to SQLite as local backup for read fallback
+        - get_audio() tries R2 first, falls back to SQLite if Cloudflare is down
+        
+        Raises:
+            RuntimeError: If R2 is unavailable (puts system in read-only mode)
+        
+        WARNING: Do NOT vacuum the SQLite database - it serves as the local replica!
+        """
+        import logging
+        logger = logging.getLogger("speechscore")
+        
+        # Upload to R2 — REQUIRED for new uploads
+        from api.r2_storage import get_r2_storage
+        r2 = get_r2_storage()
+        
+        content_type = {
+            "opus": "audio/opus",
+            "mp3": "audio/mpeg",
+            "wav": "audio/wav",
+        }.get(fmt, "application/octet-stream")
+        
+        try:
+            result = r2.upload(
+                data=data,
+                user_id=user_id,
+                speech_id=speech_id,
+                filename=filename,
+                format=fmt,
+                content_type=content_type,
+            )
+            r2_key = result["key"]
+        except Exception as e:
+            logger.error(f"R2 upload failed - system in read-only mode: {e}")
+            raise RuntimeError(f"Storage unavailable. Please try again later. (R2: {e})")
+        
+        # R2 succeeded — now write to local SQLite as read replica
+        try:
+            self.conn.execute(
+                """INSERT INTO audio
+                   (speech_id, format, data, r2_key, original_filename, sample_rate,
+                    channels, bitrate_kbps, duration_sec, size_bytes)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (speech_id, fmt, data, r2_key, filename, 48000, 1, bitrate, duration, len(data))
+            )
+            self.conn.commit()
+        except Exception as e:
+            # SQLite backup failure is non-fatal (R2 has the data)
+            logger.warning(f"SQLite replica write failed (non-fatal): {e}")
+        
+        # Store metadata in Supabase
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO audio
+                (speech_id, format, r2_key, original_filename, sample_rate,
+                 channels, bitrate_kbps, duration_sec, size_bytes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                speech_id, fmt, r2_key, filename,
+                48000, 1, bitrate, duration, len(data),
+            ))
+            row_id = cur.fetchone()['id']
+            conn.commit()
+            return row_id
+        finally:
+            conn.close()
+
+    def get_audio(self, speech_id: int, user_id: int = None) -> Optional[dict]:
+        """Get audio metadata for a speech. Always includes SQLite data for R2 fallback."""
+        # Try Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT * FROM audio WHERE speech_id = %s ORDER BY id DESC LIMIT 1",
+                    (speech_id,)
+                )
+                row = cur.fetchone()
+                if row:
+                    audio_data = dict(row)
+                    # Always try to get SQLite data as fallback (for R2 outages)
+                    sqlite_row = self.conn.execute(
+                        "SELECT data FROM audio WHERE speech_id = ? ORDER BY id DESC LIMIT 1",
+                        (speech_id,),
+                    ).fetchone()
+                    if sqlite_row and sqlite_row["data"]:
+                        audio_data["data"] = sqlite_row["data"]
+                    return audio_data
+                return None
+            finally:
+                conn.close()
+        
         row = self.conn.execute(
             "SELECT * FROM audio WHERE speech_id = ? ORDER BY id DESC LIMIT 1",
             (speech_id,),
@@ -860,10 +1234,18 @@ class SpeechDB:
         word_count: int = None,
         language: str = None,
         model: str = "large-v3",
+        user_id: int = None,
     ) -> int:
         """Store transcription. Returns row id."""
         if word_count is None:
             word_count = len(text.split())
+        
+        # Use Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._store_transcription_supabase(
+                speech_id, text, segments, word_count, language, model
+            )
+        
         cur = self.conn.execute(
             """INSERT INTO transcriptions
                (speech_id, text, segments, word_count, language, model)
@@ -877,8 +1259,53 @@ class SpeechDB:
         self.conn.commit()
         return cur.lastrowid
 
-    def get_transcription(self, speech_id: int) -> Optional[dict]:
+    def _store_transcription_supabase(
+        self, speech_id, text, segments, word_count, language, model
+    ) -> int:
+        """Store transcription in Supabase."""
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO transcriptions
+                (speech_id, text, segments, word_count, language, model)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                speech_id, text,
+                Json(segments) if segments else None,
+                word_count, language, model,
+            ))
+            row_id = cur.fetchone()['id']
+            conn.commit()
+            return row_id
+        finally:
+            conn.close()
+
+    def get_transcription(self, speech_id: int, user_id: int = None) -> Optional[dict]:
         """Get latest transcription for a speech."""
+        # Try Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT * FROM transcriptions WHERE speech_id = %s ORDER BY id DESC LIMIT 1",
+                    (speech_id,)
+                )
+                row = cur.fetchone()
+                if row:
+                    d = dict(row)
+                    # segments may already be parsed as list from JSONB
+                    if isinstance(d.get("segments"), str):
+                        d["segments"] = json.loads(d["segments"])
+                    elif d.get("segments") is None:
+                        d["segments"] = []
+                    return d
+                return None
+            finally:
+                conn.close()
+        
         row = self.conn.execute(
             "SELECT * FROM transcriptions WHERE speech_id = ? ORDER BY id DESC LIMIT 1",
             (speech_id,),
@@ -897,11 +1324,16 @@ class SpeechDB:
         result: dict,
         preset: str = None,
         modules: list = None,
+        user_id: int = None,
     ) -> int:
         """
         Store full analysis result. Extracts key metrics for indexed columns.
         Returns row id.
         """
+        # Use Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            return self._store_analysis_supabase(speech_id, result, preset, modules)
+        
         # Extract key metrics from the result JSON
         # Handle both API-style and pipeline-style field names
         aa = result.get("audio_analysis", {})
@@ -994,8 +1426,69 @@ class SpeechDB:
         self.conn.commit()
         return cur.lastrowid
 
-    def get_analysis(self, speech_id: int) -> Optional[dict]:
+    def _store_analysis_supabase(
+        self, speech_id: int, result: dict, preset: str, modules: list
+    ) -> int:
+        """Store analysis in Supabase with simplified schema."""
+        # Extract key metrics
+        aa = result.get("audio_analysis", {})
+        sr = aa.get("speaking_rate", {})
+        pitch = aa.get("pitch", {})
+        txt = result.get("speech3_text_analysis", {})
+        metrics = txt.get("metrics", {})
+        
+        wpm = sr.get("words_per_minute") or sr.get("overall_wpm")
+        pitch_mean = pitch.get("mean_f0") or pitch.get("mean_hz")
+        fluency = metrics.get("fluency_score")
+        
+        conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO analyses
+                (speech_id, preset, modules, result, wpm, pitch_mean_hz, fluency_score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                speech_id, preset,
+                json.dumps(modules) if modules else None,
+                Json(result),
+                wpm, pitch_mean, fluency,
+            ))
+            row_id = cur.fetchone()['id']
+            conn.commit()
+            return row_id
+        finally:
+            conn.close()
+
+    def get_analysis(self, speech_id: int, user_id: int = None) -> Optional[dict]:
         """Get latest analysis for a speech."""
+        # Try Supabase for user data
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT * FROM analyses WHERE speech_id = %s ORDER BY id DESC LIMIT 1",
+                    (speech_id,)
+                )
+                row = cur.fetchone()
+                if row:
+                    d = dict(row)
+                    # result may already be parsed as dict from JSONB
+                    if isinstance(d.get("result"), str):
+                        d["result"] = json.loads(d["result"])
+                    elif d.get("result") is None:
+                        d["result"] = {}
+                    if isinstance(d.get("modules"), str):
+                        d["modules"] = json.loads(d["modules"])
+                    elif d.get("modules") is None:
+                        d["modules"] = []
+                    return d
+                return None
+            finally:
+                conn.close()
+        
         row = self.conn.execute(
             "SELECT * FROM analyses WHERE speech_id = ? ORDER BY id DESC LIMIT 1",
             (speech_id,),
@@ -1007,8 +1500,26 @@ class SpeechDB:
             return d
         return None
 
-    def get_full_analysis(self, speech_id: int) -> Optional[dict]:
+    def get_full_analysis(self, speech_id: int, user_id: int = None) -> Optional[dict]:
         """Get the full JSON result for a speech."""
+        # Try Supabase when enabled (for any access)
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT result FROM analyses WHERE speech_id = %s ORDER BY id DESC LIMIT 1",
+                    (speech_id,)
+                )
+                row = cur.fetchone()
+                if row:
+                    result = row["result"]
+                    # JSONB returns dict directly
+                    return result if isinstance(result, dict) else json.loads(result)
+                return None
+            finally:
+                conn.close()
+        
         row = self.conn.execute(
             "SELECT result FROM analyses WHERE speech_id = ? ORDER BY id DESC LIMIT 1",
             (speech_id,),
