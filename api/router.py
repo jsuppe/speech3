@@ -118,6 +118,96 @@ async def health(request: Request):
     )
 
 
+@router.get("/pipeline/stages", tags=["Pipeline"])
+async def get_pipeline_stages(
+    profile: str = Query(default="general", description="Scoring profile to get stages for"),
+):
+    """
+    Get pipeline stages for a given profile.
+    
+    Returns the ordered list of processing stages with:
+    - id: Stage identifier
+    - name: Human-readable name
+    - icon: Material icon name for UI
+    - percent: Percentage of total processing time (approximate)
+    
+    Use this to show progress during analysis.
+    """
+    from .pipeline_stages import get_stages_for_profile, PIPELINE_METADATA
+    
+    stages = get_stages_for_profile(profile)
+    return {
+        "profile": profile,
+        "stages": stages,
+        "available_profiles": PIPELINE_METADATA["profiles"],
+    }
+
+
+@router.get("/pipeline/progress/{speech_id}", tags=["Pipeline"])
+async def get_pipeline_progress(
+    speech_id: int,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get current processing progress for a speech.
+    
+    Returns:
+    - status: 'pending', 'processing', 'complete', 'error'
+    - current_stage: Current stage ID (if processing)
+    - percent: Overall progress percentage
+    - stages_completed: List of completed stage IDs
+    - error: Error message (if status is 'error')
+    """
+    db = pipeline_runner.get_db()
+    user_id = auth.get("user_id")
+    
+    # Check if speech exists
+    speech = db.get_speech(speech_id)
+    if not speech:
+        return _error(404, "NOT_FOUND", "Speech not found")
+    
+    # Check ownership (unless admin API key)
+    if speech.get("user_id") and speech.get("user_id") != user_id:
+        if not auth.get("key_data"):  # Not an API key
+            return _error(403, "FORBIDDEN", "Not authorized")
+    
+    # Check if analysis exists (complete)
+    conn = db.conn
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, created_at FROM analyses WHERE speech_id = ? LIMIT 1", (speech_id,))
+    analysis = cursor.fetchone()
+    
+    if analysis:
+        return {
+            "speech_id": speech_id,
+            "status": "complete",
+            "percent": 100,
+            "current_stage": None,
+            "stages_completed": ["all"],
+        }
+    
+    # Check job queue for pending/processing status
+    job = job_manager.get_job_by_speech_id(speech_id) if hasattr(job_manager, 'get_job_by_speech_id') else None
+    
+    if job:
+        return {
+            "speech_id": speech_id,
+            "status": job.get("status", "processing"),
+            "percent": job.get("progress", 0),
+            "current_stage": job.get("current_stage"),
+            "stages_completed": job.get("stages_completed", []),
+        }
+    
+    # No analysis, no job - must be pending or lost
+    return {
+        "speech_id": speech_id,
+        "status": "pending",
+        "percent": 0,
+        "current_stage": None,
+        "stages_completed": [],
+    }
+
+
 @router.get("/config", tags=["Config"])
 async def get_config(
     request: Request,
@@ -4657,6 +4747,115 @@ async def analyze_dementia_conversation(
         return _error(500, "ANALYSIS_ERROR", str(e))
 
 
+class TestRecordingRequest(BaseModel):
+    """Request to analyze a test recording from the server."""
+    filename: str
+    profile: str = "dementia"
+
+
+@router.post("/analyze/test", tags=["Analysis", "Debug"])
+async def analyze_test_recording(
+    request: TestRecordingRequest,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Analyze a test recording from the server's dementia_samples directory.
+    
+    This is a debug endpoint for testing without manual recording.
+    Available test files:
+    - alzheimers_patient_10yr.mp3
+    - dementia_speech_patterns.mp3
+    - dementia_kids_interview.mp3
+    - broca_aphasia.mp3
+    - expressive_aphasia_sarah.mp3
+    - conduction_aphasia.mp3
+    - global_aphasia.mp3
+    """
+    import shutil
+    
+    # Security: only allow specific files from dementia_samples
+    allowed_files = {
+        'alzheimers_patient_10yr.mp3',
+        'dementia_speech_patterns.mp3',
+        'dementia_kids_interview.mp3',
+        'broca_aphasia.mp3',
+        'expressive_aphasia_sarah.mp3',
+        'conduction_aphasia.mp3',
+        'global_aphasia.mp3',
+    }
+    
+    if request.filename not in allowed_files:
+        return _error(400, "BAD_REQUEST", f"Invalid test file. Allowed: {', '.join(allowed_files)}")
+    
+    samples_dir = "/home/melchior/speech3/dementia_samples"
+    audio_path = os.path.join(samples_dir, request.filename)
+    
+    if not os.path.exists(audio_path):
+        return _error(404, "NOT_FOUND", f"Test file not found: {request.filename}")
+    
+    try:
+        # Copy to temp file for analysis
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp:
+            shutil.copy(audio_path, tmp.name)
+            temp_path = tmp.name
+        
+        # Run analysis pipeline
+        result = pipeline_runner.run_pipeline(temp_path)
+        
+        # Persist result to database (use authenticated user if available)
+        user_id = auth.get("user_id")
+        speech_id = pipeline_runner.persist_result(
+            original_audio_path=temp_path,
+            result=result,
+            filename=request.filename,
+            title=f"Test: {request.filename}",
+            profile=request.profile,
+            user_id=user_id,
+        )
+        
+        # Run dementia-specific analysis if profile is dementia
+        dementia_result = None
+        if request.profile == "dementia":
+            from .dementia_analysis import analyze_dementia_markers
+            
+            # Build segments from transcript
+            transcript = result.get("transcript", "")
+            segments = [{"text": transcript, "speaker": "Speaker 1", "start": 0, "end": 0}]
+            
+            # Use diarization if available
+            diarization = result.get("diarization", [])
+            if diarization:
+                segments = diarization
+            
+            dementia_result = analyze_dementia_markers(
+                segments=segments,
+                repetition_threshold=0.70,  # Semantic threshold
+                min_segment_gap=2,
+            )
+        
+        # Clean up temp file
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        
+        response = {
+            "success": True,
+            "speech_id": speech_id,
+            "test_file": request.filename,
+            **result,
+        }
+        
+        if dementia_result:
+            response["dementia_analysis"] = dementia_result
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Test recording analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+        return _error(500, "ANALYSIS_ERROR", str(e))
+
+
 @router.get("/dementia/analyze/{speech_id}", tags=["Dementia"])
 async def get_dementia_analysis(
     speech_id: int,
@@ -6709,6 +6908,61 @@ async def get_dementia_recordings(
     try:
         user_id = user.get("user_id") if user else None
         db = pipeline_runner.get_db()
+        recordings = []
+        
+        # Try Supabase first if enabled
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            try:
+                # Use psycopg2 connection for Supabase
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                import os
+                conn_str = os.getenv(
+                    "DATABASE_URL",
+                    "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                )
+                with psycopg2.connect(conn_str) as pg_conn:
+                    with pg_conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        if user_id:
+                            cur.execute("""
+                                SELECT id, title, created_at, dementia_metrics, profile
+                                FROM speeches
+                                WHERE user_id = %s AND profile = 'dementia'
+                                ORDER BY created_at DESC
+                                LIMIT %s
+                            """, (user_id, limit))
+                        else:
+                            cur.execute("""
+                                SELECT id, title, created_at, dementia_metrics, profile
+                                FROM speeches
+                                WHERE profile = 'dementia'
+                                ORDER BY created_at DESC
+                                LIMIT %s
+                            """, (limit,))
+                        
+                        rows = cur.fetchall()
+                        for row in rows:
+                            dementia_metrics = row.get('dementia_metrics')
+                            if isinstance(dementia_metrics, str):
+                                try:
+                                    dementia_metrics = json.loads(dementia_metrics)
+                                except:
+                                    pass
+                            
+                            recordings.append({
+                                "id": row['id'],
+                                "title": row.get('title', 'Untitled'),
+                                "created_at": str(row.get('created_at')) if row.get('created_at') else None,
+                                "dementia_metrics": dementia_metrics,
+                                "transcript": "",  # Skip transcript for list view
+                            })
+                        
+                        return {"recordings": recordings}
+            except Exception as e:
+                logger.warning(f"Supabase query failed, falling back to SQLite: {e}")
+        
+        # Fallback to SQLite
         conn = db.conn
         cursor = conn.cursor()
         
@@ -6732,7 +6986,6 @@ async def get_dementia_recordings(
             """, (limit,))
         
         rows = cursor.fetchall()
-        recordings = []
         
         for row in rows:
             dementia_metrics = None
