@@ -24,6 +24,10 @@ import logging
 import subprocess
 import tempfile
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+
+# Background task executor for non-blocking work (spectrograms, etc.)
+_background_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="bg_task")
 
 # Ensure speech3 root is on the path
 SPEECH3_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -895,12 +899,30 @@ def persist_result(
                 logger.warning(f"Auto phoneme analysis failed: {e}")
 
         # Store spectrogram — use provided path or auto-generate
-        # Skip spectrogram for dementia profile (not displayed, saves processing time)
-        if profile != "dementia":
+        def _store_spectrogram_task(sid: int, audio_path: str, spec_path: str = None):
+            """Background task to generate and store spectrogram."""
+            try:
+                task_db = get_db()
+                if spec_path and os.path.exists(spec_path):
+                    task_db.store_spectrogram_from_file(sid, spec_path)
+                elif os.path.exists(audio_path):
+                    png_data = _generate_spectrogram_bytes(audio_path)
+                    if png_data:
+                        task_db.store_spectrogram(sid, png_data, spec_type="combined", fmt="png")
+                        logger.info(f"[bg] Generated spectrogram for speech_id={sid} ({len(png_data)/1024:.0f} KB)")
+            except Exception as e:
+                logger.warning(f"[bg] Spectrogram generation failed for speech_id={sid}: {e}")
+        
+        # For dementia profile, queue spectrogram as background task (don't block results)
+        if profile == "dementia":
+            if audio_exists:
+                _background_executor.submit(_store_spectrogram_task, speech_id, original_audio_path, spectrogram_path)
+                logger.debug(f"Queued spectrogram generation for speech_id={speech_id}")
+        else:
+            # For other profiles, generate inline (they display it immediately)
             if spectrogram_path and os.path.exists(spectrogram_path):
                 db.store_spectrogram_from_file(speech_id, spectrogram_path)
             elif audio_exists:
-                # Auto-generate spectrogram from the original audio
                 png_data = _generate_spectrogram_bytes(original_audio_path)
                 if png_data:
                     db.store_spectrogram(speech_id, png_data, spec_type="combined", fmt="png")
