@@ -7074,27 +7074,61 @@ async def get_dementia_flagged_segments(speech_id: int, user: dict = Depends(fle
     
     try:
         user_id = user.get("user_id") if user else None
-        db = pipeline_runner.get_db()
-        conn = db.conn
-        cursor = conn.cursor()
+        row = None
         
-        # Get speech and verify ownership
-        if user_id:
-            cursor.execute("""
-                SELECT s.id, s.title, t.segments, t.text
-                FROM speeches s
-                JOIN transcriptions t ON t.speech_id = s.id
-                WHERE s.id = ? AND s.user_id = ? AND s.profile = 'dementia'
-            """, (speech_id, user_id))
-        else:
-            cursor.execute("""
-                SELECT s.id, s.title, t.segments, t.text
-                FROM speeches s
-                JOIN transcriptions t ON t.speech_id = s.id
-                WHERE s.id = ? AND s.profile = 'dementia'
-            """, (speech_id,))
+        # Try Supabase first
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            import psycopg2
+            try:
+                pg_conn = psycopg2.connect(
+                    "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                )
+                pg_cursor = pg_conn.cursor()
+                
+                if user_id:
+                    pg_cursor.execute("""
+                        SELECT s.id, s.title, t.segments, t.text
+                        FROM speeches s
+                        JOIN transcriptions t ON t.speech_id = s.id
+                        WHERE s.id = %s AND s.user_id = %s AND s.profile = 'dementia'
+                    """, (speech_id, user_id))
+                else:
+                    pg_cursor.execute("""
+                        SELECT s.id, s.title, t.segments, t.text
+                        FROM speeches s
+                        JOIN transcriptions t ON t.speech_id = s.id
+                        WHERE s.id = %s AND s.profile = 'dementia'
+                    """, (speech_id,))
+                
+                row = pg_cursor.fetchone()
+                pg_cursor.close()
+                pg_conn.close()
+            except Exception as e:
+                logger.warning(f"Supabase query failed, falling back to SQLite: {e}")
         
-        row = cursor.fetchone()
+        # Fall back to SQLite if needed
+        if not row:
+            db = pipeline_runner.get_db()
+            conn = db.conn
+            cursor = conn.cursor()
+            
+            if user_id:
+                cursor.execute("""
+                    SELECT s.id, s.title, t.segments, t.text
+                    FROM speeches s
+                    JOIN transcriptions t ON t.speech_id = s.id
+                    WHERE s.id = ? AND s.user_id = ? AND s.profile = 'dementia'
+                """, (speech_id, user_id))
+            else:
+                cursor.execute("""
+                    SELECT s.id, s.title, t.segments, t.text
+                    FROM speeches s
+                    JOIN transcriptions t ON t.speech_id = s.id
+                    WHERE s.id = ? AND s.profile = 'dementia'
+                """, (speech_id,))
+            
+            row = cursor.fetchone()
         if not row:
             return _error(404, "NOT_FOUND", "Recording not found")
         
