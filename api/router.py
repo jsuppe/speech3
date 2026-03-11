@@ -4640,15 +4640,41 @@ async def analyze_dementia_conversation(
             return _error(403, "FORBIDDEN", "Not authorized to access this speech")
         
         # Get analysis result (contains transcript and optionally diarization)
-        conn = db.conn
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT result 
-            FROM analyses 
-            WHERE speech_id = ? 
-            ORDER BY created_at DESC LIMIT 1
-        """, (request.speech_id,))
-        row = cursor.fetchone()
+        row = None
+        
+        # Try Supabase first
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            try:
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                conn_str = os.getenv(
+                    "DATABASE_URL",
+                    "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                )
+                with psycopg2.connect(conn_str) as pg_conn:
+                    with pg_conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT result 
+                            FROM analyses 
+                            WHERE speech_id = %s 
+                            ORDER BY created_at DESC LIMIT 1
+                        """, (request.speech_id,))
+                        row = cur.fetchone()
+            except Exception as e:
+                logger.warning(f"Supabase analysis query failed: {e}")
+        
+        # Fall back to SQLite
+        if not row:
+            conn = db.conn
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT result 
+                FROM analyses 
+                WHERE speech_id = ? 
+                ORDER BY created_at DESC LIMIT 1
+            """, (request.speech_id,))
+            row = cursor.fetchone()
         
         if not row:
             return _error(404, "NOT_FOUND", "No analysis found for this speech")
