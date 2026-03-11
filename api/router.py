@@ -6638,25 +6638,58 @@ async def get_dementia_stats(user: dict = Depends(flexible_auth)):
     
     try:
         user_id = user.get("user_id") if user else None
-        db = pipeline_runner.get_db()
-        conn = db.conn
-        cursor = conn.cursor()
+        rows = []
         
-        # Get all dementia recordings with dates
-        if user_id:
-            cursor.execute("""
-                SELECT dementia_metrics, DATE(created_at) as day, created_at
-                FROM speeches 
-                WHERE user_id = ? AND profile = 'dementia' AND dementia_metrics IS NOT NULL
-                ORDER BY created_at ASC
-            """, (user_id,))
-        else:
-            cursor.execute("""
-                SELECT dementia_metrics, DATE(created_at) as day, created_at
-                FROM speeches 
-                WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
-                ORDER BY created_at ASC
-            """)
+        # Try Supabase first
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            try:
+                import psycopg2
+                conn_str = os.getenv(
+                    "DATABASE_URL",
+                    "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                )
+                with psycopg2.connect(conn_str) as pg_conn:
+                    with pg_conn.cursor() as cur:
+                        if user_id:
+                            cur.execute("""
+                                SELECT dementia_metrics, DATE(created_at) as day, created_at
+                                FROM speeches 
+                                WHERE user_id = %s AND profile = 'dementia' AND dementia_metrics IS NOT NULL
+                                ORDER BY created_at ASC
+                            """, (user_id,))
+                        else:
+                            cur.execute("""
+                                SELECT dementia_metrics, DATE(created_at) as day, created_at
+                                FROM speeches 
+                                WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
+                                ORDER BY created_at ASC
+                            """)
+                        rows = cur.fetchall()
+            except Exception as e:
+                logger.warning(f"Supabase query failed for dementia/stats: {e}")
+        
+        # Fall back to SQLite if needed
+        if not rows:
+            db = pipeline_runner.get_db()
+            conn = db.conn
+            cursor = conn.cursor()
+            
+            if user_id:
+                cursor.execute("""
+                    SELECT dementia_metrics, DATE(created_at) as day, created_at
+                    FROM speeches 
+                    WHERE user_id = ? AND profile = 'dementia' AND dementia_metrics IS NOT NULL
+                    ORDER BY created_at ASC
+                """, (user_id,))
+            else:
+                cursor.execute("""
+                    SELECT dementia_metrics, DATE(created_at) as day, created_at
+                    FROM speeches 
+                    WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
+                    ORDER BY created_at ASC
+                """)
+            rows = cursor.fetchall()
         
         rows = cursor.fetchall()
         
@@ -6792,27 +6825,58 @@ async def get_dementia_metrics_aggregated(user: dict = Depends(flexible_auth)):
     
     try:
         user_id = user.get("user_id") if user else None
-        db = pipeline_runner.get_db()
-        conn = db.conn
-        cursor = conn.cursor()
+        rows = []
         
-        # Get all dementia recordings
-        if user_id:
-            cursor.execute("""
-                SELECT dementia_metrics, created_at
-                FROM speeches 
-                WHERE user_id = ? AND profile = 'dementia' AND dementia_metrics IS NOT NULL
-                ORDER BY created_at DESC
-            """, (user_id,))
-        else:
-            cursor.execute("""
-                SELECT dementia_metrics, created_at
-                FROM speeches 
-                WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
-                ORDER BY created_at DESC
-            """)
+        # Try Supabase first
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            try:
+                import psycopg2
+                conn_str = os.getenv(
+                    "DATABASE_URL",
+                    "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                )
+                with psycopg2.connect(conn_str) as pg_conn:
+                    with pg_conn.cursor() as cur:
+                        if user_id:
+                            cur.execute("""
+                                SELECT dementia_metrics, created_at
+                                FROM speeches 
+                                WHERE user_id = %s AND profile = 'dementia' AND dementia_metrics IS NOT NULL
+                                ORDER BY created_at DESC
+                            """, (user_id,))
+                        else:
+                            cur.execute("""
+                                SELECT dementia_metrics, created_at
+                                FROM speeches 
+                                WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
+                                ORDER BY created_at DESC
+                            """)
+                        rows = cur.fetchall()
+            except Exception as e:
+                logger.warning(f"Supabase query failed for dementia/metrics/aggregated: {e}")
         
-        rows = cursor.fetchall()
+        # Fall back to SQLite if needed
+        if not rows:
+            db = pipeline_runner.get_db()
+            conn = db.conn
+            cursor = conn.cursor()
+            
+            if user_id:
+                cursor.execute("""
+                    SELECT dementia_metrics, created_at
+                    FROM speeches 
+                    WHERE user_id = ? AND profile = 'dementia' AND dementia_metrics IS NOT NULL
+                    ORDER BY created_at DESC
+                """, (user_id,))
+            else:
+                cursor.execute("""
+                    SELECT dementia_metrics, created_at
+                    FROM speeches 
+                    WHERE profile = 'dementia' AND dementia_metrics IS NOT NULL
+                    ORDER BY created_at DESC
+                """)
+            rows = cursor.fetchall()
         
         if not rows:
             return {
