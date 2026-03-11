@@ -4863,7 +4863,6 @@ async def analyze_test_recording(
                 from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
                 if USE_SUPABASE and SUPABASE_AVAILABLE:
                     import psycopg2
-                    import os
                     conn_str = os.getenv(
                         "DATABASE_URL",
                         "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
