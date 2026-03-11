@@ -895,14 +895,16 @@ def persist_result(
                 logger.warning(f"Auto phoneme analysis failed: {e}")
 
         # Store spectrogram — use provided path or auto-generate
-        if spectrogram_path and os.path.exists(spectrogram_path):
-            db.store_spectrogram_from_file(speech_id, spectrogram_path)
-        elif audio_exists:
-            # Auto-generate spectrogram from the original audio
-            png_data = _generate_spectrogram_bytes(original_audio_path)
-            if png_data:
-                db.store_spectrogram(speech_id, png_data, spec_type="combined", fmt="png")
-                logger.info(f"Auto-generated spectrogram for speech_id={speech_id} ({len(png_data)/1024:.0f} KB)")
+        # Skip spectrogram for dementia profile (not displayed, saves processing time)
+        if profile != "dementia":
+            if spectrogram_path and os.path.exists(spectrogram_path):
+                db.store_spectrogram_from_file(speech_id, spectrogram_path)
+            elif audio_exists:
+                # Auto-generate spectrogram from the original audio
+                png_data = _generate_spectrogram_bytes(original_audio_path)
+                if png_data:
+                    db.store_spectrogram(speech_id, png_data, spec_type="combined", fmt="png")
+                    logger.info(f"Auto-generated spectrogram for speech_id={speech_id} ({len(png_data)/1024:.0f} KB)")
 
         logger.info(f"Persisted analysis → speech_id={speech_id}, title='{title}'")
         
