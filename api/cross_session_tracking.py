@@ -12,12 +12,35 @@ story every visit is a stronger indicator than within-session repetition.
 
 import json
 import logging
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 
 logger = logging.getLogger("speechscore.cross_session")
+
+# Database connection helper
+def _get_connection(db_path: str = None):
+    """Get database connection - Supabase if available, else SQLite."""
+    from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+    
+    if USE_SUPABASE and SUPABASE_AVAILABLE:
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            conn_str = os.getenv(
+                "DATABASE_URL",
+                "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+            )
+            return psycopg2.connect(conn_str, cursor_factory=RealDictCursor), 'postgres'
+        except Exception as e:
+            logger.warning(f"Supabase connection failed, falling back to SQLite: {e}")
+    
+    # SQLite fallback
+    conn = sqlite3.connect(db_path or '/home/melchior/speech3/speechscore.db')
+    conn.row_factory = sqlite3.Row
+    return conn, 'sqlite'
 
 # Lazy-loaded semantic model
 _model = None
@@ -75,37 +98,65 @@ def get_user_concept_history(
     Returns:
         List of concept history records with embeddings
     """
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn, db_type = _get_connection(db_path)
     
-    query = """
-        SELECT id, concept_text, concept_type, embedding, 
-               first_seen_at, last_seen_at, occurrence_count, speech_ids
-        FROM user_concept_history
-        WHERE user_id = ?
-    """
-    params = [user_id]
-    
-    if concept_type:
-        query += " AND concept_type = ?"
-        params.append(concept_type)
-    
-    query += " ORDER BY last_seen_at DESC LIMIT ?"
-    params.append(limit)
-    
-    cursor = conn.execute(query, params)
-    results = []
-    
-    for row in cursor:
-        record = dict(row)
-        # Deserialize embedding
-        if record['embedding']:
-            record['embedding'] = np.frombuffer(record['embedding'], dtype=np.float32)
-        record['speech_ids'] = json.loads(record['speech_ids'] or '[]')
-        results.append(record)
-    
-    conn.close()
-    return results
+    try:
+        if db_type == 'postgres':
+            # PostgreSQL query
+            query = """
+                SELECT id, concept_text, concept_type, embedding, 
+                       first_seen_at, last_seen_at, occurrence_count, speech_ids
+                FROM user_concept_history
+                WHERE user_id = %s
+            """
+            params = [user_id]
+            
+            if concept_type:
+                query += " AND concept_type = %s"
+                params.append(concept_type)
+            
+            query += " ORDER BY last_seen_at DESC LIMIT %s"
+            params.append(limit)
+            
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            cursor.close()
+        else:
+            # SQLite query
+            query = """
+                SELECT id, concept_text, concept_type, embedding, 
+                       first_seen_at, last_seen_at, occurrence_count, speech_ids
+                FROM user_concept_history
+                WHERE user_id = ?
+            """
+            params = [user_id]
+            
+            if concept_type:
+                query += " AND concept_type = ?"
+                params.append(concept_type)
+            
+            query += " ORDER BY last_seen_at DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            record = dict(row)
+            # Deserialize embedding
+            if record.get('embedding'):
+                if isinstance(record['embedding'], bytes):
+                    record['embedding'] = np.frombuffer(record['embedding'], dtype=np.float32)
+                elif isinstance(record['embedding'], memoryview):
+                    record['embedding'] = np.frombuffer(bytes(record['embedding']), dtype=np.float32)
+            record['speech_ids'] = json.loads(record.get('speech_ids') or '[]') if isinstance(record.get('speech_ids'), str) else (record.get('speech_ids') or [])
+            results.append(record)
+        
+        return results
+    finally:
+        conn.close()
 
 
 def store_concepts(
