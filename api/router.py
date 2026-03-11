@@ -7137,7 +7137,11 @@ async def get_dementia_flagged_segments(speech_id: int, user: dict = Depends(fle
         segments_json = row[2]
         full_transcript = row[3]
         
-        segments = json.loads(segments_json) if segments_json else []
+        # Handle both string (SQLite) and list (PostgreSQL JSONB)
+        if isinstance(segments_json, str):
+            segments = json.loads(segments_json) if segments_json else []
+        else:
+            segments = segments_json if segments_json else []
         
         flagged_segments = []
         
