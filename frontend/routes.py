@@ -550,52 +550,126 @@ async def recording_list(
     if not user:
         return RedirectResponse(url="/", status_code=302)
     
-    db = get_db()
-    
-    # Single optimized query with JOIN to get speeches + analysis in one shot
-    query = """
-        SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
-               s.language, s.category, s.products, s.tags, s.notes, s.description, s.audio_hash,
-               s.created_at, s.updated_at, s.user_id, s.profile, s.project_id,
-               a.wpm, a.pitch_mean_hz, a.vocal_fry_ratio, a.lexical_diversity, 
-               a.quality_level, a.sentiment
-        FROM speeches s
-        LEFT JOIN analyses a ON a.speech_id = s.id
-        WHERE s.user_id IS NOT NULL
-    """
-    params = []
-    if category:
-        query += " AND s.category = ?"
-        params.append(category)
-    if product:
-        query += " AND s.products LIKE ?"
-        params.append(f'%"{product}"%')
-    if q:
-        query += " AND (LOWER(s.title) LIKE ? OR LOWER(s.speaker) LIKE ? OR LOWER(s.description) LIKE ?)"
-        q_param = f"%{q.lower()}%"
-        params.extend([q_param, q_param, q_param])
-    query += " ORDER BY s.created_at DESC LIMIT 500"
-    
-    rows = db.conn.execute(query, params).fetchall()
     speeches = []
-    for row in rows:
-        d = dict(row)
-        d["products"] = json.loads(d["products"]) if d.get("products") else []
-        d["metrics"] = {
-            k: d.pop(k) for k in ["wpm", "pitch_mean_hz", "vocal_fry_ratio", 
-                                   "lexical_diversity", "quality_level", "sentiment"]
-            if d.get(k) is not None
-        }
-        speeches.append(d)
-
-    # Get categories efficiently (single query, cached in future)
-    cat_rows = db.conn.execute(
-        "SELECT DISTINCT category FROM speeches WHERE user_id IS NOT NULL AND category IS NOT NULL"
-    ).fetchall()
-    all_categories = sorted([r[0] for r in cat_rows])
     
-    # Get products
-    all_products = sorted(db.stats().get("products", {}).keys())
+    # Try Supabase first for user recordings
+    from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+    if USE_SUPABASE and SUPABASE_AVAILABLE:
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            import os
+            conn_str = os.getenv(
+                "DATABASE_URL",
+                "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+            )
+            with psycopg2.connect(conn_str) as pg_conn:
+                with pg_conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Build query for Supabase
+                    pg_query = """
+                        SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
+                               s.language, s.category, s.products, s.tags, s.notes, s.description, s.audio_hash,
+                               s.created_at, s.updated_at, s.user_id, s.profile, s.project_id,
+                               a.wpm, a.pitch_mean_hz, a.vocal_fry_ratio, a.lexical_diversity, 
+                               a.quality_level, a.sentiment
+                        FROM speeches s
+                        LEFT JOIN analyses a ON a.speech_id = s.id
+                        WHERE s.user_id IS NOT NULL
+                    """
+                    pg_params = []
+                    if category:
+                        pg_query += " AND s.category = %s"
+                        pg_params.append(category)
+                    if product:
+                        pg_query += " AND s.products::text LIKE %s"
+                        pg_params.append(f'%"{product}"%')
+                    if q:
+                        pg_query += " AND (LOWER(s.title) LIKE %s OR LOWER(s.speaker) LIKE %s OR LOWER(COALESCE(s.description, '')) LIKE %s)"
+                        q_param = f"%{q.lower()}%"
+                        pg_params.extend([q_param, q_param, q_param])
+                    pg_query += " ORDER BY s.created_at DESC LIMIT 500"
+                    
+                    cur.execute(pg_query, pg_params)
+                    rows = cur.fetchall()
+                    
+                    for row in rows:
+                        d = dict(row)
+                        # Handle products - might be list or JSON string
+                        products = d.get("products")
+                        if isinstance(products, str):
+                            d["products"] = json.loads(products) if products else []
+                        elif isinstance(products, list):
+                            d["products"] = products
+                        else:
+                            d["products"] = []
+                        d["metrics"] = {
+                            k: d.pop(k) for k in ["wpm", "pitch_mean_hz", "vocal_fry_ratio", 
+                                                   "lexical_diversity", "quality_level", "sentiment"]
+                            if d.get(k) is not None
+                        }
+                        speeches.append(d)
+        except Exception as e:
+            logger.warning(f"Supabase query failed, falling back to SQLite: {e}")
+    
+    # Fall back to SQLite if Supabase failed or not enabled
+    if not speeches:
+        db = get_db()
+        
+        # Single optimized query with JOIN to get speeches + analysis in one shot
+        query = """
+            SELECT s.id, s.title, s.speaker, s.year, s.source_url, s.source_file, s.duration_sec,
+                   s.language, s.category, s.products, s.tags, s.notes, s.description, s.audio_hash,
+                   s.created_at, s.updated_at, s.user_id, s.profile, s.project_id,
+                   a.wpm, a.pitch_mean_hz, a.vocal_fry_ratio, a.lexical_diversity, 
+                   a.quality_level, a.sentiment
+            FROM speeches s
+            LEFT JOIN analyses a ON a.speech_id = s.id
+            WHERE s.user_id IS NOT NULL
+        """
+        params = []
+        if category:
+            query += " AND s.category = ?"
+            params.append(category)
+        if product:
+            query += " AND s.products LIKE ?"
+            params.append(f'%"{product}"%')
+        if q:
+            query += " AND (LOWER(s.title) LIKE ? OR LOWER(s.speaker) LIKE ? OR LOWER(s.description) LIKE ?)"
+            q_param = f"%{q.lower()}%"
+            params.extend([q_param, q_param, q_param])
+        query += " ORDER BY s.created_at DESC LIMIT 500"
+        
+        rows = db.conn.execute(query, params).fetchall()
+        for row in rows:
+            d = dict(row)
+            d["products"] = json.loads(d["products"]) if d.get("products") else []
+            d["metrics"] = {
+                k: d.pop(k) for k in ["wpm", "pitch_mean_hz", "vocal_fry_ratio", 
+                                       "lexical_diversity", "quality_level", "sentiment"]
+                if d.get(k) is not None
+            }
+            speeches.append(d)
+
+    # Get categories - use Supabase if available
+    all_categories = []
+    all_products = []
+    
+    if USE_SUPABASE and SUPABASE_AVAILABLE:
+        try:
+            with psycopg2.connect(conn_str) as pg_conn:
+                with pg_conn.cursor() as cur:
+                    cur.execute("SELECT DISTINCT category FROM speeches WHERE user_id IS NOT NULL AND category IS NOT NULL")
+                    all_categories = sorted([r[0] for r in cur.fetchall()])
+        except:
+            pass
+    
+    if not all_categories:
+        db = get_db()
+        cat_rows = db.conn.execute(
+            "SELECT DISTINCT category FROM speeches WHERE user_id IS NOT NULL AND category IS NOT NULL"
+        ).fetchall()
+        all_categories = sorted([r[0] for r in cat_rows])
+        all_products = sorted(db.stats().get("products", {}).keys())
 
     return templates.TemplateResponse("speeches.html", {
         "request": request,
