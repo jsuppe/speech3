@@ -4846,6 +4846,46 @@ async def analyze_test_recording(
         
         if dementia_result:
             response["dementia_analysis"] = dementia_result
+            
+            # Save dementia_metrics to database
+            try:
+                dementia_metrics = {
+                    "prepositions_per_10_words": dementia_result.get("preposition_analysis", {}).get("prepositions_per_10_words", 0),
+                    "preposition_count": dementia_result.get("preposition_analysis", {}).get("preposition_count", 0),
+                    "word_count": dementia_result.get("preposition_analysis", {}).get("word_count", 0),
+                    "repetition_count": len(dementia_result.get("repetitions", [])),
+                    "aphasic_events": len(dementia_result.get("aphasic_events", [])),
+                    "aphasic_confidence": dementia_result.get("aphasic_confidence", 0),
+                    "num_speakers": dementia_result.get("num_speakers", 1),
+                }
+                
+                # Update in Supabase
+                from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+                if USE_SUPABASE and SUPABASE_AVAILABLE:
+                    import psycopg2
+                    import os
+                    conn_str = os.getenv(
+                        "DATABASE_URL",
+                        "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                    )
+                    with psycopg2.connect(conn_str) as pg_conn:
+                        with pg_conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE speeches SET dementia_metrics = %s WHERE id = %s",
+                                (json.dumps(dementia_metrics), speech_id)
+                            )
+                        pg_conn.commit()
+                    logger.info(f"Saved dementia_metrics to Supabase for speech_id={speech_id}")
+                else:
+                    # SQLite fallback
+                    db = pipeline_runner.get_db()
+                    db.conn.execute(
+                        "UPDATE speeches SET dementia_metrics = ? WHERE id = ?",
+                        (json.dumps(dementia_metrics), speech_id)
+                    )
+                    db.conn.commit()
+            except Exception as e:
+                logger.warning(f"Failed to save dementia_metrics: {e}")
         
         return response
         
