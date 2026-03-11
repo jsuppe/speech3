@@ -7212,25 +7212,62 @@ async def get_dementia_recording(speech_id: int, user: dict = Depends(flexible_a
     try:
         user_id = user.get("user_id") if user else None
         db = pipeline_runner.get_db()
-        conn = db.conn
-        cursor = conn.cursor()
+        row = None
         
-        if user_id:
-            cursor.execute("""
-                SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
-                FROM speeches s
-                LEFT JOIN analyses a ON a.speech_id = s.id
-                WHERE s.id = ? AND s.user_id = ? AND s.profile = 'dementia'
-            """, (speech_id, user_id))
-        else:
-            cursor.execute("""
-                SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
-                FROM speeches s
-                LEFT JOIN analyses a ON a.speech_id = s.id
-                WHERE s.id = ? AND s.profile = 'dementia'
-            """, (speech_id,))
+        # Try Supabase first
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            try:
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                import os
+                conn_str = os.getenv(
+                    "DATABASE_URL",
+                    "postgresql://postgres.fkxuqyvcvxklzrxjmzsa:Y4ZLP97tHSTQn7Jz@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+                )
+                with psycopg2.connect(conn_str) as pg_conn:
+                    with pg_conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        if user_id:
+                            cur.execute("""
+                                SELECT id, title, created_at, dementia_metrics, profile
+                                FROM speeches
+                                WHERE id = %s AND user_id = %s AND profile = 'dementia'
+                            """, (speech_id, user_id))
+                        else:
+                            cur.execute("""
+                                SELECT id, title, created_at, dementia_metrics, profile
+                                FROM speeches
+                                WHERE id = %s AND profile = 'dementia'
+                            """, (speech_id,))
+                        pg_row = cur.fetchone()
+                        if pg_row:
+                            # Convert to tuple format matching SQLite query
+                            row = (pg_row['id'], pg_row['title'], str(pg_row['created_at']) if pg_row['created_at'] else None, 
+                                   pg_row['dementia_metrics'], None)  # No analysis result in Supabase yet
+            except Exception as e:
+                logger.warning(f"Supabase query failed for speech {speech_id}, falling back to SQLite: {e}")
         
-        row = cursor.fetchone()
+        # Fallback to SQLite
+        if not row:
+            conn = db.conn
+            cursor = conn.cursor()
+            
+            if user_id:
+                cursor.execute("""
+                    SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
+                    FROM speeches s
+                    LEFT JOIN analyses a ON a.speech_id = s.id
+                    WHERE s.id = ? AND s.user_id = ? AND s.profile = 'dementia'
+                """, (speech_id, user_id))
+            else:
+                cursor.execute("""
+                    SELECT s.id, s.title, s.created_at, s.dementia_metrics, a.result
+                    FROM speeches s
+                    LEFT JOIN analyses a ON a.speech_id = s.id
+                    WHERE s.id = ? AND s.profile = 'dementia'
+                """, (speech_id,))
+            
+            row = cursor.fetchone()
         
         if not row:
             return _error(404, "NOT_FOUND", "Recording not found")
