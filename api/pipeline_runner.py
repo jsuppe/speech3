@@ -784,13 +784,19 @@ def persist_result(
             except Exception as e:
                 logger.warning(f"Failed to get user name for speaker: {e}")
 
-        # Check for duplicate audio
+        # Check for duplicate audio (only consider duplicates for same user)
         existing = db.find_speech_by_hash(audio_hash)
-        if existing:
-            # Still store new analysis against existing speech
+        
+        # Only consider it a duplicate if same user owns it
+        if existing and existing.get("user_id") == user_id:
+            # Same user, same audio — reuse existing record
             speech_id = existing["id"]
-            logger.info(f"Duplicate audio — appending analysis to speech_id={speech_id}")
+            logger.info(f"Duplicate audio for same user — appending analysis to speech_id={speech_id}")
         else:
+            # Either no duplicate, or different user — create new record
+            if existing and user_id is not None:
+                logger.info(f"Same audio but different user (existing={existing.get('user_id')}, new={user_id}) — creating new record")
+            
             # Create new speech record
             speech_id = db.add_speech(
                 title=title,
