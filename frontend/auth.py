@@ -19,6 +19,12 @@ logger = logging.getLogger("speechscore.frontend.auth")
 # Tiers allowed to access the dashboard
 ALLOWED_TIERS = {"qa", "admin"}
 
+# Explicit email whitelist - only these emails can access dashboard
+# Set to None to disable whitelist (use tier-based access only)
+DASHBOARD_EMAIL_WHITELIST = {
+    "jon.suppe@gmail.com",
+}
+
 # Session storage (in-memory for simplicity)
 # In production, use Redis or database
 _sessions = {}
@@ -66,7 +72,15 @@ def destroy_session(token: str):
 
 
 def is_email_allowed(email: str, db_path: str = None) -> bool:
-    """Check if the user has QA or Admin tier access."""
+    """Check if the user is allowed to access the dashboard."""
+    # Check explicit whitelist first (if enabled)
+    if DASHBOARD_EMAIL_WHITELIST is not None:
+        allowed = email.lower() in {e.lower() for e in DASHBOARD_EMAIL_WHITELIST}
+        if not allowed:
+            logger.info(f"User {email} denied access (not in whitelist)")
+        return allowed
+    
+    # Fall back to tier-based access
     if not db_path:
         # Default path
         db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "speechscore.db")
