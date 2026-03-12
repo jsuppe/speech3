@@ -4774,6 +4774,135 @@ async def analyze_dementia_conversation(
         return _error(500, "ANALYSIS_ERROR", str(e))
 
 
+class DelayedRecallRequest(BaseModel):
+    """Request to compare immediate and delayed recall recordings."""
+    immediate_speech_id: int
+    delayed_speech_id: int
+
+
+@router.post("/dementia/recall-comparison", tags=["Dementia"])
+async def compare_recall_tasks(
+    request: DelayedRecallRequest,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Compare immediate vs delayed recall task performance.
+    
+    This is a key diagnostic tool for cognitive screening:
+    - Patient describes something immediately after seeing/hearing it
+    - Then describes it again after a delay (5-15 minutes)
+    - Greater degradation in delayed recall indicates memory issues
+    
+    Key metrics compared:
+    - Speech tempo (WPM drop)
+    - Pause-per-utterance ratio (increase)
+    - Hesitation frequency (increase)
+    - Content completeness (decrease)
+    """
+    import sqlite3
+    from speech_db import get_speech_by_id
+    from .dementia_analysis import compare_recall_tasks as compare_tasks
+    
+    try:
+        # Get both speech records
+        immediate = get_speech_by_id(request.immediate_speech_id)
+        delayed = get_speech_by_id(request.delayed_speech_id)
+        
+        if not immediate:
+            return _error(404, "NOT_FOUND", f"Immediate recall speech {request.immediate_speech_id} not found")
+        if not delayed:
+            return _error(404, "NOT_FOUND", f"Delayed recall speech {request.delayed_speech_id} not found")
+        
+        # Parse analysis JSON if stored as strings
+        immediate_analysis = immediate.get('audio_analysis') or {}
+        delayed_analysis = delayed.get('audio_analysis') or {}
+        
+        if isinstance(immediate_analysis, str):
+            immediate_analysis = json.loads(immediate_analysis)
+        if isinstance(delayed_analysis, str):
+            delayed_analysis = json.loads(delayed_analysis)
+        
+        # Add dementia analysis if available
+        immediate_full = {
+            'audio_analysis': immediate_analysis,
+            'dementia_analysis': immediate.get('dementia_analysis') or {}
+        }
+        delayed_full = {
+            'audio_analysis': delayed_analysis,
+            'dementia_analysis': delayed.get('dementia_analysis') or {}
+        }
+        
+        if isinstance(immediate_full['dementia_analysis'], str):
+            immediate_full['dementia_analysis'] = json.loads(immediate_full['dementia_analysis'])
+        if isinstance(delayed_full['dementia_analysis'], str):
+            delayed_full['dementia_analysis'] = json.loads(delayed_full['dementia_analysis'])
+        
+        # Run comparison
+        comparison = compare_tasks(immediate_full, delayed_full)
+        
+        # Calculate time between recordings
+        from datetime import datetime
+        immediate_time = datetime.fromisoformat(immediate['created_at'].replace('Z', '+00:00').replace('+00:00', ''))
+        delayed_time = datetime.fromisoformat(delayed['created_at'].replace('Z', '+00:00').replace('+00:00', ''))
+        delay_minutes = (delayed_time - immediate_time).total_seconds() / 60
+        
+        return {
+            "immediate_speech_id": request.immediate_speech_id,
+            "delayed_speech_id": request.delayed_speech_id,
+            "delay_duration_minutes": round(delay_minutes, 1),
+            "comparison": comparison,
+            "recommendation": (
+                "Consider clinical evaluation" if comparison['risk_level'] == 'elevated' else
+                "Continue monitoring" if comparison['risk_level'] == 'moderate' else
+                "Within normal range"
+            )
+        }
+        
+    except Exception as e:
+        logger.error(f"Recall comparison error: {e}")
+        return _error(500, "ANALYSIS_ERROR", str(e))
+
+
+@router.get("/dementia/degradation/{user_id}", tags=["Dementia"])
+async def get_degradation_analysis(
+    user_id: int,
+    profile_id: Optional[int] = None,
+    days: int = 90,
+    auth: dict = Depends(flexible_auth),
+):
+    """
+    Get cross-session degradation analysis for a user.
+    
+    Analyzes trends in cognitive metrics over time:
+    - Speech tempo changes
+    - Pause-per-utterance ratio trends
+    - Hesitation frequency changes
+    - Repetition pattern changes
+    
+    Returns risk assessment if declining trends detected.
+    """
+    from .cross_session_tracking import analyze_metric_degradation
+    
+    try:
+        db_path = "/home/melchior/speech3/speechscore.db"
+        analysis = analyze_metric_degradation(
+            db_path=db_path,
+            user_id=user_id,
+            profile_id=profile_id,
+            lookback_days=days
+        )
+        
+        return {
+            "user_id": user_id,
+            "profile_id": profile_id,
+            "analysis": analysis
+        }
+        
+    except Exception as e:
+        logger.error(f"Degradation analysis error: {e}")
+        return _error(500, "ANALYSIS_ERROR", str(e))
+
+
 class TestRecordingRequest(BaseModel):
     """Request to analyze a test recording from the server."""
     filename: str

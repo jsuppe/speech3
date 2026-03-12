@@ -429,6 +429,259 @@ def _calculate_cross_session_concern(
     return round(min(concern, 1.0), 3)
 
 
+def analyze_metric_degradation(
+    db_path: str,
+    user_id: int,
+    profile_id: Optional[int] = None,
+    current_metrics: Dict[str, float] = None,
+    lookback_days: int = 90
+) -> Dict[str, Any]:
+    """
+    Analyze cognitive metric degradation over time.
+    
+    Tracks key metrics across sessions to detect declining trends:
+    - Speech tempo (WPM) - declining is concerning
+    - Pause-per-utterance ratio - increasing is concerning
+    - Hesitation rate - increasing is concerning
+    - Repetition frequency - increasing is concerning
+    
+    Args:
+        db_path: Path to database
+        user_id: User ID
+        profile_id: Optional profile ID for multi-profile support
+        current_metrics: Current session metrics to include in analysis
+        lookback_days: How many days back to analyze
+    
+    Returns:
+        Degradation analysis with trends and risk assessment
+    """
+    conn, db_type = _get_connection(db_path)
+    
+    try:
+        cutoff = (datetime.utcnow() - timedelta(days=lookback_days)).isoformat()
+        
+        # Query historical metrics from speeches table
+        if db_type == 'postgres':
+            query = """
+                SELECT 
+                    s.id, s.created_at, s.duration,
+                    s.audio_analysis, s.dementia_analysis
+                FROM speeches s
+                WHERE s.user_id = %s 
+                  AND s.created_at > %s
+                  AND s.scoring_profile = 'dementia'
+            """
+            params = [user_id, cutoff]
+            
+            if profile_id is not None:
+                query += " AND s.profile_id = %s"
+                params.append(profile_id)
+            
+            query += " ORDER BY s.created_at ASC"
+            
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            cursor.close()
+        else:
+            query = """
+                SELECT 
+                    id, created_at, duration,
+                    audio_analysis, dementia_analysis
+                FROM speeches
+                WHERE user_id = ? 
+                  AND created_at > ?
+                  AND scoring_profile = 'dementia'
+            """
+            params = [user_id, cutoff]
+            
+            if profile_id is not None:
+                query += " AND profile_id = ?"
+                params.append(profile_id)
+            
+            query += " ORDER BY created_at ASC"
+            
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+        
+        # Extract metrics from each session
+        sessions = []
+        for row in rows:
+            record = dict(row)
+            
+            # Parse JSON fields
+            audio = record.get('audio_analysis')
+            dementia = record.get('dementia_analysis')
+            
+            if isinstance(audio, str):
+                try:
+                    audio = json.loads(audio)
+                except:
+                    audio = {}
+            if isinstance(dementia, str):
+                try:
+                    dementia = json.loads(dementia)
+                except:
+                    dementia = {}
+            
+            # Extract metrics
+            wpm = 0
+            if audio and 'speaking_rate' in audio:
+                wpm = audio['speaking_rate'].get('overall_wpm', 0)
+            
+            pause_ratio = 0
+            hesitation_rate = 0
+            repetition_count = 0
+            
+            if dementia:
+                pause_metrics = dementia.get('pause_metrics', {})
+                pause_ratio = pause_metrics.get('pause_per_utterance_ratio', 0)
+                
+                # Sum from all speakers
+                for speaker_data in dementia.get('speakers', {}).values():
+                    metrics = speaker_data.get('metrics', {})
+                    hesitation_rate += metrics.get('aphasic_events', 0)
+                    repetition_count += metrics.get('repeated_concepts', 0)
+                    repetition_count += metrics.get('repeated_questions', 0)
+            
+            sessions.append({
+                'date': record['created_at'],
+                'speech_id': record['id'],
+                'metrics': {
+                    'speech_tempo': wpm,
+                    'pause_per_utterance': pause_ratio,
+                    'hesitation_rate': hesitation_rate,
+                    'repetition_count': repetition_count
+                }
+            })
+        
+        # Add current metrics if provided
+        if current_metrics:
+            sessions.append({
+                'date': datetime.utcnow().isoformat(),
+                'speech_id': None,
+                'metrics': current_metrics
+            })
+        
+        if len(sessions) < 3:
+            return {
+                'enabled': True,
+                'sessions_analyzed': len(sessions),
+                'message': 'Insufficient history for trend analysis (need 3+ sessions)',
+                'overall_trend': 'unknown'
+            }
+        
+        # Calculate trends for each metric
+        def calculate_trend(values: List[float]) -> Dict[str, Any]:
+            """Calculate linear trend and statistics."""
+            if not values or len(values) < 2:
+                return {'trend': 0, 'change_pct': 0, 'direction': 'stable'}
+            
+            # Simple linear regression
+            n = len(values)
+            x = list(range(n))
+            x_mean = sum(x) / n
+            y_mean = sum(values) / n
+            
+            numerator = sum((x[i] - x_mean) * (values[i] - y_mean) for i in range(n))
+            denominator = sum((x[i] - x_mean) ** 2 for i in range(n))
+            
+            slope = numerator / denominator if denominator != 0 else 0
+            
+            # Percentage change from first to last
+            if values[0] != 0:
+                change_pct = ((values[-1] - values[0]) / values[0]) * 100
+            else:
+                change_pct = 0
+            
+            # Determine direction
+            if abs(change_pct) < 5:
+                direction = 'stable'
+            elif change_pct > 0:
+                direction = 'increasing'
+            else:
+                direction = 'decreasing'
+            
+            return {
+                'slope': round(slope, 4),
+                'change_pct': round(change_pct, 1),
+                'direction': direction,
+                'first_value': round(values[0], 2),
+                'last_value': round(values[-1], 2),
+                'min': round(min(values), 2),
+                'max': round(max(values), 2)
+            }
+        
+        # Extract metric series
+        speech_tempo_series = [s['metrics']['speech_tempo'] for s in sessions if s['metrics']['speech_tempo'] > 0]
+        pause_ratio_series = [s['metrics']['pause_per_utterance'] for s in sessions]
+        hesitation_series = [s['metrics']['hesitation_rate'] for s in sessions]
+        repetition_series = [s['metrics']['repetition_count'] for s in sessions]
+        
+        trends = {
+            'speech_tempo': calculate_trend(speech_tempo_series),
+            'pause_per_utterance': calculate_trend(pause_ratio_series),
+            'hesitation_rate': calculate_trend(hesitation_series),
+            'repetition_count': calculate_trend(repetition_series)
+        }
+        
+        # Calculate overall degradation score
+        # Negative for speech tempo (slowing bad), positive for others (increasing bad)
+        degradation_score = 0
+        concerning_metrics = []
+        
+        if trends['speech_tempo']['direction'] == 'decreasing' and trends['speech_tempo']['change_pct'] < -10:
+            degradation_score += abs(trends['speech_tempo']['change_pct']) / 100
+            concerning_metrics.append(f"Speech tempo declining {abs(trends['speech_tempo']['change_pct']):.0f}%")
+        
+        if trends['pause_per_utterance']['direction'] == 'increasing' and trends['pause_per_utterance']['change_pct'] > 20:
+            degradation_score += trends['pause_per_utterance']['change_pct'] / 100
+            concerning_metrics.append(f"Pause ratio increasing {trends['pause_per_utterance']['change_pct']:.0f}%")
+        
+        if trends['hesitation_rate']['direction'] == 'increasing' and trends['hesitation_rate']['change_pct'] > 20:
+            degradation_score += trends['hesitation_rate']['change_pct'] / 200
+            concerning_metrics.append(f"Hesitations increasing {trends['hesitation_rate']['change_pct']:.0f}%")
+        
+        if trends['repetition_count']['direction'] == 'increasing' and trends['repetition_count']['change_pct'] > 30:
+            degradation_score += trends['repetition_count']['change_pct'] / 200
+            concerning_metrics.append(f"Repetitions increasing {trends['repetition_count']['change_pct']:.0f}%")
+        
+        # Overall trend assessment
+        if degradation_score >= 0.5:
+            overall_trend = 'declining'
+            risk_message = 'Multiple metrics showing decline - recommend clinical evaluation'
+        elif degradation_score >= 0.2:
+            overall_trend = 'mild_decline'
+            risk_message = 'Some metrics showing slight decline - continue monitoring'
+        elif degradation_score < 0:
+            overall_trend = 'improving'
+            risk_message = 'Metrics stable or improving'
+        else:
+            overall_trend = 'stable'
+            risk_message = 'Metrics within normal variation'
+        
+        return {
+            'enabled': True,
+            'sessions_analyzed': len(sessions),
+            'period_days': lookback_days,
+            'trends': trends,
+            'degradation_score': round(degradation_score, 3),
+            'overall_trend': overall_trend,
+            'risk_message': risk_message,
+            'concerning_metrics': concerning_metrics,
+            'session_dates': [s['date'] for s in sessions]
+        }
+        
+    except Exception as e:
+        logger.error(f"Degradation analysis error: {e}")
+        return {
+            'enabled': False,
+            'error': str(e)
+        }
+    finally:
+        conn.close()
+
+
 def get_user_repetition_summary(
     db_path: str,
     user_id: int,

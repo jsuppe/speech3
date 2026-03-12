@@ -4,10 +4,14 @@ Dementia Conversation Analysis Module
 Analyzes conversations between two participants for cognitive markers:
 1. Preposition usage rate (per 10 words) - lower rates correlate with cognitive decline
 2. Repetition detection - repeated concepts/questions indicate memory issues
+3. Pause-per-utterance ratio - higher ratios indicate word-finding difficulty
+4. Delayed recall comparison - comparing immediate vs delayed recall tasks
+5. Cross-session degradation - tracking metric decline over time
 
 References:
 - Preposition deficit in Alzheimer's: https://pubmed.ncbi.nlm.nih.gov/8931575/
 - Repetitive speech patterns: https://pubmed.ncbi.nlm.nih.gov/29493412/
+- Temporal speech features for MCI: https://pubmed.ncbi.nlm.nih.gov/29165085/
 """
 
 import re
@@ -103,6 +107,195 @@ PREPOSITIONS = {
     'past', 'since', 'through', 'throughout', 'till', 'to', 'toward', 'towards',
     'under', 'underneath', 'until', 'up', 'upon', 'with', 'within', 'without'
 }
+
+
+def calculate_pause_per_utterance_ratio(
+    segments: List[Dict[str, Any]],
+    min_pause_duration: float = 0.3,  # Minimum pause to count (seconds)
+    utterance_gap: float = 1.0  # Gap between segments to count as new utterance
+) -> Dict[str, Any]:
+    """
+    Calculate pause-per-utterance ratio - a key biomarker for cognitive decline.
+    
+    Research shows increased pause frequency correlates with MCI/dementia:
+    - Normal: ~0.5-1.0 pauses per utterance
+    - MCI: ~1.5-2.5 pauses per utterance
+    - Dementia: ~2.5+ pauses per utterance
+    
+    Args:
+        segments: List of speech segments with 'start', 'end', 'text'
+        min_pause_duration: Minimum gap to count as pause (seconds)
+        utterance_gap: Gap duration to consider as utterance boundary
+    
+    Returns:
+        Dict with pause analysis metrics
+    """
+    if not segments or len(segments) < 2:
+        return {
+            'pause_count': 0,
+            'utterance_count': 1,
+            'pause_per_utterance_ratio': 0.0,
+            'total_pause_duration': 0.0,
+            'average_pause_duration': 0.0,
+            'longest_pause': 0.0,
+            'pauses': [],
+            'risk_level': 'insufficient_data'
+        }
+    
+    # Sort segments by start time
+    sorted_segments = sorted(segments, key=lambda x: x.get('start', 0))
+    
+    pauses = []
+    utterance_count = 1
+    total_pause_duration = 0.0
+    
+    for i in range(1, len(sorted_segments)):
+        prev_end = sorted_segments[i-1].get('end', sorted_segments[i-1].get('start', 0))
+        curr_start = sorted_segments[i].get('start', 0)
+        gap = curr_start - prev_end
+        
+        if gap >= min_pause_duration:
+            pauses.append({
+                'duration': round(gap, 2),
+                'after_segment': i - 1,
+                'position_seconds': round(prev_end, 2)
+            })
+            total_pause_duration += gap
+            
+            # Count as new utterance if gap is large enough
+            if gap >= utterance_gap:
+                utterance_count += 1
+    
+    # If no utterance boundaries found via gaps, estimate from segment count
+    if utterance_count == 1 and len(sorted_segments) > 5:
+        # Estimate utterances from natural breaks (sentences)
+        utterance_count = max(1, len(sorted_segments) // 3)
+    
+    pause_count = len(pauses)
+    ratio = pause_count / utterance_count if utterance_count > 0 else 0.0
+    avg_pause = total_pause_duration / pause_count if pause_count > 0 else 0.0
+    longest = max([p['duration'] for p in pauses]) if pauses else 0.0
+    
+    # Risk level based on research thresholds
+    if ratio < 1.0:
+        risk_level = 'normal'
+    elif ratio < 1.5:
+        risk_level = 'mild'
+    elif ratio < 2.5:
+        risk_level = 'moderate'
+    else:
+        risk_level = 'elevated'
+    
+    return {
+        'pause_count': pause_count,
+        'utterance_count': utterance_count,
+        'pause_per_utterance_ratio': round(ratio, 2),
+        'total_pause_duration': round(total_pause_duration, 2),
+        'average_pause_duration': round(avg_pause, 2),
+        'longest_pause': round(longest, 2),
+        'pauses': pauses[:20],  # Limit to first 20
+        'risk_level': risk_level
+    }
+
+
+def compare_recall_tasks(
+    immediate_analysis: Dict[str, Any],
+    delayed_analysis: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Compare immediate vs delayed recall task performance.
+    
+    Key metrics that decline more in delayed recall for cognitive impairment:
+    - Speech tempo drops more
+    - More pauses per utterance
+    - More hesitations/word-finding difficulties
+    - Lower content accuracy
+    
+    Args:
+        immediate_analysis: Full analysis of immediate recall recording
+        delayed_analysis: Full analysis of delayed recall recording
+    
+    Returns:
+        Comparison metrics and risk assessment
+    """
+    def safe_get(d: Dict, *keys, default=0.0):
+        """Safely navigate nested dict."""
+        for key in keys:
+            if isinstance(d, dict):
+                d = d.get(key, {})
+            else:
+                return default
+        return d if d != {} else default
+    
+    # Extract key metrics from both
+    immediate_metrics = {
+        'wpm': safe_get(immediate_analysis, 'audio_analysis', 'speaking_rate', 'overall_wpm'),
+        'pause_ratio': safe_get(immediate_analysis, 'dementia_analysis', 'pause_metrics', 'pause_per_utterance_ratio'),
+        'hesitation_count': safe_get(immediate_analysis, 'audio_analysis', 'filler_words', 'total_count'),
+        'aphasic_events': 0,  # Will be filled if available
+    }
+    
+    delayed_metrics = {
+        'wpm': safe_get(delayed_analysis, 'audio_analysis', 'speaking_rate', 'overall_wpm'),
+        'pause_ratio': safe_get(delayed_analysis, 'dementia_analysis', 'pause_metrics', 'pause_per_utterance_ratio'),
+        'hesitation_count': safe_get(delayed_analysis, 'audio_analysis', 'filler_words', 'total_count'),
+        'aphasic_events': 0,
+    }
+    
+    # Calculate percentage changes
+    def pct_change(before, after):
+        if before == 0:
+            return 0.0
+        return round(((after - before) / before) * 100, 1)
+    
+    changes = {
+        'wpm_change_pct': pct_change(immediate_metrics['wpm'], delayed_metrics['wpm']),
+        'pause_ratio_change_pct': pct_change(immediate_metrics['pause_ratio'], delayed_metrics['pause_ratio']),
+        'hesitation_change_pct': pct_change(immediate_metrics['hesitation_count'], delayed_metrics['hesitation_count']),
+    }
+    
+    # Risk assessment based on delayed recall degradation
+    # Normal aging: 0-10% WPM drop, 0-20% pause increase
+    # MCI: 10-25% WPM drop, 20-50% pause increase
+    # Dementia: >25% WPM drop, >50% pause increase
+    
+    wpm_drop = -changes['wpm_change_pct']  # Negative change is bad
+    pause_increase = changes['pause_ratio_change_pct']
+    
+    if wpm_drop > 25 or pause_increase > 50:
+        risk_level = 'elevated'
+        risk_message = 'Significant degradation between immediate and delayed recall'
+    elif wpm_drop > 10 or pause_increase > 20:
+        risk_level = 'moderate'
+        risk_message = 'Notable degradation in delayed recall performance'
+    elif wpm_drop > 5 or pause_increase > 10:
+        risk_level = 'mild'
+        risk_message = 'Slight degradation in delayed recall (may be normal)'
+    else:
+        risk_level = 'normal'
+        risk_message = 'Delayed recall performance within normal range'
+    
+    return {
+        'immediate_metrics': immediate_metrics,
+        'delayed_metrics': delayed_metrics,
+        'changes': changes,
+        'risk_level': risk_level,
+        'risk_message': risk_message,
+        'interpretation': {
+            'wpm_interpretation': (
+                'Normal' if wpm_drop <= 5 else
+                'Mild slowing' if wpm_drop <= 15 else
+                'Moderate slowing' if wpm_drop <= 25 else
+                'Significant slowing - concerning'
+            ),
+            'pause_interpretation': (
+                'Normal' if pause_increase <= 10 else
+                'Slightly increased pausing' if pause_increase <= 30 else
+                'Moderately increased pausing' if pause_increase <= 50 else
+                'Significantly increased pausing - concerning'
+            )
+        }
+    }
 
 
 def count_prepositions(text: str) -> Tuple[int, int, List[str]]:
@@ -600,7 +793,9 @@ def analyze_dementia_markers(
     min_segment_gap: int = 2,
     user_id: Optional[int] = None,
     speech_id: Optional[int] = None,
+    profile_id: Optional[int] = None,
     db_path: Optional[str] = None,
+    audio_analysis: Optional[Dict[str, Any]] = None,  # For pause extraction
 ) -> Dict[str, Any]:
     """
     Full dementia marker analysis for a conversation.
@@ -621,6 +816,9 @@ def analyze_dementia_markers(
         # Auto-detect speakers from segments
         speakers = list(set(seg.get('speaker', 'Speaker 1') for seg in segments))
         speaker_labels = {s: s for s in speakers}
+    
+    # Calculate pause-per-utterance ratio for all segments
+    pause_metrics = calculate_pause_per_utterance_ratio(segments)
     
     # Group segments by speaker
     speaker_segments = {}
@@ -645,6 +843,9 @@ def analyze_dementia_markers(
         # Aphasic event detection (word-finding difficulties)
         aphasic_analysis = detect_aphasic_events(full_text)
         
+        # Per-speaker pause metrics
+        speaker_pause_metrics = calculate_pause_per_utterance_ratio(segs)
+        
         speaker_results[speaker] = {
             'label': speaker_labels.get(speaker, speaker),
             'total_segments': len(segs),
@@ -652,12 +853,14 @@ def analyze_dementia_markers(
             'preposition_analysis': prep_analysis,
             'repetition_analysis': rep_analysis,
             'aphasic_analysis': aphasic_analysis,
+            'pause_metrics': speaker_pause_metrics,
             'metrics': {
                 'prepositions_per_10_words': prep_analysis['rate_per_10_words'],
                 'repeated_concepts': rep_analysis['repeated_concepts_count'],
                 'repeated_questions': rep_analysis['repeated_questions_count'],
                 'aphasic_events': aphasic_analysis['event_count'],
-                'aphasic_confidence': aphasic_analysis['confidence_score']
+                'aphasic_confidence': aphasic_analysis['confidence_score'],
+                'pause_per_utterance': speaker_pause_metrics['pause_per_utterance_ratio']
             }
         }
     
@@ -706,6 +909,23 @@ def analyze_dementia_markers(
                 'value': aphasic_count,
                 'confidence': aphasic_conf,
                 'concern': f'Frequent hesitations/word-searching ({aphasic_count} events)'
+            })
+        
+        # Pause-per-utterance risk flag
+        pause_ratio = data['metrics'].get('pause_per_utterance', 0)
+        if pause_ratio >= 2.5:
+            risk_flags.append({
+                'speaker': speaker,
+                'flag': 'elevated_pause_ratio',
+                'value': pause_ratio,
+                'concern': f'High pause-per-utterance ratio ({pause_ratio:.1f}) - may indicate word-finding difficulty'
+            })
+        elif pause_ratio >= 1.5:
+            risk_flags.append({
+                'speaker': speaker,
+                'flag': 'moderate_pause_ratio',
+                'value': pause_ratio,
+                'concern': f'Elevated pause-per-utterance ratio ({pause_ratio:.1f})'
             })
     
     # Cross-session tracking (if user_id provided)
@@ -774,15 +994,56 @@ def analyze_dementia_markers(
             logger.warning(f"Cross-session tracking failed: {e}")
             cross_session_analysis = {'enabled': False, 'error': str(e)}
     
+    # Calculate degradation tracking if we have user/profile history
+    degradation_analysis = None
+    if user_id is not None and db_path is not None:
+        try:
+            from .cross_session_tracking import analyze_metric_degradation
+            degradation_analysis = analyze_metric_degradation(
+                db_path=db_path,
+                user_id=user_id,
+                profile_id=profile_id,
+                current_metrics={
+                    'pause_per_utterance': pause_metrics['pause_per_utterance_ratio'],
+                    'speech_tempo': audio_analysis.get('speaking_rate', {}).get('overall_wpm', 0) if audio_analysis else 0,
+                    'hesitation_rate': sum(
+                        data['metrics']['aphasic_events'] 
+                        for data in speaker_results.values()
+                    ) / max(1, len(segments)),
+                    'repetition_count': sum(
+                        data['metrics']['repeated_concepts'] + data['metrics']['repeated_questions']
+                        for data in speaker_results.values()
+                    ),
+                },
+                lookback_days=90
+            )
+            
+            # Add degradation risk flags
+            if degradation_analysis and degradation_analysis.get('overall_trend') == 'declining':
+                risk_flags.append({
+                    'speaker': 'all',
+                    'flag': 'cross_session_degradation',
+                    'value': degradation_analysis.get('degradation_score', 0),
+                    'concern': f"Declining speech metrics over {degradation_analysis.get('sessions_analyzed', 0)} sessions"
+                })
+        except Exception as e:
+            logger.warning(f"Degradation analysis failed: {e}")
+            degradation_analysis = {'enabled': False, 'error': str(e)}
+    
     return {
         'speakers': speaker_results,
+        'pause_metrics': pause_metrics,  # Overall pause analysis
         'cross_speaker_repetition': cross_repetition,
         'cross_session_analysis': cross_session_analysis,
+        'degradation_analysis': degradation_analysis,
         'risk_flags': risk_flags,
         'summary': {
             'total_speakers': len(speaker_results),
             'total_segments': len(segments),
             'flags_detected': len(risk_flags),
-            'cross_session_enabled': cross_session_analysis is not None
+            'pause_per_utterance': pause_metrics['pause_per_utterance_ratio'],
+            'pause_risk_level': pause_metrics['risk_level'],
+            'cross_session_enabled': cross_session_analysis is not None,
+            'degradation_enabled': degradation_analysis is not None
         }
     }
