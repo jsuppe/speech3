@@ -699,6 +699,13 @@ async def analyze(
     resolved_modules, resolved_preset, modules_requested, mod_error = _resolve_modules(modules, preset)
     if mod_error is not None:
         return mod_error
+    
+    # Dementia profile requires diarization for speaker tracking
+    if profile and profile.lower() == "dementia":
+        resolved_modules.add("diarization")
+        if "diarization" not in modules_requested:
+            modules_requested = modules_requested + ["diarization"]
+            logger.info("Auto-added diarization for dementia profile")
 
     # --- Validate quality_gate ---
     qg = config.DEFAULT_QUALITY_GATE
