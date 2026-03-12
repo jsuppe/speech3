@@ -312,6 +312,7 @@ def run_pipeline(
     voice_health_mode: bool = False,
     exercise_type: str = None,
     target_duration: float = None,
+    user_id: int = None,
 ) -> dict:
     """
     Run the speech analysis pipeline on an audio file.

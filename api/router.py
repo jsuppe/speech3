@@ -855,6 +855,7 @@ async def analyze(
                 voice_health_mode=(profile == "voice_health"),
                 exercise_type=exercise_type,
                 target_duration=target_duration,
+                user_id=user_id,
             )
         except pipeline_runner.QualityGateError as e:
             return _error(422, "QUALITY_GATE_BLOCKED", str(e))
