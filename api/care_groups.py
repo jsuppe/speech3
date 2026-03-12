@@ -10,7 +10,7 @@ import string
 from typing import Optional, List
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel, Field
 
 from .user_auth import flexible_auth
@@ -34,7 +34,8 @@ class GroupUpdate(BaseModel):
 
 class ProfileCreate(BaseModel):
     name: str = Field(..., max_length=100)
-    avatar_emoji: str = Field(default="👤", max_length=10)
+    avatar_emoji: Optional[str] = Field(default="👤", max_length=10)
+    avatar_url: Optional[str] = None  # Photo URL (from R2 upload)
     avatar_color: str = Field(default="#14B8A6", max_length=20)
     date_of_birth: Optional[str] = None
     diagnosis: Optional[str] = None
@@ -436,12 +437,12 @@ async def create_profile(group_id: str, data: ProfileCreate, auth: dict = Depend
     conn = get_connection()
     cur = conn.cursor()
     cur.execute('''
-        INSERT INTO care_profiles (group_id, name, avatar_emoji, avatar_color, 
+        INSERT INTO care_profiles (group_id, name, avatar_emoji, avatar_url, avatar_color, 
                                    date_of_birth, diagnosis, notes, 
                                    physician_name, physician_email, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *
-    ''', (group_id, data.name, data.avatar_emoji, data.avatar_color,
+    ''', (group_id, data.name, data.avatar_emoji or '👤', data.avatar_url, data.avatar_color,
           data.date_of_birth, data.diagnosis, data.notes,
           data.physician_name, data.physician_email, user_id))
     profile = dict(cur.fetchone())
@@ -450,6 +451,62 @@ async def create_profile(group_id: str, data: ProfileCreate, auth: dict = Depend
     
     logger.info(f"User {user_id} created profile '{data.name}' in group {group_id}")
     return {"profile": profile}
+
+
+@router.post("/{group_id}/profile-photo")
+async def upload_profile_photo(
+    group_id: str, 
+    file: UploadFile = File(...),
+    auth: dict = Depends(flexible_auth)
+):
+    """Upload a profile photo and return the URL."""
+    from .r2_storage import R2Storage
+    import hashlib
+    from datetime import datetime
+    
+    user_id = auth.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    require_group_role(user_id, group_id, ['admin', 'caregiver'])
+    
+    # Validate file type
+    content_type = file.content_type or 'image/jpeg'
+    if not content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Determine extension
+    ext_map = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'}
+    ext = ext_map.get(content_type, 'jpg')
+    
+    # Read file
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+    
+    # Generate unique key
+    now = datetime.utcnow()
+    file_hash = hashlib.md5(f"{group_id}:{user_id}:{now.isoformat()}".encode()).hexdigest()[:12]
+    key = f"profiles/{group_id}/{file_hash}.{ext}"
+    
+    # Upload to R2
+    r2 = R2Storage()
+    r2.client.put_object(
+        Bucket=r2.bucket,
+        Key=key,
+        Body=contents,
+        ContentType=content_type,
+        Metadata={
+            'group_id': group_id,
+            'uploaded_by': str(user_id),
+        }
+    )
+    
+    # Get URL
+    url = r2.get_url(key, expires_in=86400 * 365)  # 1 year expiry for profile photos
+    
+    logger.info(f"User {user_id} uploaded profile photo to {key}")
+    return {"url": url, "key": key}
 
 
 @router.get("/profiles/{profile_id}")
