@@ -455,6 +455,14 @@ try:
 except ImportError as e:
     logger.warning(f"TTS endpoints not available: {e}")
 
+# Register Care Groups routes (Memory app multi-profile)
+try:
+    from .care_groups import router as care_groups_router  # noqa: E402
+    app.include_router(care_groups_router)
+    logger.info("Care Groups routes registered at /v1/groups")
+except ImportError as e:
+    logger.warning(f"Care Groups endpoints not available: {e}")
+
 # Register frontend routes
 try:
     from frontend.routes import router as frontend_router
