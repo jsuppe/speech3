@@ -46,6 +46,7 @@ class ProfileCreate(BaseModel):
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     avatar_emoji: Optional[str] = None
+    avatar_url: Optional[str] = None
     avatar_color: Optional[str] = None
     date_of_birth: Optional[str] = None
     diagnosis: Optional[str] = None
@@ -566,12 +567,12 @@ async def update_profile(profile_id: str, data: ProfileUpdate, auth: dict = Depe
     
     updates = []
     values = []
-    for field in ['name', 'avatar_emoji', 'avatar_color', 'date_of_birth', 
+    for field in ['name', 'avatar_emoji', 'avatar_url', 'avatar_color', 'date_of_birth', 
                   'diagnosis', 'notes', 'physician_name', 'physician_email', 'settings']:
         value = getattr(data, field, None)
         if value is not None:
             updates.append(f"{field} = %s")
-            values.append(value)
+            values.append(value if value != '' else None)  # Allow clearing with empty string
     
     if not updates:
         conn.close()
