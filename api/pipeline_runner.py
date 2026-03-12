@@ -686,6 +686,7 @@ def persist_result(
     profile: str = "general",
     reference_text: str = None,
     coach_session_data: str = None,
+    profile_id: str = None,
 ) -> int | None:
     """
     Persist analysis result + audio (as Opus) to SQLite.
@@ -814,6 +815,7 @@ def persist_result(
                 audio_hash=audio_hash,
                 user_id=user_id,
                 profile=profile,
+                profile_id=profile_id,
             )
             
             # Store reference text for reading practice

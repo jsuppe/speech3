@@ -308,6 +308,7 @@ class SpeechDB:
         audio_hash: str = None,
         user_id: int = None,
         profile: str = "general",
+        profile_id: str = None,
     ) -> int:
         """Insert a new speech record. Returns speech_id."""
         # Use Supabase for user data
@@ -315,7 +316,7 @@ class SpeechDB:
             return self._add_speech_supabase(
                 title, speaker, year, source_url, source_file, duration_sec,
                 language, category, products, tags, notes, description,
-                audio_hash, user_id, profile
+                audio_hash, user_id, profile, profile_id
             )
         
         # SQLite for research/local data
@@ -338,7 +339,7 @@ class SpeechDB:
     def _add_speech_supabase(
         self, title, speaker, year, source_url, source_file, duration_sec,
         language, category, products, tags, notes, description,
-        audio_hash, user_id, profile
+        audio_hash, user_id, profile, profile_id=None
     ) -> int:
         """Insert speech into Supabase. Returns speech_id."""
         conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
@@ -348,15 +349,15 @@ class SpeechDB:
                 INSERT INTO speeches
                 (title, speaker, year, source_url, source_file, duration_sec,
                  language, category, products, tags, notes, description, 
-                 audio_hash, user_id, profile)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 audio_hash, user_id, profile, profile_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 title, speaker, year, source_url, source_file, duration_sec,
                 language, category,
                 json.dumps(products) if products else None,
                 json.dumps(tags) if tags else None,
-                notes, description, audio_hash, user_id, profile,
+                notes, description, audio_hash, user_id, profile, profile_id,
             ))
             speech_id = cur.fetchone()['id']
             conn.commit()

@@ -669,6 +669,7 @@ async def analyze(
     target_duration: Optional[float] = Form(None, description="Target duration in seconds for sustained exercises"),
     reference_text: Optional[str] = Form(None, description="Reference text for reading practice (stored for later comparison)"),
     coach_session_data: Optional[str] = Form(None, description="JSON object with live coaching session data (document_context, objectives, notes)"),
+    profile_id: Optional[str] = Form(None, description="Care profile ID (UUID) for Memory app multi-profile support"),
     auth: dict = Depends(flexible_auth),
 ):
     """
@@ -892,6 +893,7 @@ async def analyze(
                 profile=profile or "general",
                 reference_text=reference_text,
                 coach_session_data=coach_session_data,
+                profile_id=profile_id,
             )
         except RuntimeError as e:
             # R2 storage unavailable — read-only mode
