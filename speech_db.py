@@ -642,14 +642,16 @@ class SpeechDB:
         user_id: int = None,
         include_unowned: bool = False,
         unassigned: bool = False,
+        profile_id: str = None,
     ) -> list:
         """List speeches with optional filters. If user_id is set, only return that user's speeches.
-        If unassigned=True, only return speeches not assigned to any project."""
+        If unassigned=True, only return speeches not assigned to any project.
+        If profile_id is set, only return speeches for that care profile."""
         
         # Use Supabase for user data queries
         if USE_SUPABASE and SUPABASE_AVAILABLE:
             return self._list_speeches_supabase(
-                category, product, limit, offset, user_id, unassigned
+                category, product, limit, offset, user_id, unassigned, profile_id
             )
         
         # Explicitly select columns, excluding heavy cached_score_json (3.5KB avg)
@@ -688,7 +690,7 @@ class SpeechDB:
         return results
 
     def _list_speeches_supabase(
-        self, category, product, limit, offset, user_id, unassigned
+        self, category, product, limit, offset, user_id, unassigned, profile_id=None
     ) -> list:
         """List speeches from Supabase."""
         conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
@@ -706,6 +708,11 @@ class SpeechDB:
             if user_id:
                 query += " AND s.user_id = %s"
                 params.append(user_id)
+            
+            # Filter by profile_id for Memory app care profiles
+            if profile_id:
+                query += " AND s.profile_id = %s"
+                params.append(profile_id)
             
             if unassigned:
                 query += " AND s.project_id IS NULL"
@@ -730,8 +737,8 @@ class SpeechDB:
         finally:
             conn.close()
 
-    def count_speeches(self, user_id: int = None, include_unowned: bool = False, unassigned: bool = False) -> int:
-        """Total speech count, optionally filtered by user. If unassigned=True, only count unassigned."""
+    def count_speeches(self, user_id: int = None, include_unowned: bool = False, unassigned: bool = False, profile_id: str = None) -> int:
+        """Total speech count, optionally filtered by user/profile. If unassigned=True, only count unassigned."""
         # Use Supabase for user counts
         if USE_SUPABASE and SUPABASE_AVAILABLE:
             conn = psycopg2.connect(SUPABASE_URL, cursor_factory=RealDictCursor)
@@ -739,6 +746,9 @@ class SpeechDB:
                 cur = conn.cursor()
                 query = "SELECT COUNT(*) FROM speeches WHERE user_id = %s"
                 params = [user_id]
+                if profile_id:
+                    query += " AND profile_id = %s"
+                    params.append(profile_id)
                 if unassigned:
                     query += " AND project_id IS NULL"
                 cur.execute(query, params)

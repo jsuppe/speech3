@@ -1336,6 +1336,7 @@ async def delete_api_key(
 async def list_speeches(
     category: Optional[str] = Query(None),
     product: Optional[str] = Query(None),
+    profile_id: Optional[str] = Query(None, description="Filter by care profile ID (Memory app)"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     unassigned: bool = Query(False, description="Only return speeches not assigned to any project"),
@@ -1346,9 +1347,9 @@ async def list_speeches(
     user_id = auth.get("user_id")
     speeches = db.list_speeches(
         category=category, product=product, limit=limit, offset=offset, 
-        user_id=user_id, unassigned=unassigned
+        user_id=user_id, unassigned=unassigned, profile_id=profile_id
     )
-    total = db.count_speeches(user_id=user_id, unassigned=unassigned)
+    total = db.count_speeches(user_id=user_id, unassigned=unassigned, profile_id=profile_id)
     return {"speeches": speeches, "total": total, "limit": limit, "offset": offset}
 
 
@@ -7031,9 +7032,10 @@ async def get_dementia_metrics_aggregated(user: dict = Depends(flexible_auth)):
 @router.get("/dementia/recordings", tags=["Dementia"])
 async def get_dementia_recordings(
     limit: int = Query(100, ge=1, le=500),
+    profile_id: Optional[str] = Query(None, description="Filter by care profile ID"),
     user: dict = Depends(flexible_auth)
 ):
-    """Get all dementia assessment recordings."""
+    """Get all dementia assessment recordings. Filter by profile_id for per-profile history."""
     try:
         user_id = user.get("user_id") if user else None
         db = pipeline_runner.get_db()
@@ -7053,22 +7055,26 @@ async def get_dementia_recordings(
                 )
                 with psycopg2.connect(conn_str) as pg_conn:
                     with pg_conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        # Build query with optional profile_id filter
+                        query = """
+                            SELECT id, title, created_at, dementia_metrics, profile, profile_id
+                            FROM speeches
+                            WHERE profile = 'dementia'
+                        """
+                        params = []
+                        
                         if user_id:
-                            cur.execute("""
-                                SELECT id, title, created_at, dementia_metrics, profile
-                                FROM speeches
-                                WHERE user_id = %s AND profile = 'dementia'
-                                ORDER BY created_at DESC
-                                LIMIT %s
-                            """, (user_id, limit))
-                        else:
-                            cur.execute("""
-                                SELECT id, title, created_at, dementia_metrics, profile
-                                FROM speeches
-                                WHERE profile = 'dementia'
-                                ORDER BY created_at DESC
-                                LIMIT %s
-                            """, (limit,))
+                            query += " AND user_id = %s"
+                            params.append(user_id)
+                        
+                        if profile_id:
+                            query += " AND profile_id = %s"
+                            params.append(profile_id)
+                        
+                        query += " ORDER BY created_at DESC LIMIT %s"
+                        params.append(limit)
+                        
+                        cur.execute(query, params)
                         
                         rows = cur.fetchall()
                         for row in rows:
