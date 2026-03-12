@@ -4635,6 +4635,7 @@ async def analyze_dementia_conversation(
     - segments: List of {text, speaker, start, end} objects
     """
     user_id = auth.get("user_id")
+    logger.info(f"Dementia analyze: auth={auth}, user_id={user_id}, speech_id={request.speech_id}")
     
     segments = request.segments
     
@@ -4647,7 +4648,9 @@ async def analyze_dementia_conversation(
         if not speech:
             return _error(404, "NOT_FOUND", "Speech not found")
         
-        if speech.get("user_id") and speech.get("user_id") != user_id:
+        logger.info(f"Dementia analyze: speech.user_id={speech.get('user_id')}, auth.user_id={user_id}")
+        # API keys (user_id=None) have admin access; JWT users must own the speech
+        if user_id is not None and speech.get("user_id") and speech.get("user_id") != user_id:
             return _error(403, "FORBIDDEN", "Not authorized to access this speech")
         
         # Get analysis result (contains transcript and optionally diarization)
@@ -4690,18 +4693,20 @@ async def analyze_dementia_conversation(
         if not row:
             return _error(404, "NOT_FOUND", "No analysis found for this speech")
         
-        # Parse the result JSON
-        try:
-            result_data = json.loads(row[0]) if row[0] else {}
-        except:
-            result_data = {}
+        # Parse the result JSON (may already be dict from Postgres JSONB)
+        result_data = row[0] if row[0] else {}
+        if isinstance(result_data, str):
+            try:
+                result_data = json.loads(result_data)
+            except:
+                result_data = {}
         
         transcript = result_data.get("transcript", "")
-        diarization = result_data.get("diarization", [])
+        raw_segments = result_data.get("segments", [])
         
-        # Use diarization segments if available
-        if diarization:
-            segments = diarization
+        # Use transcription segments (with speaker info from diarization)
+        if raw_segments:
+            segments = raw_segments
         # Fallback: create single segment from transcript
         elif transcript:
             segments = [{"text": transcript, "speaker": "Speaker 1", "start": 0, "end": 0}]
