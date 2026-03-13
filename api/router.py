@@ -701,12 +701,9 @@ async def analyze(
     if mod_error is not None:
         return mod_error
     
-    # Dementia profile requires diarization for speaker tracking
-    if profile and profile.lower() == "dementia":
-        resolved_modules.add("diarization")
-        if "diarization" not in modules_requested:
-            modules_requested = modules_requested + ["diarization"]
-            logger.info("Auto-added diarization for dementia profile")
+    # Dementia profile: single-speaker cognitive assessment
+    # No diarization needed - use transcription segments directly
+    # (Diarization caused false multi-speaker detection with single person)
 
     # --- Validate quality_gate ---
     qg = config.DEFAULT_QUALITY_GATE
@@ -912,6 +909,59 @@ async def analyze(
                     usage_limiter.record_usage(user_id, audio_minutes)
                 except Exception as e:
                     logger.warning(f"Failed to record usage for user {user_id}: {e}")
+
+        # Run inline dementia analysis for dementia profile
+        # Uses transcription segments (no diarization needed for single-speaker cognitive tests)
+        if profile and profile.lower() == "dementia":
+            try:
+                from .dementia_analysis import analyze_dementia_markers
+                
+                # Use transcription segments with timestamps from Whisper
+                raw_segments = result.get("segments", [])
+                if raw_segments:
+                    segments = [
+                        {**seg, "speaker": seg.get("speaker", "Speaker 1")}
+                        for seg in raw_segments
+                    ]
+                else:
+                    segments = [{"text": transcript, "speaker": "Speaker 1", "start": 0, "end": 0}]
+                
+                dementia_result = analyze_dementia_markers(
+                    segments=segments,
+                    repetition_threshold=0.70,
+                    min_segment_gap=2,
+                )
+                result["dementia_analysis"] = dementia_result
+                
+                # Save dementia_metrics to database
+                if speech_id:
+                    dementia_metrics = {
+                        "prepositions_per_10_words": dementia_result.get("preposition_analysis", {}).get("prepositions_per_10_words", 0),
+                        "preposition_count": dementia_result.get("preposition_analysis", {}).get("preposition_count", 0),
+                        "word_count": dementia_result.get("preposition_analysis", {}).get("word_count", 0),
+                        "repetition_count": len(dementia_result.get("repetitions", [])),
+                        "aphasic_events": len(dementia_result.get("aphasic_events", [])),
+                        "aphasic_confidence": dementia_result.get("aphasic_confidence", 0),
+                        "num_speakers": 1,  # Single speaker assumed
+                        "pause_metrics": dementia_result.get("pause_metrics", {}),
+                    }
+                    try:
+                        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+                        db = pipeline_runner.get_db()
+                        if USE_SUPABASE and SUPABASE_AVAILABLE:
+                            from .supabase_client import get_supabase
+                            sb = get_supabase()
+                            sb.table("speeches").update({"dementia_metrics": dementia_metrics}).eq("id", speech_id).execute()
+                        else:
+                            db.conn.execute(
+                                "UPDATE speeches SET dementia_metrics = ? WHERE id = ?",
+                                (json.dumps(dementia_metrics), speech_id)
+                            )
+                            db.conn.commit()
+                    except Exception as e:
+                        logger.warning(f"Failed to save dementia_metrics for speech_id={speech_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Dementia analysis failed: {e}")
 
         logger.info(
             f"Completed: {audio.filename} | "
@@ -4989,14 +5039,19 @@ async def analyze_test_recording(
         if request.profile == "dementia":
             from .dementia_analysis import analyze_dementia_markers
             
-            # Build segments from transcript
-            transcript = result.get("transcript", "")
-            segments = [{"text": transcript, "speaker": "Speaker 1", "start": 0, "end": 0}]
-            
-            # Use diarization if available
-            diarization = result.get("diarization", [])
-            if diarization:
-                segments = diarization
+            # Use transcription segments (already have start/end timestamps from Whisper)
+            # Single speaker assumed - no diarization needed for cognitive assessments
+            raw_segments = result.get("segments", [])
+            if raw_segments:
+                # Add default speaker label to transcription segments
+                segments = [
+                    {**seg, "speaker": seg.get("speaker", "Speaker 1")}
+                    for seg in raw_segments
+                ]
+            else:
+                # Fallback: create single segment from full transcript
+                transcript = result.get("transcript", "")
+                segments = [{"text": transcript, "speaker": "Speaker 1", "start": 0, "end": 0}]
             
             dementia_result = analyze_dementia_markers(
                 segments=segments,
