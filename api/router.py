@@ -935,14 +935,22 @@ async def analyze(
                 
                 # Save dementia_metrics to database
                 if speech_id:
+                    # Extract metrics from speaker data (single speaker for Memory app)
+                    speakers = dementia_result.get("speakers", {})
+                    speaker_data = list(speakers.values())[0] if speakers else {}
+                    speaker_metrics = speaker_data.get("metrics", {})
+                    preposition_analysis = speaker_data.get("preposition_analysis", {})
+                    repetition_analysis = speaker_data.get("repetition_analysis", {})
+                    aphasic_analysis = speaker_data.get("aphasic_analysis", {})
+                    
                     dementia_metrics = {
-                        "prepositions_per_10_words": dementia_result.get("preposition_analysis", {}).get("prepositions_per_10_words", 0),
-                        "preposition_count": dementia_result.get("preposition_analysis", {}).get("preposition_count", 0),
-                        "word_count": dementia_result.get("preposition_analysis", {}).get("word_count", 0),
-                        "repetition_count": len(dementia_result.get("repetitions", [])),
-                        "aphasic_events": len(dementia_result.get("aphasic_events", [])),
-                        "aphasic_confidence": dementia_result.get("aphasic_confidence", 0),
-                        "num_speakers": 1,  # Single speaker assumed
+                        "prepositions_per_10_words": speaker_metrics.get("prepositions_per_10_words", 0) or preposition_analysis.get("rate_per_10_words", 0),
+                        "preposition_count": preposition_analysis.get("preposition_count", 0),
+                        "word_count": preposition_analysis.get("word_count", 0) or speaker_data.get("total_words", 0),
+                        "repetition_count": repetition_analysis.get("total_repetition_count", 0),
+                        "aphasic_events": aphasic_analysis.get("event_count", 0),
+                        "aphasic_confidence": aphasic_analysis.get("confidence_score", 0),
+                        "num_speakers": len(speakers),
                         "pause_metrics": dementia_result.get("pause_metrics", {}),
                     }
                     try:
