@@ -4835,12 +4835,27 @@ async def analyze_dementia_conversation(
             }
             
             # Update speech record with dementia metrics and set profile to 'dementia'
-            cursor.execute("""
-                UPDATE speeches 
-                SET dementia_metrics = ?, profile = 'dementia'
-                WHERE id = ?
-            """, (json.dumps(dementia_metrics), request.speech_id))
-            conn.commit()
+            from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+            if USE_SUPABASE and SUPABASE_AVAILABLE:
+                try:
+                    from .supabase_client import get_connection
+                    with get_connection() as pg_conn:
+                        with pg_conn.cursor() as pg_cur:
+                            pg_cur.execute(
+                                "UPDATE speeches SET dementia_metrics = %s, profile = 'dementia' WHERE id = %s",
+                                (json.dumps(dementia_metrics), request.speech_id)
+                            )
+                        pg_conn.commit()
+                    logger.info(f"Saved dementia_metrics for speech_id={request.speech_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to save dementia_metrics to Supabase: {e}")
+            else:
+                cursor.execute("""
+                    UPDATE speeches 
+                    SET dementia_metrics = ?, profile = 'dementia'
+                    WHERE id = ?
+                """, (json.dumps(dementia_metrics), request.speech_id))
+                conn.commit()
         
         return {
             "success": True,
