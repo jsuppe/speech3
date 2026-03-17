@@ -955,12 +955,18 @@ async def analyze(
                     }
                     try:
                         from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
-                        db = pipeline_runner.get_db()
                         if USE_SUPABASE and SUPABASE_AVAILABLE:
-                            from .supabase_client import get_supabase
-                            sb = get_supabase()
-                            sb.table("speeches").update({"dementia_metrics": dementia_metrics}).eq("id", speech_id).execute()
+                            from .supabase_client import get_connection
+                            with get_connection() as pg_conn:
+                                with pg_conn.cursor() as cur:
+                                    cur.execute(
+                                        "UPDATE speeches SET dementia_metrics = %s WHERE id = %s",
+                                        (json.dumps(dementia_metrics), speech_id)
+                                    )
+                                pg_conn.commit()
+                            logger.info(f"Saved dementia_metrics for speech_id={speech_id}")
                         else:
+                            db = pipeline_runner.get_db()
                             db.conn.execute(
                                 "UPDATE speeches SET dementia_metrics = ? WHERE id = ?",
                                 (json.dumps(dementia_metrics), speech_id)
@@ -7297,6 +7303,7 @@ async def get_dementia_recordings(
                                 "title": row.get('title', 'Untitled'),
                                 "created_at": str(row.get('created_at')) if row.get('created_at') else None,
                                 "dementia_metrics": dementia_metrics,
+                                "profile_id": row.get('profile_id'),
                                 "transcript": "",  # Skip transcript for list view
                             })
                         
