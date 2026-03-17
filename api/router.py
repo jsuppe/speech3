@@ -7469,6 +7469,49 @@ async def get_dementia_flagged_segments(speech_id: int, user: dict = Depends(fle
         
         flagged_segments = []
         
+        # Run full dementia analysis to get repetitions
+        from .dementia_analysis import analyze_dementia_markers, detect_aphasic_events
+        
+        # Format segments for analysis
+        analysis_segments = [
+            {**seg, "speaker": seg.get("speaker", "Speaker 1")}
+            for seg in segments
+        ]
+        
+        dementia_result = analyze_dementia_markers(
+            segments=analysis_segments,
+            repetition_threshold=0.70,
+            min_segment_gap=2,
+        )
+        
+        # Extract repetition segment indices from analysis
+        repetition_segments = {}  # segment_idx -> repetition info
+        speakers_data = dementia_result.get("speakers", {})
+        for speaker_id, speaker_data in speakers_data.items():
+            rep_analysis = speaker_data.get("repetition_analysis", {})
+            for rep in rep_analysis.get("repeated_concepts", []):
+                concept = rep.get("concept_1", rep.get("concept", ""))
+                for seg_idx in rep.get("segments", []):
+                    if seg_idx not in repetition_segments:
+                        repetition_segments[seg_idx] = []
+                    repetition_segments[seg_idx].append({
+                        "type": "repeated_concept",
+                        "concept": concept,
+                        "similarity": rep.get("similarity", 0),
+                        "concern_score": rep.get("concern_score", 0),
+                    })
+            for rep in rep_analysis.get("repeated_questions", []):
+                concept = rep.get("concept_1", rep.get("concept", ""))
+                for seg_idx in rep.get("segments", []):
+                    if seg_idx not in repetition_segments:
+                        repetition_segments[seg_idx] = []
+                    repetition_segments[seg_idx].append({
+                        "type": "repeated_question",
+                        "concept": concept,
+                        "similarity": rep.get("similarity", 0),
+                        "concern_score": rep.get("concern_score", 0),
+                    })
+        
         for i, seg in enumerate(segments):
             seg_text = seg.get('text', '')
             seg_start = seg.get('start', 0)
@@ -7478,6 +7521,17 @@ async def get_dementia_flagged_segments(speech_id: int, user: dict = Depends(fle
             aphasic_result = detect_aphasic_events(seg_text)
             events = aphasic_result.get('events', [])
             confidence = aphasic_result.get('confidence_score', 0)
+            
+            # Check if this segment is part of a repetition
+            if i in repetition_segments:
+                for rep_info in repetition_segments[i]:
+                    events.append({
+                        'type': 'repetition',
+                        'marker': rep_info.get("concept", seg_text[:50]),
+                        'confidence': rep_info.get("concern_score", 0.8),
+                        'repetition_type': rep_info.get("type"),
+                    })
+                    confidence = max(confidence, rep_info.get("concern_score", 0.8))
             
             # Flag segment if it has events or high confidence
             if events or confidence > 0.3:
