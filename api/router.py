@@ -7599,21 +7599,46 @@ async def save_dementia_annotations(
     """
     try:
         user_id = user.get("user_id") if user else None
+        
+        # Verify speech exists and user has access
+        speech_exists = False
+        from speech_db import USE_SUPABASE, SUPABASE_AVAILABLE
+        if USE_SUPABASE and SUPABASE_AVAILABLE:
+            try:
+                from .supabase_client import get_connection
+                with get_connection() as pg_conn:
+                    with pg_conn.cursor() as cur:
+                        if user_id:
+                            cur.execute(
+                                "SELECT id FROM speeches WHERE id = %s AND user_id = %s",
+                                (speech_id, user_id)
+                            )
+                        else:
+                            cur.execute("SELECT id FROM speeches WHERE id = %s", (speech_id,))
+                        speech_exists = cur.fetchone() is not None
+            except Exception as e:
+                logger.warning(f"Supabase check failed: {e}")
+        
+        if not speech_exists:
+            # Fall back to SQLite
+            db = pipeline_runner.get_db()
+            conn = db.conn
+            cursor = conn.cursor()
+            if user_id:
+                cursor.execute(
+                    "SELECT id FROM speeches WHERE id = ? AND user_id = ?",
+                    (speech_id, user_id)
+                )
+            else:
+                cursor.execute("SELECT id FROM speeches WHERE id = ?", (speech_id,))
+            speech_exists = cursor.fetchone() is not None
+        
+        if not speech_exists:
+            return _error(404, "NOT_FOUND", "Recording not found")
+        
         db = pipeline_runner.get_db()
         conn = db.conn
         cursor = conn.cursor()
-        
-        # Verify speech exists and user has access
-        if user_id:
-            cursor.execute(
-                "SELECT id FROM speeches WHERE id = ? AND user_id = ?",
-                (speech_id, user_id)
-            )
-        else:
-            cursor.execute("SELECT id FROM speeches WHERE id = ?", (speech_id,))
-        
-        if not cursor.fetchone():
-            return _error(404, "NOT_FOUND", "Recording not found")
         
         # Create annotations table if not exists
         cursor.execute("""
